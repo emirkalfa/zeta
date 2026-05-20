@@ -51,7 +51,7 @@ def get_airfoil(airfoil_id):
     conn = get_db()
     airfoil = conn.execute('SELECT * FROM airfoils WHERE id=?', (airfoil_id,)).fetchone()
     coords = conn.execute(
-        'SELECT x, y_upper, y_lower FROM airfoil_coordinates WHERE airfoil_id=? ORDER BY x',
+        'SELECT x, y_upper, y_lower FROM airfoil_coordinates WHERE airfoil_id=? ORDER BY rowid',
         (airfoil_id,)
     ).fetchall()
     conn.close()

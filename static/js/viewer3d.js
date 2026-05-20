@@ -111,10 +111,9 @@ function buildWing(geom, coords, junction) {
   const wingPos = geom.wing_position_offset || 0;
 
   const nSections = 35;
-  const foilX = coords.map(c => c.x);
-  const foilY = coords.map(c => c.y_upper);
-  // Make it symmetric for lower
   const nHalf = Math.floor(coords.length / 2);
+  // Upper surface: rows 0 to nHalf-1 (LE to TE), use y_upper
+  // Lower surface: rows 2*nHalf-1 down to nHalf (TE to LE), use y_lower
   const uIdx = Array.from({length: nHalf}, (_, i) => i);
   const lIdx = Array.from({length: nHalf}, (_, i) => coords.length - 1 - i);
 
@@ -131,16 +130,16 @@ function buildWing(geom, coords, junction) {
       // Upper surface
       for (const idx of uIdx) {
         pts.push(new THREE.Vector3(
-          foilX[idx] * chord + xOff,
-          foilY[idx] * chord + wingPos,
+          coords[idx].x * chord + xOff,
+          coords[idx].y_upper * chord + wingPos,
           sign * (yPos + zOff)
         ));
       }
-      // Lower surface (reverse order)
+      // Lower surface (reversed from TE to LE, using y_lower which is negative)
       for (const idx of lIdx) {
         pts.push(new THREE.Vector3(
-          foilX[idx] * chord + xOff,
-          -foilY[idx] * chord + wingPos, // symmetric - positive foilY becomes lower surface negative
+          coords[idx].x * chord + xOff,
+          coords[idx].y_lower * chord + wingPos,
           sign * (yPos + zOff)
         ));
       }
@@ -285,29 +284,33 @@ function buildFuselage(geom) {
 
 function buildTail(geom, coords, tailType) {
   const nSections = 20;
-  const foilX = coords.map(c => c.x);
-  const foilY = coords.map(c => c.y_upper);
   const nHalf = Math.floor(coords.length / 2);
   const uIdx = Array.from({length: nHalf}, (_, i) => i);
   const lIdx = Array.from({length: nHalf}, (_, i) => coords.length - 1 - i);
   const arm = geom.htail_arm || geom.fuselage_length * 0.75;
 
-  const buildHalfSurface = (sections, sign) => {
-    const nPts = sections[0].length;
+  const getPt = (idx, chord, xOff, yScale, sign, zPos) => {
+    const isUpper = idx < nHalf;
+    return new THREE.Vector3(
+      coords[idx].x * chord + xOff,
+      (isUpper ? coords[idx].y_upper : coords[idx].y_lower) * chord * yScale,
+      sign * zPos
+    );
+  };
+
+  const makeHalfSurface = (secs) => {
+    const nPts = secs[0].length;
     const verts = [];
     const idxs = [];
-    for (const sec of sections) {
+    for (const sec of secs) {
       for (const p of sec) { verts.push(p.x, p.y, p.z); }
     }
-    for (let i = 0; i < sections.length - 1; i++) {
+    for (let i = 0; i < secs.length - 1; i++) {
       for (let j = 0; j < nPts; j++) {
         const jn = (j + 1) % nPts;
-        const a = i * nPts + j;
-        const b = i * nPts + jn;
-        const c = (i + 1) * nPts + j;
-        const d = (i + 1) * nPts + jn;
-        idxs.push(a, b, c);
-        idxs.push(b, d, c);
+        const a = i * nPts + j, b = i * nPts + jn;
+        const c = (i + 1) * nPts + j, d = (i + 1) * nPts + jn;
+        idxs.push(a, b, c); idxs.push(b, d, c);
       }
     }
     const g = new THREE.BufferGeometry();
@@ -317,11 +320,9 @@ function buildTail(geom, coords, tailType) {
     return g;
   };
 
-  // Horizontal tail
-  const hSpan = geom.htail_span / 2;
-  const hChord = geom.htail_chord;
-
-  const makeHTailHalf = (sign) => {
+  const buildHTailHalf = (sign) => {
+    const hSpan = geom.htail_span / 2;
+    const hChord = geom.htail_chord;
     const secs = [];
     for (let i = 0; i <= nSections; i++) {
       const eta = i / nSections;
@@ -329,80 +330,59 @@ function buildTail(geom, coords, tailType) {
       const chord = hChord * (1 - eta * 0.3);
       const xOff = arm + yPos * Math.tan(THREE.MathUtils.degToRad(3));
       const pts = [];
-      for (const idx of uIdx) {
-        pts.push(new THREE.Vector3(foilX[idx] * chord + xOff, foilY[idx] * chord * 0.8, sign * yPos));
-      }
-      for (const idx of lIdx) {
-        pts.push(new THREE.Vector3(foilX[idx] * chord + xOff, -foilY[idx] * chord * 0.8, sign * yPos));
-      }
+      for (const idx of uIdx) pts.push(getPt(idx, chord, xOff, 0.8, sign, yPos));
+      for (const idx of lIdx) pts.push(getPt(idx, chord, xOff, 0.8, sign, yPos));
       secs.push(pts);
     }
     return secs;
   };
 
   if (tailType === 'ttail') {
-    // T-tail - horizontal at top of vertical
-    // First build vertical
-    buildVTail(geom, foilX, foilY, uIdx, lIdx, nSections, arm);
-    // Then horizontal at top
-    const hSecRight = makeHTailHalf(1);
-    const hSecLeft = makeHTailHalf(-1);
-    const hSpan2 = geom.htail_span / 2;
-
-    // Move horizontal to top of vertical
-    for (const sec of [...hSecRight, ...hSecLeft]) {
-      for (const p of sec) {
-        p.z += geom.vtail_span * 0.5;
-      }
-    }
-
-    const allSecs = [...hSecRight, ...hSecLeft.reverse()];
-    for (const sec of allSecs) {
-      for (const p of sec) {
-        p.y += geom.vtail_span * 0.3;
-      }
-    }
-
-    addSurface(allSecs, 0xf59e0b, tailGroup);
+    buildVTail(geom, nHalf, uIdx, lIdx, nSections, arm, coords);
 
   } else if (tailType === 'vtail') {
-    // V-tail - two surfaces at an angle
     const vAngle = THREE.MathUtils.degToRad(35);
     const vHalfSpan = geom.vtail_span * 0.7;
     for (const sign of [-1, 1]) {
       const secs = [];
       for (let i = 0; i <= nSections; i++) {
         const eta = i / nSections;
-        const chord = hChord * (1 - eta * 0.3);
+        const chord = geom.htail_chord * (1 - eta * 0.3);
         const xOff = arm + eta * vHalfSpan * Math.tan(THREE.MathUtils.degToRad(5));
         const rLen = eta * vHalfSpan;
         const pts = [];
         for (const idx of uIdx) {
-          pts.push(new THREE.Vector3(
-            foilX[idx] * chord + xOff,
-            foilY[idx] * chord * 0.8 + rLen * Math.sin(vAngle) * 0.3,
-            sign * rLen * Math.cos(vAngle)
-          ));
+          const p = getPt(idx, chord, xOff, 0.8, 1, 0);
+          p.y += rLen * Math.sin(vAngle) * 0.3;
+          p.z = sign * rLen * Math.cos(vAngle);
+          pts.push(p);
         }
         for (const idx of lIdx) {
-          pts.push(new THREE.Vector3(
-            foilX[idx] * chord + xOff,
-            -foilY[idx] * chord * 0.8 + rLen * Math.sin(vAngle) * 0.3,
-            sign * rLen * Math.cos(vAngle)
-          ));
+          const p = getPt(idx, chord, xOff, 0.8, 1, 0);
+          p.y += rLen * Math.sin(vAngle) * 0.3;
+          p.z = sign * rLen * Math.cos(vAngle);
+          pts.push(p);
         }
         secs.push(pts);
       }
-      addSurface(secs, 0xf59e0b, tailGroup);
+      const g = makeHalfSurface(secs);
+      const m = new THREE.MeshPhongMaterial({ color: 0xf59e0b, side: THREE.DoubleSide });
+      tailGroup.add(new THREE.Mesh(g, m));
+      const eg = new THREE.EdgesGeometry(g);
+      tailGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x92400e, transparent: true, opacity: 0.25 })));
     }
 
   } else {
-    // Conventional - build horizontal and vertical separately
-    const hSecRight = makeHTailHalf(1);
-    const hSecLeft = makeHTailHalf(-1);
-    const hAll = [...hSecRight, ...hSecLeft.reverse()];
-    addSurface(hAll, 0xf59e0b, tailGroup);
-    buildVTail(geom, foilX, foilY, uIdx, lIdx, nSections, arm);
+    // Conventional
+    const hRight = buildHTailHalf(1);
+    const hLeft = buildHTailHalf(-1);
+    const all = [...hRight, ...hLeft.reverse()];
+    const g = makeHalfSurface(all);
+    const m = new THREE.MeshPhongMaterial({ color: 0xf59e0b, side: THREE.DoubleSide });
+    tailGroup.add(new THREE.Mesh(g, m));
+    const eg = new THREE.EdgesGeometry(g);
+    tailGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x92400e, transparent: true, opacity: 0.25 })));
+    buildVTail(geom, nHalf, uIdx, lIdx, nSections, arm, coords);
   }
 }
 
@@ -438,10 +418,9 @@ function addSurface(sections, color, group) {
   group.add(new THREE.LineSegments(edgeGeo, edgeMat));
 }
 
-function buildVTail(geom, foilX, foilY, uIdx, lIdx, nSections, arm) {
+function buildVTail(geom, nHalf, uIdx, lIdx, nSections, arm, coords) {
   const vSpan = geom.vtail_span;
   const vChord = geom.vtail_chord;
-
   const secs = [];
   for (let i = 0; i <= nSections; i++) {
     const eta = i / nSections;
@@ -449,27 +428,21 @@ function buildVTail(geom, foilX, foilY, uIdx, lIdx, nSections, arm) {
     const xOff = arm + 0.2 + eta * vSpan * Math.tan(THREE.MathUtils.degToRad(5));
     const zPos = eta * vSpan;
     const pts = [];
-    // Right side of vertical tail
+    // Right side
     for (const idx of uIdx) {
-      pts.push(new THREE.Vector3(foilX[idx] * chord + xOff, foilY[idx] * chord * 0.5, zPos));
+      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_upper * chord * 0.5, zPos));
     }
     for (const idx of lIdx) {
-      pts.push(new THREE.Vector3(foilX[idx] * chord + xOff, -foilY[idx] * chord * 0.5, zPos));
+      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_lower * chord * 0.5, zPos));
     }
     secs.push(pts);
   }
-
-  // Mirror for left side
   const allSecs = [];
   for (const sec of secs) {
-    const leftPts = sec.map(p => new THREE.Vector3(p.x, -p.y, p.z));
-    allSecs.push(leftPts);
+    allSecs.push(sec.map(p => new THREE.Vector3(p.x, -p.y, p.z)));
   }
   allSecs.reverse();
-  for (const sec of secs) {
-    allSecs.push(sec);
-  }
-
+  for (const sec of secs) allSecs.push(sec);
   addSurface(allSecs, 0xf59e0b, tailGroup);
 }
 
