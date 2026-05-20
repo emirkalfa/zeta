@@ -21,11 +21,11 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     fuse_max_height = 0.12 * wingspan
 
     htail_span = 0.35 * wingspan
-    htail_chord = 0.35 * mac
+    htail_chord = 0.40 * root_chord
     htail_area = htail_span * htail_chord
 
     vtail_span = 0.20 * wingspan
-    vtail_chord = 0.40 * mac
+    vtail_chord = 0.35 * root_chord
     vtail_area = vtail_span * vtail_chord
 
     cg_position = 0.25 * mac
@@ -38,6 +38,11 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'mid': 0.0,
         'high': fuse_max_height * 0.4,
     }
+
+    # Positioning (for 3D model)
+    wing_x_pos = 0.35 * fuse_length
+    tail_x_pos = 0.82 * fuse_length
+    htail_arm = tail_x_pos - wing_x_pos
 
     result = {
         'wingspan': round(wingspan, 3),
@@ -62,13 +67,15 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'htail_span': round(htail_span, 3),
         'htail_chord': round(htail_chord, 3),
         'htail_area': round(htail_area, 3),
-        'htail_arm': round(fuse_length * 0.75, 3),
+        'htail_arm': round(htail_arm, 3),
         'vtail_span': round(vtail_span, 3),
         'vtail_chord': round(vtail_chord, 3),
         'vtail_area': round(vtail_area, 3),
         'cg_position': round(cg_position, 3),
         'span_efficiency': span_efficiency,
         'taper_ratio_input': taper_ratio,
+        'wing_x_pos': round(wing_x_pos, 3),
+        'tail_x_pos': round(tail_x_pos, 3),
     }
 
     return result
