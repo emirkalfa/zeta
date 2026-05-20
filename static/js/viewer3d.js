@@ -80,16 +80,18 @@ function addAxes(fuseLen) {
 
 function makeTextSprite(text, color) {
   const c = document.createElement('canvas');
-  c.width = 64; c.height = 64;
+  c.width = 32; c.height = 32;
   const ctx = c.getContext('2d');
-  ctx.font = 'Bold 40px Arial';
+  ctx.font = 'Bold 22px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
-  ctx.fillText(text, 32, 32);
+  ctx.fillText(text, 16, 16);
   const tex = new THREE.CanvasTexture(c);
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-  return new THREE.Sprite(mat);
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.18, 0.18, 1);
+  return sprite;
 }
 
 // --- WING ---
