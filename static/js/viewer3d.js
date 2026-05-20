@@ -177,6 +177,8 @@ function buildFuselage(geom, fuseType) {
   const nCirc = 36;
   const verts = [];
   const idxs = [];
+  // Wing root position along fuselage for waist narrowing
+  const wingEta = (geom.wing_x_pos || 0.35 * L) / L;
 
   // Smoothstep: C1-continuous cubic blend
   const ss = (t) => t * t * (3 - 2 * t);
@@ -289,7 +291,15 @@ function buildFuselage(geom, fuseType) {
   for (let i = 0; i <= nSpan; i++) {
     const eta = i / nSpan;
     const xPos = eta * L;
-    const { ws, hs } = profile(eta, fuseType);
+    let { ws, hs } = profile(eta, fuseType);
+
+    // Waist: gövde kanat birleşim noktasında incelme
+    const dw = (eta - wingEta) / 0.10;
+    if (Math.abs(dw) < 1) {
+      const bell = 1 - Math.cos(dw * Math.PI) / 2;
+      ws *= 1 - 0.06 * bell;
+      hs *= 1 - 0.02 * bell;
+    }
 
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
