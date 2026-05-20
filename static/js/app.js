@@ -213,21 +213,30 @@ async function getAirfoilId(code) {
 
 function displayResults(geom) {
   const items = [
+    { label: 'Kanat Açıklığı', value: geom.wingspan + ' m', key: '' },
     { label: 'Kök Veter', value: geom.root_chord + ' m', key: 'root_chord' },
     { label: 'Uç Veter', value: geom.tip_chord + ' m', key: 'tip_chord' },
     { label: 'MAC', value: geom.mac + ' m', key: 'mac' },
     { label: 'Kanat Alanı', value: geom.wing_area + ' m²', key: 'wing_area' },
-    { label: 'Açıklık Oranı', value: geom.aspect_ratio, key: 'aspect_ratio' },
+    { label: 'Açıklık Oranı (AR)', value: geom.aspect_ratio, key: 'aspect_ratio' },
     { label: 'Daralma Oranı', value: geom.taper_ratio, key: 'taper_ratio' },
     { label: 'Ok Açısı', value: geom.sweep_angle + '°', key: 'sweep_angle' },
     { label: 'Dihedral', value: geom.dihedral_angle + '°', key: 'dihedral_angle' },
+    { label: 'Kanat Konumu', value: geom.wing_position === 'low' ? 'Alçak' : geom.wing_position === 'high' ? 'Yüksek' : 'Orta', key: '' },
+    { label: 'Kanat X Pozisyonu', value: geom.wing_x_pos + ' m', key: '' },
     { label: 'Gövde Uzunluğu', value: geom.fuselage_length + ' m', key: 'fuselage_length' },
     { label: 'Gövde Genişliği', value: geom.fuselage_max_width + ' m', key: 'fuselage_max_width' },
     { label: 'Gövde Yüksekliği', value: geom.fuselage_max_height + ' m', key: 'fuselage_max_height' },
     { label: 'Yatay Kuyruk Açıklığı', value: geom.htail_span + ' m', key: 'htail_span' },
+    { label: 'Yatay Kuyruk Veteri', value: geom.htail_chord + ' m', key: '' },
+    { label: 'Yatay Kuyruk Alanı', value: geom.htail_area + ' m²', key: '' },
+    { label: 'Kuyruk Kolu (Arm)', value: geom.htail_arm + ' m', key: '' },
+    { label: 'Kuyruk X Pozisyonu', value: geom.tail_x_pos + ' m', key: '' },
     { label: 'Dikey Kuyruk Açıklığı', value: geom.vtail_span + ' m', key: 'vtail_span' },
+    { label: 'Dikey Kuyruk Veteri', value: geom.vtail_chord + ' m', key: '' },
+    { label: 'Dikey Kuyruk Alanı', value: geom.vtail_area + ' m²', key: '' },
     { label: 'CG Pozisyonu', value: geom.cg_position + ' m', key: 'cg_position' },
-    { label: 'Kanat Konumu', value: geom.wing_position === 'low' ? 'Alçak' : geom.wing_position === 'high' ? 'Yüksek' : 'Orta', key: '' },
+    { label: 'Kanat Yüklemesi', value: (geom.weight / geom.wing_area).toFixed(2) + ' kg/m²', key: '' },
     { label: 'Kuyruk Tipi', value: geom.tail_type === 'ttail' ? 'T-tail' : geom.tail_type === 'vtail' ? 'V-tail' : 'Konvansiyonel', key: '' },
   ];
 
