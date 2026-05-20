@@ -242,19 +242,18 @@ function buildFuselage(geom, fuseType) {
   };
 
   // — Cross-section shape for each type —
+  // Y = vertical (up), Z = spanwise (horizontal)
   const crossSection = (ws, hs, th, type) => {
     const ct = Math.cos(th);
     const st = Math.sin(th);
-    const w = W / 2 * ws;
-    const h = H / 2 * hs;
+    const w = W / 2 * ws;  // half-width (spanwise)
+    const h = H / 2 * hs;  // half-height (vertical)
 
     if (type === 'cessna') {
       // Hemispherical top, flat bottom
-      // Top half (st > 0): circular
-      // Bottom half (st < 0): transitions to flat
       const topR = st >= 0 ? 1 : 1 - 0.35 * (-st) * (1 - Math.abs(ct) * 0.5);
-      const y = w * ct * (st >= 0 ? 1 : 1 - 0.15 * (1 - Math.abs(ct)));
-      const z = st >= 0 ? h * st * topR : h * st * topR * 0.5;
+      const y = st >= 0 ? h * st * topR : h * st * topR * 0.5;
+      const z = w * ct * (st >= 0 ? 1 : 1 - 0.15 * (1 - Math.abs(ct)));
       return { y, z };
     }
 
@@ -262,14 +261,14 @@ function buildFuselage(geom, fuseType) {
       // Flat bottom, rounded top, bulging sides
       const sideBulge = 1 + 0.12 * (1 - Math.abs(ct));
       const flatBot = st < -0.15 ? 0.7 + 0.3 * (st + 0.15) / 0.85 : 1;
-      const y = w * ct * sideBulge * flatBot;
-      const z = h * st * (st > 0 ? 1.0 : 0.6);
+      const y = h * st * (st > 0 ? 1.0 : 0.6);
+      const z = w * ct * sideBulge * flatBot;
       return { y, z };
     }
 
     // Cirrus: smooth elliptical, slightly flattened bottom
     const squeeze = st < -0.2 ? 0.85 : st > 0.2 ? 1 : 1 - 0.15 * (0.2 - Math.abs(st)) / 0.2;
-    return { y: w * ct * squeeze, z: h * st };
+    return { y: h * st, z: w * ct * squeeze };
   };
 
   for (let i = 0; i <= nSpan; i++) {
