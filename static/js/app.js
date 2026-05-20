@@ -130,6 +130,15 @@ function setupEventListeners() {
   $('stlWing').addEventListener('click', () => exportSTL('wing'));
   $('stlFuselage').addEventListener('click', () => exportSTL('fuselage'));
   $('stlTail').addEventListener('click', () => exportSTL('tail'));
+
+  // Auto-switch wing position when fuselage type changes
+  document.querySelectorAll('input[name="fuse_type"]').forEach(el => {
+    el.addEventListener('change', () => {
+      const map = { cessna: 'high', cirrus: 'low', gulfstream: 'low' };
+      const wp = map[el.value] || 'mid';
+      document.querySelector(`input[name="wing_pos"][value="${wp}"]`).checked = true;
+    });
+  });
 }
 
 async function calculateAll() {
@@ -166,7 +175,7 @@ async function calculateAll() {
 
     // Calculate geometry
     state.geometry = await fetchAPI('/api/calculate', {
-      wingspan, weight, airfoil_code, tail_airfoil_code, wing_position, tail_type, wing_junction
+      wingspan, weight, airfoil_code, tail_airfoil_code, wing_position, tail_type, wing_junction, fuselage_type
     });
 
     // Run analysis
