@@ -89,8 +89,10 @@ def api_stability():
     data = request.get_json()
     geom = data.get('geometry', {})
     airfoil_code = data.get('airfoil_code', '2412')
+    tail_airfoil_code = data.get('tail_airfoil_code', '0012')
     props = get_airfoil_properties(airfoil_code)
-    result = flight_test(geom, props)
+    tail_props = get_airfoil_properties(tail_airfoil_code)
+    result = flight_test(geom, props, tail_props)
     return jsonify(result)
 
 @app.route('/api/airfoil_props/<code>')

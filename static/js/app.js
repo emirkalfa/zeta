@@ -41,10 +41,12 @@ async function init() {
 
 async function loadAirfoils() {
   const data = await fetchAPI('/api/airfoils');
-  const sel = $('airfoil');
-  sel.innerHTML = data.map(a =>
+  const opts = data.map(a =>
     `<option value="${a.code}">${a.name} (t=${(a.max_thickness*100).toFixed(0)}%)</option>`
   ).join('');
+  $('airfoil').innerHTML = opts;
+  $('tailAirfoil').innerHTML = opts;
+  $('tailAirfoil').value = '0012';
 }
 
 function setupDarkMode() {
@@ -74,6 +76,7 @@ function checkSavedProject() {
         $('wingspan').value = data.wingspan;
         $('weight').value = data.weight;
         $('airfoil').value = data.airfoil_code || '2412';
+        $('tailAirfoil').value = data.tail_airfoil_code || '0012';
         const wp = document.querySelector(`input[name="wing_pos"][value="${data.wing_position || 'mid'}"]`);
         if (wp) wp.checked = true;
         const tt = document.querySelector(`input[name="tail_type"][value="${data.tail_type || 'conventional'}"]`);
@@ -90,6 +93,7 @@ function saveProject() {
     wingspan: $('wingspan').value,
     weight: $('weight').value,
     airfoil_code: $('airfoil').value,
+    tail_airfoil_code: $('tailAirfoil').value,
     wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
     wing_junction: document.querySelector('input[name="junction"]:checked')?.value || 'through',
@@ -132,6 +136,7 @@ async function calculateAll() {
   const wingspan = parseFloat($('wingspan').value);
   const weight = parseFloat($('weight').value);
   const airfoil_code = $('airfoil').value;
+  const tail_airfoil_code = $('tailAirfoil').value;
   const wing_position = document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid';
   const tail_type = document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional';
   const wing_junction = document.querySelector('input[name="junction"]:checked')?.value || 'through';
@@ -150,9 +155,14 @@ async function calculateAll() {
     const airfoilData = await fetchAPI(`/api/airfoil/${airfoilId}`);
     state.airfoilCoords = airfoilData.coordinates;
 
+    // Get tail airfoil coordinates
+    const tailId = await getAirfoilId(tail_airfoil_code);
+    const tailData = await fetchAPI(`/api/airfoil/${tailId}`);
+    state.tailCoords = tailData.coordinates;
+
     // Calculate geometry
     state.geometry = await fetchAPI('/api/calculate', {
-      wingspan, weight, airfoil_code, wing_position, tail_type, wing_junction
+      wingspan, weight, airfoil_code, tail_airfoil_code, wing_position, tail_type, wing_junction
     });
 
     // Run analysis
@@ -162,7 +172,7 @@ async function calculateAll() {
 
     // Run stability test
     state.stability = await fetchAPI('/api/stability', {
-      geometry: state.geometry, airfoil_code
+      geometry: state.geometry, airfoil_code, tail_airfoil_code
     });
 
     // Save to localStorage
@@ -172,7 +182,7 @@ async function calculateAll() {
     displayResults(state.geometry);
     displayFlightTest(state.stability);
     displayCharts(state.polars);
-    initViewer(state.geometry, state.airfoilCoords, airfoil_code, wing_junction, tail_type);
+    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, airfoil_code, wing_junction, tail_type);
     hideLoading(btn);
 
     show('results-card');

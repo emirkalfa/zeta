@@ -1,6 +1,8 @@
 import numpy as np
 
-def flight_test(geom, airfoil_props, rho=1.225):
+def flight_test(geom, airfoil_props, tail_props=None, rho=1.225):
+    if tail_props is None:
+        tail_props = airfoil_props
     W = geom['weight'] * 9.81
     S = geom['wing_area']
     AR = geom['aspect_ratio']
@@ -38,10 +40,12 @@ def flight_test(geom, airfoil_props, rho=1.225):
     climb_rate = excess_power / W if excess_power > 0 else 0
 
     # Static stability
-    # Neutral point (simplified)
+    # Neutral point (simplified, uses tail airfoil lift curve slope)
     v_h = (htail_area * htail_arm) / (S * mac)
     d_epsilon_d_alpha = 0.5
-    np_position = 0.25 + v_h * (1 - d_epsilon_d_alpha)
+    a_t = tail_props['cl_alpha']
+    a_w = airfoil_props['cl_alpha']
+    np_position = 0.25 + v_h * (a_t / a_w) * (1 - d_epsilon_d_alpha)
 
     # CG at 25% MAC
     cg_percent = cg / mac

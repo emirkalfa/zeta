@@ -4,7 +4,7 @@ let wingGroup, fuseGroup, tailGroup;
 let autoRotate = true;
 let animFrame;
 
-function initViewer(geom, coords, airfoilCode, junction, tailType) {
+function initViewer(geom, wingCoords, tailCoords, airfoilCode, junction, tailType) {
   if (viewer) {
     disposeViewer();
   }
@@ -56,9 +56,9 @@ function initViewer(geom, coords, airfoilCode, junction, tailType) {
   fuseGroup = new THREE.Group();
   tailGroup = new THREE.Group();
 
-  buildWing(geom, coords, junction);
+  buildWing(geom, wingCoords, junction);
   buildFuselage(geom);
-  buildTail(geom, coords, tailType);
+  buildTail(geom, tailCoords, tailType);
 
   scene.add(wingGroup);
   scene.add(fuseGroup);
