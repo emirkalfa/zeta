@@ -146,7 +146,8 @@ async function calculateAll() {
     state.airfoilCode = airfoil_code;
 
     // Get airfoil coordinates
-    const airfoilData = await fetchAPI(`/api/airfoil/${getAirfoilId(airfoil_code)}`);
+    const airfoilId = await getAirfoilId(airfoil_code);
+    const airfoilData = await fetchAPI(`/api/airfoil/${airfoilId}`);
     state.airfoilCoords = airfoilData.coordinates;
 
     // Calculate geometry
