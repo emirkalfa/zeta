@@ -4,7 +4,7 @@ let wingGroup, fuseGroup, tailGroup;
 let autoRotate = false;
 let animFrame;
 
-function initViewer(geom, wingCoords, tailCoords, airfoilCode, junction, tailType) {
+function initViewer(geom, wingCoords, tailCoords, airfoilCode, junction, tailType, fuseType) {
   if (viewer) disposeViewer();
 
   const container = document.getElementById('three-container');
@@ -52,7 +52,7 @@ function initViewer(geom, wingCoords, tailCoords, airfoilCode, junction, tailTyp
   const tailX = geom.tail_x_pos || geom.fuselage_length * 0.82;
 
   buildWing(geom, wingCoords, junction, wingX);
-  buildFuselage(geom);
+  buildFuselage(geom, fuseType || 'elliptic');
   buildTail(geom, tailCoords, tailType, tailX);
 
   scene.add(wingGroup);
@@ -167,7 +167,7 @@ function buildWing(geom, coords, junction, wingX) {
 }
 
 // --- FUSELAGE ---
-function buildFuselage(geom) {
+function buildFuselage(geom, fuseType) {
   const len = geom.fuselage_length;
   const maxW = geom.fuselage_max_width / 2;
   const maxH = geom.fuselage_max_height / 2;
@@ -176,19 +176,35 @@ function buildFuselage(geom) {
   const verts = [];
   const idxs = [];
 
+  // Nose shape function
+  const noseFn = (eta) => Math.sin(Math.PI * Math.min(eta / 0.2, 1));
+  // Tail shape function
+  const tailFn = (eta) => Math.sin(Math.PI * Math.min((1 - eta) / 0.2, 1));
+
   for (let i = 0; i <= nSpan; i++) {
     const eta = i / nSpan;
-    const xPos = eta * len; // nose at 0, tail at len
+    const xPos = eta * len;
     let w, h;
-    if (eta < 0.15) {
-      const r = Math.sin(Math.PI * eta / 0.3);
-      w = maxW * r; h = maxH * r;
-    } else if (eta > 0.85) {
-      const r = Math.sin(Math.PI * (1 - eta) / 0.3);
-      w = maxW * r; h = maxH * r;
+
+    const noseR = eta < 0.2 ? noseFn(eta) : 1;
+    const tailR = eta > 0.8 ? tailFn(eta) : 1;
+    const r = Math.min(noseR, tailR);
+
+    if (fuseType === 'circular') {
+      // Circular cross-section: w === h (perfect circle)
+      const radius = maxW * (eta < 0.2 ? eta / 0.2 : eta > 0.8 ? (1 - eta) / 0.2 : 1);
+      w = radius; h = radius;
+    } else if (fuseType === 'blended') {
+      // Blended / streamlined: wider than tall, pointed nose and tail
+      const taper = eta < 0.15 ? Math.pow(eta / 0.15, 0.6) : eta > 0.85 ? Math.pow((1 - eta) / 0.15, 0.6) : 1;
+      w = maxW * taper;
+      h = maxH * taper * (0.6 + 0.4 * (eta < 0.5 ? eta * 2 : (1 - eta) * 2));
     } else {
-      w = maxW; h = maxH;
+      // Elliptic (default): elliptical cross-section
+      w = maxW * r;
+      h = maxH * r;
     }
+
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
       verts.push(xPos, w * Math.cos(th), h * Math.sin(th));
