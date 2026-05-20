@@ -28,7 +28,7 @@ function initViewer(geom, coords, airfoilCode, junction, tailType) {
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.1;
-  controls.autoRotate = true;
+  controls.autoRotate = false;
   controls.autoRotateSpeed = 2.0;
   controls.target.set(0, 0, 0);
   controls.update();
@@ -485,8 +485,8 @@ function viewerReset() {
   if (!viewer) return;
   camera.position.set(3, 2, 4);
   controls.target.set(0, 0, 0);
-  controls.autoRotate = true;
-  document.getElementById('viewAutoRotate').classList.add('active');
+  controls.autoRotate = false;
+  document.getElementById('viewAutoRotate').classList.remove('active');
   controls.update();
 }
 
