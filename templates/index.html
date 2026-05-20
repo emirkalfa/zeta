@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZETA - Uçak Tasarım Aracı</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/exporters/STLBinaryExporter.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="header-left">
+      <h1>ZETA</h1>
+      <span class="subtitle">Uçak Tasarım Aracı</span>
+    </div>
+    <div class="header-right">
+      <button id="darkToggle" class="icon-btn" title="Karanlık Mod">🌙</button>
+      <button id="saveBtn" class="icon-btn" title="Projeyi Kaydet">💾</button>
+      <button id="loadBtn" class="icon-btn" title="Projeyi Yükle">📂</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Input Section -->
+    <section class="card" id="input-card">
+      <h2>Uçak Parametreleri</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="wingspan">Kanat Açıklığı (m)</label>
+          <input type="number" id="wingspan" step="0.1" min="0.1" max="100" value="1.5">
+        </div>
+        <div class="form-group">
+          <label for="weight">Ağırlık (kg)</label>
+          <input type="number" id="weight" step="0.1" min="0.1" max="10000" value="2.5">
+        </div>
+        <div class="form-group">
+          <label for="airfoil">Airfoil Profili</label>
+          <select id="airfoil"></select>
+        </div>
+        <div class="form-group">
+          <label>Kanat Konumu</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="wing_pos" value="low"> Alçak</label>
+            <label class="radio-label"><input type="radio" name="wing_pos" value="mid" checked> Orta</label>
+            <label class="radio-label"><input type="radio" name="wing_pos" value="high"> Yüksek</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Kuyruk Tipi</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="tail_type" value="conventional" checked> Konvansiyonel</label>
+            <label class="radio-label"><input type="radio" name="tail_type" value="ttail"> T-tail</label>
+            <label class="radio-label"><input type="radio" name="tail_type" value="vtail"> V-tail</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Kanat-Gövde Birleşimi</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="junction" value="through" checked> İçten Geçen</label>
+            <label class="radio-label"><input type="radio" name="junction" value="surface"> Yüzeyde Biten</label>
+            <label class="radio-label"><input type="radio" name="junction" value="separate"> Ayrı</label>
+          </div>
+        </div>
+      </div>
+      <button id="calculateBtn" class="primary-btn">HESAPLA</button>
+    </section>
+
+    <!-- Results Section -->
+    <section class="card" id="results-card" style="display:none">
+      <h2>Geometrik Ölçüler</h2>
+      <div id="results-grid" class="results-grid"></div>
+    </section>
+
+    <!-- 3D Viewer Section -->
+    <section class="card" id="viewer-card" style="display:none">
+      <div class="viewer-header">
+        <h2>3D Model</h2>
+        <div class="viewer-controls">
+          <button id="viewX" class="small-btn">X</button>
+          <button id="viewY" class="small-btn">Y</button>
+          <button id="viewZ" class="small-btn">Z</button>
+          <button id="viewAutoRotate" class="small-btn active">⟳</button>
+          <button id="viewReset" class="small-btn">↺</button>
+        </div>
+      </div>
+      <div id="three-container"></div>
+    </section>
+
+    <!-- Charts Section -->
+    <section class="card" id="charts-card" style="display:none">
+      <h2>Aerodinamik Analiz</h2>
+      <div class="charts-grid">
+        <div class="chart-box">
+          <h3>Cl vs α (Kaldırma Katsayısı)</h3>
+          <canvas id="chartClAlpha"></canvas>
+          <div class="chart-table" id="tableClAlpha"></div>
+        </div>
+        <div class="chart-box">
+          <h3>Cd vs Cl (Sürükleme Poları)</h3>
+          <canvas id="chartCdCl"></canvas>
+          <div class="chart-table" id="tableCdCl"></div>
+        </div>
+        <div class="chart-box">
+          <h3>Cm vs α (Moment Katsayısı)</h3>
+          <canvas id="chartCmAlpha"></canvas>
+          <div class="chart-table" id="tableCmAlpha"></div>
+        </div>
+        <div class="chart-box">
+          <h3>Cl/Cd vs α (Verim)</h3>
+          <canvas id="chartEff"></canvas>
+          <div class="chart-table" id="tableEff"></div>
+        </div>
+        <div class="chart-box full-width">
+          <h3>Kanat Boyunca Lift Dağılımı</h3>
+          <canvas id="chartLiftDist"></canvas>
+          <div class="chart-table" id="tableLiftDist"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Flight Test Section -->
+    <section class="card" id="flight-card" style="display:none">
+      <h2>Uçabilirlik Testi</h2>
+      <div id="flight-results" class="flight-grid"></div>
+    </section>
+
+    <!-- STL Export Section -->
+    <section class="card" id="stl-card" style="display:none">
+      <h2>STL İndirme</h2>
+      <p class="stl-info">3D modeli 3D yazıcıda basmak için ayrı ayrı STL dosyalarını indirin.</p>
+      <div class="stl-buttons">
+        <button id="stlWing" class="stl-btn wing-btn">🪽 Kanat STL</button>
+        <button id="stlFuselage" class="stl-btn fuse-btn">🛸 Gövde STL</button>
+        <button id="stlTail" class="stl-btn tail-btn">🔄 Kuyruk STL</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>ZETA v1.0 — Üniversite Projeleri İçin Uçak Tasarım Aracı</p>
+  </footer>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script src="/static/js/viewer3d.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/stlexport.js"></script>
+</body>
+</html>
