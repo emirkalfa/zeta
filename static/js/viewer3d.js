@@ -173,104 +173,117 @@ function buildFuselage(geom, fuseType) {
   const L = geom.fuselage_length;
   const W = geom.fuselage_max_width;
   const H = geom.fuselage_max_height;
-  const nSpan = 40;
-  const nCirc = 32;
+  const nSpan = 50;
+  const nCirc = 36;
   const verts = [];
   const idxs = [];
 
-  // — Profile (side silhouette) for each aircraft type —
-  // Returns { widthScale, heightScale } at normalized position eta (0-1)
+  // Smoothstep: C1-continuous cubic blend
+  const ss = (t) => t * t * (3 - 2 * t);
+  // Cosine blend: C2-continuous
+  const cs = (t) => 0.5 - 0.5 * Math.cos(t * Math.PI);
+
+  // — Profile generators —
+  // Each returns { ws, hs } at normalized pos eta (0-1)
   const profile = (eta, type) => {
     if (type === 'cessna') {
-      // Cessna 172: hemispherical dome nose, flat belly, long constant body, conical tail
-      let ws, hs;
-      // Width profile (top view)
-      if (eta < 0.12) {
-        // Nose dome: quarter ellipse
-        const u = eta / 0.12;
-        ws = Math.sqrt(1 - (1 - u) * (1 - u));
-      } else if (eta < 0.78) {
-        // Constant body
-        ws = 1;
+      // Cessna 172: hemispherical dome, flat belly, long constant cabin, conical tailcone
+      // Width (top view)
+      let ws;
+      if (eta < 0.18) {
+        const u = eta / 0.18;
+        ws = Math.sin(u * Math.PI / 2);
+      } else if (eta < 0.70) {
+        const u = (eta - 0.18) / 0.52;
+        ws = 1 - 0.02 * u * u;
       } else {
-        // Tail cone: linear to 0
-        ws = 1 - (eta - 0.78) / 0.22;
+        const u = (eta - 0.70) / 0.30;
+        ws = 0.98 * (1 - cs(u));
       }
-      // Height profile (side view): bottom is flat, top is domed
-      if (eta < 0.12) {
-        const u = eta / 0.12;
-        hs = Math.sqrt(1 - (1 - u) * (1 - u));
-      } else if (eta < 0.75) {
-        hs = 1;
+      // Height (side view): flat belly, domed top
+      let hs;
+      if (eta < 0.18) {
+        const u = eta / 0.18;
+        hs = Math.sin(u * Math.PI / 2);
+      } else if (eta < 0.42) {
+        // cabin crown: gentle rise
+        const u = (eta - 0.18) / 0.24;
+        hs = 0.93 + 0.07 * ss(u);
+      } else if (eta < 0.70) {
+        // slight downward slope toward tail
+        const u = (eta - 0.42) / 0.28;
+        hs = 1.0 - 0.03 * cs(u);
       } else {
-        hs = 1 - (eta - 0.75) / 0.25;
+        const u = (eta - 0.70) / 0.30;
+        hs = 0.97 * (1 - cs(u));
       }
       return { ws, hs };
     }
 
     if (type === 'gulfstream') {
-      // Gulfstream G650: moderate nose, wide flat body, long tailcone
-      let ws, hs;
-      if (eta < 0.20) {
-        // Pointy nose
-        const u = eta / 0.20;
-        ws = Math.pow(u, 0.65);
-        hs = Math.pow(u, 0.7);
-      } else if (eta < 0.72) {
-        // Constant wide body
-        ws = 1;
-        hs = 1;
+      // Gulfstream G650: sharp nose, wide flat body, long tailcone
+      let ws;
+      if (eta < 0.22) {
+        const u = eta / 0.22;
+        ws = Math.pow(u, 0.6);
+      } else if (eta < 0.68) {
+        ws = 1 - 0.01 * Math.pow((eta - 0.22) / 0.46, 2);
       } else {
-        // Tailcone
-        const u = (eta - 0.72) / 0.28;
-        ws = 1 - Math.pow(u, 0.75);
-        hs = 1 - Math.pow(u, 0.7);
+        const u = (eta - 0.68) / 0.32;
+        ws = 0.99 * (1 - Math.pow(u, 0.65));
       }
-      // Gulfstream is wider relative to height
-      ws *= 1.15;
-      return { ws, hs };
+      let hs;
+      if (eta < 0.22) {
+        const u = eta / 0.22;
+        hs = Math.pow(u, 0.55);
+      } else if (eta < 0.68) {
+        const u = (eta - 0.22) / 0.46;
+        hs = 1 - 0.02 * u * u;
+      } else {
+        const u = (eta - 0.68) / 0.32;
+        hs = 0.98 * (1 - Math.pow(u, 0.7));
+      }
+      return { ws: ws * 1.12, hs };
     }
 
-    // Cirrus SR22: smooth teardrop (NACA thickness distribution)
+    // Cirrus SR22: smooth NACA teardrop
     const sqrtE = Math.sqrt(eta);
     const tDist = 2.969 * sqrtE - 1.260 * eta - 3.516 * eta * eta
                 + 2.843 * eta * eta * eta - 1.015 * eta * eta * eta * eta;
-    const maxT = 0.307; // max of NACA thickness function
-    const r = tDist / maxT; // normalize to 0-1
-    // Cirrus is sleeker: narrower in front, pointier
-    const ws = r * (0.85 + 0.15 * Math.sin(Math.PI * eta));
-    const hs = r * (0.80 + 0.20 * Math.sin(Math.PI * eta));
-    return { ws, hs };
+    const norm = tDist / 0.307;
+    // NACA gives asymmetric shape; apply slight squish
+    return { ws: norm, hs: norm * 0.88 };
   };
 
-  // — Cross-section shape for each type —
-  // Y = vertical (up), Z = spanwise (horizontal)
+  // — Cross-section shapes —
   const crossSection = (ws, hs, th, type) => {
     const ct = Math.cos(th);
     const st = Math.sin(th);
-    const w = W / 2 * ws;  // half-width (spanwise)
-    const h = H / 2 * hs;  // half-height (vertical)
+    const w = W / 2 * ws;
+    const h = H / 2 * hs;
 
     if (type === 'cessna') {
-      // Hemispherical top, flat bottom
-      const topR = st >= 0 ? 1 : 1 - 0.35 * (-st) * (1 - Math.abs(ct) * 0.5);
-      const y = st >= 0 ? h * st * topR : h * st * topR * 0.5;
-      const z = w * ct * (st >= 0 ? 1 : 1 - 0.15 * (1 - Math.abs(ct)));
+      // Domed top (half-ellipse), flat bottom, slight tuck-under at belly
+      const y = st >= 0
+        ? h * st
+        : h * st * 0.25;
+      const z = w * ct * (st >= 0 ? 1 : 0.93);
       return { y, z };
     }
 
     if (type === 'gulfstream') {
-      // Flat bottom, rounded top, bulging sides
-      const sideBulge = 1 + 0.12 * (1 - Math.abs(ct));
-      const flatBot = st < -0.15 ? 0.7 + 0.3 * (st + 0.15) / 0.85 : 1;
-      const y = h * st * (st > 0 ? 1.0 : 0.6);
-      const z = w * ct * sideBulge * flatBot;
+      // Flat bottom, bulging sides, oval top
+      const sideBulge = 1 + 0.08 * (1 - Math.abs(ct));
+      const y = st >= 0
+        ? h * st
+        : h * st * 0.30;
+      const z = w * ct * sideBulge * (st >= 0 ? 1 : 0.90);
       return { y, z };
     }
 
-    // Cirrus: smooth elliptical, slightly flattened bottom
-    const squeeze = st < -0.2 ? 0.85 : st > 0.2 ? 1 : 1 - 0.15 * (0.2 - Math.abs(st)) / 0.2;
-    return { y: h * st, z: w * ct * squeeze };
+    // Cirrus: smooth ellipse, very slight bottom flatten
+    const flatBot = st < -0.15 ? 0.92 : 1;
+    return { y: h * st * flatBot, z: w * ct };
   };
 
   for (let i = 0; i <= nSpan; i++) {
