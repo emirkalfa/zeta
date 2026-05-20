@@ -168,71 +168,118 @@ function buildWing(geom, coords, junction, wingX) {
 
 // --- FUSELAGE ---
 function buildFuselage(geom, fuseType) {
-  const len = geom.fuselage_length;
-  const rW = geom.fuselage_max_width / 2;
-  const rH = geom.fuselage_max_height / 2;
-  const nSpan = 36;
+  const L = geom.fuselage_length;
+  const W = geom.fuselage_max_width;
+  const H = geom.fuselage_max_height;
+  const nSpan = 40;
   const nCirc = 32;
   const verts = [];
   const idxs = [];
 
-  // Profile blends: nose (0-0.2), body (0.2-0.8), tail (0.8-1.0)
-  const smoothstep = (t) => t * t * (3 - 2 * t);
-  const noseFn = (t) => { const u = Math.min(t / 0.20, 1); return smoothstep(u); };
-  const tailFn = (t) => { const u = Math.max((t - 0.80) / 0.20, 0); return 1 - smoothstep(u); };
-
-  // Cross-section generators
-  const crossSection = (w, h, th, type) => {
-    const ct = Math.cos(th), st = Math.sin(th);
+  // — Profile (side silhouette) for each aircraft type —
+  // Returns { widthScale, heightScale } at normalized position eta (0-1)
+  const profile = (eta, type) => {
     if (type === 'cessna') {
-      // Circular tube, flat-bottom for landing gear area
-      const r = Math.max(w, h);
-      const flat = st < -0.3 ? 1 - 0.08 * (st + 0.3) / 0.7 : 1;
-      return { y: r * ct * flat, z: r * st * 0.95 };
+      // Cessna 172: hemispherical dome nose, flat belly, long constant body, conical tail
+      let ws, hs;
+      // Width profile (top view)
+      if (eta < 0.12) {
+        // Nose dome: quarter ellipse
+        const u = eta / 0.12;
+        ws = Math.sqrt(1 - (1 - u) * (1 - u));
+      } else if (eta < 0.78) {
+        // Constant body
+        ws = 1;
+      } else {
+        // Tail cone: linear to 0
+        ws = 1 - (eta - 0.78) / 0.22;
+      }
+      // Height profile (side view): bottom is flat, top is domed
+      if (eta < 0.12) {
+        const u = eta / 0.12;
+        hs = Math.sqrt(1 - (1 - u) * (1 - u));
+      } else if (eta < 0.75) {
+        hs = 1;
+      } else {
+        hs = 1 - (eta - 0.75) / 0.25;
+      }
+      return { ws, hs };
     }
+
     if (type === 'gulfstream') {
-      // Business jet: flat bottom, wider cabin, angular sides
-      const ct2 = Math.abs(ct);
-      const bulge = 1 + 0.12 * (1 - ct2); // sides bulge outward
-      const flatBot = st < -0.2 ? 0.85 : 1; // flat bottom
-      const topSquash = st > 0.3 ? 0.92 : 1; // slightly squashed top
-      return {
-        y: w * ct * bulge * flatBot,
-        z: h * st * topSquash * 0.9,
-      };
+      // Gulfstream G650: moderate nose, wide flat body, long tailcone
+      let ws, hs;
+      if (eta < 0.20) {
+        // Pointy nose
+        const u = eta / 0.20;
+        ws = Math.pow(u, 0.65);
+        hs = Math.pow(u, 0.7);
+      } else if (eta < 0.72) {
+        // Constant wide body
+        ws = 1;
+        hs = 1;
+      } else {
+        // Tailcone
+        const u = (eta - 0.72) / 0.28;
+        ws = 1 - Math.pow(u, 0.75);
+        hs = 1 - Math.pow(u, 0.7);
+      }
+      // Gulfstream is wider relative to height
+      ws *= 1.15;
+      return { ws, hs };
     }
-    // Cirrus (default): streamlined elliptical, pointy
-    const elliptic = 1 - 0.12 * Math.abs(st) * (1 - Math.abs(st));
-    return { y: w * ct * elliptic, z: h * st * elliptic };
+
+    // Cirrus SR22: smooth teardrop (NACA thickness distribution)
+    const sqrtE = Math.sqrt(eta);
+    const tDist = 2.969 * sqrtE - 1.260 * eta - 3.516 * eta * eta
+                + 2.843 * eta * eta * eta - 1.015 * eta * eta * eta * eta;
+    const maxT = 0.307; // max of NACA thickness function
+    const r = tDist / maxT; // normalize to 0-1
+    // Cirrus is sleeker: narrower in front, pointier
+    const ws = r * (0.85 + 0.15 * Math.sin(Math.PI * eta));
+    const hs = r * (0.80 + 0.20 * Math.sin(Math.PI * eta));
+    return { ws, hs };
+  };
+
+  // — Cross-section shape for each type —
+  const crossSection = (ws, hs, th, type) => {
+    const ct = Math.cos(th);
+    const st = Math.sin(th);
+    const w = W / 2 * ws;
+    const h = H / 2 * hs;
+
+    if (type === 'cessna') {
+      // Hemispherical top, flat bottom
+      // Top half (st > 0): circular
+      // Bottom half (st < 0): transitions to flat
+      const topR = st >= 0 ? 1 : 1 - 0.35 * (-st) * (1 - Math.abs(ct) * 0.5);
+      const y = w * ct * (st >= 0 ? 1 : 1 - 0.15 * (1 - Math.abs(ct)));
+      const z = st >= 0 ? h * st * topR : h * st * topR * 0.5;
+      return { y, z };
+    }
+
+    if (type === 'gulfstream') {
+      // Flat bottom, rounded top, bulging sides
+      const sideBulge = 1 + 0.12 * (1 - Math.abs(ct));
+      const flatBot = st < -0.15 ? 0.7 + 0.3 * (st + 0.15) / 0.85 : 1;
+      const y = w * ct * sideBulge * flatBot;
+      const z = h * st * (st > 0 ? 1.0 : 0.6);
+      return { y, z };
+    }
+
+    // Cirrus: smooth elliptical, slightly flattened bottom
+    const squeeze = st < -0.2 ? 0.85 : st > 0.2 ? 1 : 1 - 0.15 * (0.2 - Math.abs(st)) / 0.2;
+    return { y: w * ct * squeeze, z: h * st };
   };
 
   for (let i = 0; i <= nSpan; i++) {
     const eta = i / nSpan;
-    const xPos = eta * len;
-
-    // Radius scale
-    const rScale = Math.min(noseFn(eta), tailFn(eta));
-
-    let w, h;
-    if (fuseType === 'cessna') {
-      // Constant circular tube, flat bottom
-      w = rW * 1.1 * rScale;
-      h = rW * 1.1 * rScale;
-    } else if (fuseType === 'gulfstream') {
-      // Wide flat oval: wider than tall
-      const wideFactor = 1 + 0.15 * (1 - Math.pow(Math.abs(eta - 0.5) * 2, 2));
-      w = rW * wideFactor * rScale;
-      h = rH * 0.85 * rScale;
-    } else {
-      // Cirrus: elliptical teardrop
-      const stretch = 0.8 + 0.4 * (1 - Math.abs(eta - 0.5) * 2);
-      w = rW * rScale * stretch;
-      h = rH * rScale * (0.9 + 0.1 * stretch);
-    }
+    const xPos = eta * L;
+    const { ws, hs } = profile(eta, fuseType);
 
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
-      const { y, z } = crossSection(w, h, th, fuseType);
+      const { y, z } = crossSection(ws, hs, th, fuseType);
       verts.push(xPos, y, z);
     }
   }
@@ -253,11 +300,9 @@ function buildFuselage(geom, fuseType) {
   geo.computeVertexNormals();
 
   const colors = { cessna: 0x94a3b8, cirrus: 0x8ba3b8, gulfstream: 0xa0aab8 };
-  const color = colors[fuseType] || 0x94a3b8;
-
-  fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide })));
+  fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: colors[fuseType] || 0x94a3b8, side: THREE.DoubleSide })));
   const eg = new THREE.EdgesGeometry(geo);
-  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.12 })));
+  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.10 })));
 }
 
 // --- TAIL ---
