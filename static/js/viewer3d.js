@@ -172,53 +172,67 @@ function buildFuselage(geom, fuseType) {
   const rW = geom.fuselage_max_width / 2;
   const rH = geom.fuselage_max_height / 2;
   const nSpan = 36;
-  const nCirc = 28;
+  const nCirc = 32;
   const verts = [];
   const idxs = [];
 
-  // Smooth nose profile: cubic ease-out from 0 to 1 over first 25%
-  // Smooth tail profile: cubic ease-in from 1 to 0 over last 25%
-  const noseProfile = (t) => { const u = Math.min(t / 0.25, 1); return -2 * u * u * u + 3 * u * u; };
-  const tailProfile = (t) => { const u = Math.max((t - 0.75) / 0.25, 0); return 1 - (-2 * u * u * u + 3 * u * u); };
+  // Profile blends: nose (0-0.2), body (0.2-0.8), tail (0.8-1.0)
+  const smoothstep = (t) => t * t * (3 - 2 * t);
+  const noseFn = (t) => { const u = Math.min(t / 0.20, 1); return smoothstep(u); };
+  const tailFn = (t) => { const u = Math.max((t - 0.80) / 0.20, 0); return 1 - smoothstep(u); };
+
+  // Cross-section generators
+  const crossSection = (w, h, th, type) => {
+    const ct = Math.cos(th), st = Math.sin(th);
+    if (type === 'cessna') {
+      // Circular tube, flat-bottom for landing gear area
+      const r = Math.max(w, h);
+      const flat = st < -0.3 ? 1 - 0.08 * (st + 0.3) / 0.7 : 1;
+      return { y: r * ct * flat, z: r * st * 0.95 };
+    }
+    if (type === 'gulfstream') {
+      // Business jet: flat bottom, wider cabin, angular sides
+      const ct2 = Math.abs(ct);
+      const bulge = 1 + 0.12 * (1 - ct2); // sides bulge outward
+      const flatBot = st < -0.2 ? 0.85 : 1; // flat bottom
+      const topSquash = st > 0.3 ? 0.92 : 1; // slightly squashed top
+      return {
+        y: w * ct * bulge * flatBot,
+        z: h * st * topSquash * 0.9,
+      };
+    }
+    // Cirrus (default): streamlined elliptical, pointy
+    const elliptic = 1 - 0.12 * Math.abs(st) * (1 - Math.abs(st));
+    return { y: w * ct * elliptic, z: h * st * elliptic };
+  };
 
   for (let i = 0; i <= nSpan; i++) {
     const eta = i / nSpan;
     const xPos = eta * len;
-    const taper = eta < 0.25 ? noseProfile(eta) : eta > 0.75 ? tailProfile(eta) : 1;
+
+    // Radius scale
+    const rScale = Math.min(noseFn(eta), tailFn(eta));
 
     let w, h;
-
-    if (fuseType === 'circular') {
-      // Dairesel kesit: w = h (boru şeklinde)
-      const avgR = (rW + rH) / 2;
-      w = avgR * taper; h = avgR * taper;
-    } else if (fuseType === 'blended') {
-      // Sivri streamline: dar burun, geniş orta, yassı
-      const noseW = eta < 0.15 ? Math.pow(eta / 0.15, 0.7) : 1;
-      const tailW = eta > 0.85 ? Math.pow((1 - eta) / 0.15, 0.7) : 1;
-      const t2 = Math.min(noseW, tailW);
-      w = rW * t2;
-      // Height varies: flatter in middle
-      const hFactor = 0.5 + 0.5 * (1 - Math.abs(eta - 0.5) * 2);
-      h = rH * t2 * hFactor;
+    if (fuseType === 'cessna') {
+      // Constant circular tube, flat bottom
+      w = rW * 1.1 * rScale;
+      h = rW * 1.1 * rScale;
+    } else if (fuseType === 'gulfstream') {
+      // Wide flat oval: wider than tall
+      const wideFactor = 1 + 0.15 * (1 - Math.pow(Math.abs(eta - 0.5) * 2, 2));
+      w = rW * wideFactor * rScale;
+      h = rH * 0.85 * rScale;
     } else {
-      // Eliptik (default): real aircraft shape, wider than tall
-      // Slightly flattened top/bottom for realistic look
-      w = rW * taper;
-      h = rH * taper;
+      // Cirrus: elliptical teardrop
+      const stretch = 0.8 + 0.4 * (1 - Math.abs(eta - 0.5) * 2);
+      w = rW * rScale * stretch;
+      h = rH * rScale * (0.9 + 0.1 * stretch);
     }
 
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
-      // Slight flattening at top/bottom for elliptic type
-      let y = w * Math.cos(th);
-      let z = h * Math.sin(th);
-      if (fuseType === 'elliptic') {
-        // Flatten top/bottom by 15% for realistic aircraft look
-        const flat = 1 - 0.15 * Math.abs(Math.sin(th)) * (1 - Math.abs(Math.sin(th)));
-        y *= flat;
-        z *= flat;
-      }
+      const { y, z } = crossSection(w, h, th, fuseType);
       verts.push(xPos, y, z);
     }
   }
@@ -238,13 +252,12 @@ function buildFuselage(geom, fuseType) {
   geo.setIndex(idxs);
   geo.computeVertexNormals();
 
-  // Subtle color variation by type
-  const colors = { elliptic: 0x94a3b8, circular: 0x8ba3b8, blended: 0xa0aab8 };
+  const colors = { cessna: 0x94a3b8, cirrus: 0x8ba3b8, gulfstream: 0xa0aab8 };
   const color = colors[fuseType] || 0x94a3b8;
 
   fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide })));
   const eg = new THREE.EdgesGeometry(geo);
-  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.15 })));
+  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.12 })));
 }
 
 // --- TAIL ---
