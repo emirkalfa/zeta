@@ -17,8 +17,8 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     wing_sweep = sweep_angle
 
     fuse_length = 0.80 * wingspan
-    fuse_max_width = 0.11 * wingspan
-    fuse_max_height = 0.12 * wingspan
+    fuse_max_width = 0.13 * wingspan
+    fuse_max_height = 0.09 * wingspan
 
     htail_span = 0.35 * wingspan
     htail_chord = 0.40 * root_chord

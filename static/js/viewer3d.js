@@ -169,45 +169,57 @@ function buildWing(geom, coords, junction, wingX) {
 // --- FUSELAGE ---
 function buildFuselage(geom, fuseType) {
   const len = geom.fuselage_length;
-  const maxW = geom.fuselage_max_width / 2;
-  const maxH = geom.fuselage_max_height / 2;
-  const nSpan = 32;
-  const nCirc = 24;
+  const rW = geom.fuselage_max_width / 2;
+  const rH = geom.fuselage_max_height / 2;
+  const nSpan = 36;
+  const nCirc = 28;
   const verts = [];
   const idxs = [];
 
-  // Nose shape function
-  const noseFn = (eta) => Math.sin(Math.PI * Math.min(eta / 0.2, 1));
-  // Tail shape function
-  const tailFn = (eta) => Math.sin(Math.PI * Math.min((1 - eta) / 0.2, 1));
+  // Smooth nose profile: cubic ease-out from 0 to 1 over first 25%
+  // Smooth tail profile: cubic ease-in from 1 to 0 over last 25%
+  const noseProfile = (t) => { const u = Math.min(t / 0.25, 1); return -2 * u * u * u + 3 * u * u; };
+  const tailProfile = (t) => { const u = Math.max((t - 0.75) / 0.25, 0); return 1 - (-2 * u * u * u + 3 * u * u); };
 
   for (let i = 0; i <= nSpan; i++) {
     const eta = i / nSpan;
     const xPos = eta * len;
+    const taper = eta < 0.25 ? noseProfile(eta) : eta > 0.75 ? tailProfile(eta) : 1;
+
     let w, h;
 
-    const noseR = eta < 0.2 ? noseFn(eta) : 1;
-    const tailR = eta > 0.8 ? tailFn(eta) : 1;
-    const r = Math.min(noseR, tailR);
-
     if (fuseType === 'circular') {
-      // Circular cross-section: w === h (perfect circle)
-      const radius = maxW * (eta < 0.2 ? eta / 0.2 : eta > 0.8 ? (1 - eta) / 0.2 : 1);
-      w = radius; h = radius;
+      // Dairesel kesit: w = h (boru şeklinde)
+      const avgR = (rW + rH) / 2;
+      w = avgR * taper; h = avgR * taper;
     } else if (fuseType === 'blended') {
-      // Blended / streamlined: wider than tall, pointed nose and tail
-      const taper = eta < 0.15 ? Math.pow(eta / 0.15, 0.6) : eta > 0.85 ? Math.pow((1 - eta) / 0.15, 0.6) : 1;
-      w = maxW * taper;
-      h = maxH * taper * (0.6 + 0.4 * (eta < 0.5 ? eta * 2 : (1 - eta) * 2));
+      // Sivri streamline: dar burun, geniş orta, yassı
+      const noseW = eta < 0.15 ? Math.pow(eta / 0.15, 0.7) : 1;
+      const tailW = eta > 0.85 ? Math.pow((1 - eta) / 0.15, 0.7) : 1;
+      const t2 = Math.min(noseW, tailW);
+      w = rW * t2;
+      // Height varies: flatter in middle
+      const hFactor = 0.5 + 0.5 * (1 - Math.abs(eta - 0.5) * 2);
+      h = rH * t2 * hFactor;
     } else {
-      // Elliptic (default): elliptical cross-section
-      w = maxW * r;
-      h = maxH * r;
+      // Eliptik (default): real aircraft shape, wider than tall
+      // Slightly flattened top/bottom for realistic look
+      w = rW * taper;
+      h = rH * taper;
     }
 
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
-      verts.push(xPos, w * Math.cos(th), h * Math.sin(th));
+      // Slight flattening at top/bottom for elliptic type
+      let y = w * Math.cos(th);
+      let z = h * Math.sin(th);
+      if (fuseType === 'elliptic') {
+        // Flatten top/bottom by 15% for realistic aircraft look
+        const flat = 1 - 0.15 * Math.abs(Math.sin(th)) * (1 - Math.abs(Math.sin(th)));
+        y *= flat;
+        z *= flat;
+      }
+      verts.push(xPos, y, z);
     }
   }
 
@@ -226,9 +238,13 @@ function buildFuselage(geom, fuseType) {
   geo.setIndex(idxs);
   geo.computeVertexNormals();
 
-  fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0x94a3b8, side: THREE.DoubleSide })));
+  // Subtle color variation by type
+  const colors = { elliptic: 0x94a3b8, circular: 0x8ba3b8, blended: 0xa0aab8 };
+  const color = colors[fuseType] || 0x94a3b8;
+
+  fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide })));
   const eg = new THREE.EdgesGeometry(geo);
-  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.2 })));
+  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.15 })));
 }
 
 // --- TAIL ---
