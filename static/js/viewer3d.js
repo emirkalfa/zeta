@@ -337,6 +337,8 @@ function buildTail(geom, coords, tailType, tailX) {
   // ========== HORIZONTAL TAIL (Yatay Stabilizatör + Elevator) ==========
   const hSpan = geom.htail_span / 2;
   const hChord = geom.htail_chord;
+  const hTaper = geom.htail_taper || 0.5;
+  const hSweep = THREE.MathUtils.degToRad(geom.htail_sweep || 3);
   const hElevChord = hChord * 0.3; // elevator = trailing 30%
 
   const buildHTail = () => {
@@ -345,8 +347,8 @@ function buildTail(geom, coords, tailType, tailX) {
       for (let i = 0; i <= nSec; i++) {
         const eta = i / nSec;
         const spanPos = eta * hSpan;
-        const chord = hChord * (1 - eta * 0.3);
-        const xOff = tailX + spanPos * Math.tan(THREE.MathUtils.degToRad(3));
+        const chord = hChord * (1 - eta * (1 - hTaper));
+        const xOff = tailX + spanPos * Math.tan(hSweep);
         const pts = [];
         for (const idx of uIdx) {
           pts.push(new THREE.Vector3(
@@ -372,11 +374,12 @@ function buildTail(geom, coords, tailType, tailX) {
   const buildVTailFn = () => {
     const vSpan = geom.vtail_span;
     const vChord = geom.vtail_chord;
+    const vTaper = geom.vtail_taper || 0.4;
     const secs = [];
     for (let i = 0; i <= nSec; i++) {
       const eta = i / nSec;
-      const chord = vChord * (1 - eta * 0.3);
-      const xOff = tailX + eta * vSpan * Math.tan(THREE.MathUtils.degToRad(5));
+      const chord = vChord * (1 - eta * (1 - vTaper));
+      const xOff = tailX + eta * vSpan * Math.tan(hSweep);
       const yPos = eta * vSpan;
       const pts = [];
       // Right side (+Z) from airfoil upper surface
@@ -421,8 +424,8 @@ function buildTail(geom, coords, tailType, tailX) {
       const secs = [];
       for (let i = 0; i <= nSec; i++) {
         const eta = i / nSec;
-        const chord = geom.htail_chord * (1 - eta * 0.3);
-        const xOff = tailX + eta * vHalf * Math.tan(THREE.MathUtils.degToRad(5));
+        const chord = hChord * (1 - eta * (1 - hTaper));
+        const xOff = tailX + eta * vHalf * Math.tan(hSweep);
         const rLen = eta * vHalf;
         const pts = [];
         for (const idx of uIdx) {

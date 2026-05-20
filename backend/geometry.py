@@ -22,12 +22,17 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     fuse_max_height = 0.09 * wingspan
 
     htail_span = 0.35 * wingspan
-    htail_chord = 0.40 * root_chord
-    htail_area = htail_span * htail_chord
+    htail_root_chord = 0.40 * root_chord
+    htail_taper = 0.5
+    htail_tip_chord = htail_root_chord * htail_taper
+    htail_area = htail_span * htail_root_chord
+    htail_sweep = 3.0
 
     vtail_span = 0.20 * wingspan
-    vtail_chord = 0.35 * root_chord
-    vtail_area = vtail_span * vtail_chord
+    vtail_root_chord = 0.35 * root_chord
+    vtail_taper = 0.4
+    vtail_tip_chord = vtail_root_chord * vtail_taper
+    vtail_area = vtail_span * vtail_root_chord
 
     cg_position = 0.25 * mac
 
@@ -68,12 +73,16 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'fuselage_max_width': round(fuse_max_width, 3),
         'fuselage_max_height': round(fuse_max_height, 3),
         'htail_span': round(htail_span, 3),
-        'htail_chord': round(htail_chord, 3),
+        'htail_chord': round(htail_root_chord, 3),
+        'htail_tip_chord': round(htail_tip_chord, 3),
+        'htail_taper': round(htail_taper, 3),
+        'htail_sweep': round(htail_sweep, 1),
         'htail_area': round(htail_area, 3),
         'htail_arm': round(htail_arm, 3),
         'vtail_span': round(vtail_span, 3),
-        'vtail_chord': round(vtail_chord, 3),
-        'vtail_area': round(vtail_area, 3),
+        'vtail_chord': round(vtail_root_chord, 3),
+        'vtail_tip_chord': round(vtail_tip_chord, 3),
+        'vtail_taper': round(vtail_taper, 3),
         'cg_position': round(cg_position, 3),
         'span_efficiency': span_efficiency,
         'taper_ratio_input': taper_ratio,
