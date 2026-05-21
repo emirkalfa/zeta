@@ -195,14 +195,14 @@ async function calculateAll() {
     displayResults(state.geometry);
     displayFlightTest(state.stability);
     displayCharts(state.polars);
-    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, wing_junction, tail_type);
-    hideLoading(btn);
-
     show('results-card');
     show('viewer-card');
     show('charts-card');
     show('flight-card');
     show('stl-card');
+
+    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, wing_junction, tail_type);
+    hideLoading(btn);
 
     // Scroll to results
     $('results-card').scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -151,6 +151,18 @@ function buildWing(geom, coords, junction, wingX) {
         idxs.push(b, d, c);
       }
     }
+    // Tip cap — centroid fan
+    const tip = secs[nSec];
+    const cent = new THREE.Vector3(0, 0, 0);
+    for (const p of tip) cent.add(p);
+    cent.divideScalar(nPts);
+    const centIdx = verts.length / 3;
+    verts.push(cent.x, cent.y, cent.z);
+    const tipBase = offset + nSec * nPts;
+    for (let j = 0; j < nPts; j++) {
+      const jn = (j + 1) % nPts;
+      idxs.push(tipBase + j, centIdx, tipBase + jn);
+    }
   }
 
   const geo = new THREE.BufferGeometry();
