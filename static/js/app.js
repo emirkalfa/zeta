@@ -80,7 +80,7 @@ function checkSavedProject() {
         $('wingspan').value = data.wingspan;
         $('weight').value = data.weight;
         $('airfoil').value = data.airfoil_code || '2412';
-        $('tailAirfoil').value = data.tail_airfoil_code || '0012';
+        $('htailAirfoil').value = data.tail_airfoil_code || '0012';
         const wp = document.querySelector(`input[name="wing_pos"][value="${data.wing_position || 'mid'}"]`);
         if (wp) wp.checked = true;
         const tt = document.querySelector(`input[name="tail_type"][value="${data.tail_type || 'conventional'}"]`);
@@ -97,7 +97,7 @@ function saveProject() {
     wingspan: $('wingspan').value,
     weight: $('weight').value,
     airfoil_code: $('airfoil').value,
-    tail_airfoil_code: $('tailAirfoil').value,
+    tail_airfoil_code: $('htailAirfoil').value,
     wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
     wing_junction: document.querySelector('input[name="junction"]:checked')?.value || 'through',

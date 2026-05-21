@@ -24,8 +24,8 @@ function exportSTL(part) {
   const merged = mergeMeshes(meshes);
   if (!merged) return;
 
-  const exporter = new THREE.STLBinaryExporter();
-  const stlData = exporter.parse(merged);
+  const exporter = new THREE.STLExporter();
+  const stlData = exporter.parse(merged, { binary: true });
 
   const partNames = { wing: 'Kanat', fuselage: 'Govde', tail: 'Kuyruk' };
   const fileName = `zeta_${part}.stl`;

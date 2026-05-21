@@ -72,7 +72,19 @@ def api_calculate():
     wing_junction = data.get('wing_junction', 'through')
 
     geom = calculate_geometry(wingspan, weight, airfoil_code,
-                              wing_position, tail_type, wing_junction)
+                              wing_position, tail_type, wing_junction,
+                              manual_mode=data.get('manual_mode', False),
+                              man_root_chord=data.get('man_root_chord'),
+                              man_tip_chord=data.get('man_tip_chord'),
+                              man_sweep=data.get('man_sweep'),
+                              man_dihedral=data.get('man_dihedral'),
+                              man_htail_span=data.get('man_htail_span'),
+                              man_htail_root=data.get('man_htail_root'),
+                              man_htail_tip=data.get('man_htail_tip'),
+                              man_htail_sweep=data.get('man_htail_sweep'),
+                              man_vtail_span=data.get('man_vtail_span'),
+                              man_vtail_root=data.get('man_vtail_root'),
+                              man_vtail_tip=data.get('man_vtail_tip'))
     return jsonify(geom)
 
 @app.route('/api/analyze', methods=['POST'])
