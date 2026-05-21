@@ -187,83 +187,51 @@ function addMeshToFuse(verts, idxs, color, edgeColor, opacity) {
   }
 }
 
-function buildCylinderSections(radiusFn, nSegs, nCirc) {
-  // radiusFn(eta) returns radius at normalized position
-  const verts = [];
-  const idxs = [];
-  for (let i = 0; i <= nSegs; i++) {
-    const eta = i / nSegs;
-    const r = radiusFn(eta);
-    const xPos = eta;
-    for (let j = 0; j < nCirc; j++) {
-      const th = (j / nCirc) * 2 * Math.PI;
-      verts.push(xPos, r * Math.sin(th), r * Math.cos(th));
-    }
-  }
-  for (let i = 0; i < nSegs; i++) {
-    for (let j = 0; j < nCirc; j++) {
-      const jn = (j + 1) % nCirc;
-      const a = i * nCirc + j, b = i * nCirc + jn;
-      const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
-      idxs.push(a, b, c); idxs.push(b, d, c);
-    }
-  }
-  return { verts, idxs };
-}
-
 // === POD & BOOM ===
 function buildPodBoom(geom) {
   const L = geom.fuselage_length;
   const W = geom.fuselage_max_width;
   const H = geom.fuselage_max_height;
-  const nSpan = 48;
-  const nCirc = 28;
-  const verts = [];
-  const idxs = [];
-  const ss = (t) => t * t * (3 - 2 * t);
-
-  const profile = (eta) => {
-    // Pod: 0 → 0.42, Transition: 0.42 → 0.52, Boom: 0.52 → 1.0
-    let ws, hs;
-    if (eta < 0.42) {
-      // Pod nose: quarter-sine to 1, then hold
-      const u = eta / 0.42;
-      ws = u < 0.35 ? Math.sin((u / 0.35) * Math.PI / 2) : 1 - 0.03 * Math.pow((u - 0.35) / 0.65, 2);
-      hs = u < 0.35 ? Math.sin((u / 0.35) * Math.PI / 2) : 1 - 0.02 * Math.pow((u - 0.35) / 0.65, 2);
-    } else if (eta < 0.52) {
-      // Transition from pod to boom
-      const u = (eta - 0.42) / 0.10;
-      const s = ss(u);
-      ws = (1 - s) * 0.97 + s * 0.08;
-      hs = (1 - s) * 0.98 + s * 0.08;
-    } else {
-      // Boom: thin circular tube, slight taper toward tail
-      const u = (eta - 0.52) / 0.48;
-      ws = 0.08 * (1 - 0.3 * u);
-      hs = 0.08 * (1 - 0.3 * u);
-    }
-    return { ws, hs };
-  };
-
-  const wingEta = (geom.wing_x_pos || 0.35 * L) / L;
+  const nSpan = 60;
+  const nCirc = 24;
+  const verts = []; const idxs = [];
+  const s3 = (t) => t * t * (3 - 2 * t);
 
   for (let i = 0; i <= nSpan; i++) {
     const eta = i / nSpan;
     const xPos = eta * L;
-    let { ws, hs } = profile(eta);
-    const dw = (eta - wingEta) / 0.10;
-    if (Math.abs(dw) < 1) {
-      const bell = 0.5 - 0.5 * Math.cos(dw * Math.PI);
-      ws *= 1 - 0.05 * bell;
-      hs *= 1 - 0.02 * bell;
+    let ws, hs;
+    if (eta < 0.12) {
+      // Pod nose: rounded bullet
+      const u = eta / 0.12;
+      const s = Math.sin(u * Math.PI / 2);
+      ws = s; hs = s * 0.80;
+    } else if (eta < 0.28) {
+      // Pod body: wide with crown
+      const u = (eta - 0.12) / 0.16;
+      ws = 1 - 0.02 * u;
+      hs = 0.80 + 0.18 * u;
+    } else if (eta < 0.36) {
+      // Pod-to-boom transition
+      const u = (eta - 0.28) / 0.08;
+      const t = s3(u);
+      const endW = 0.055;
+      const endH = 0.055;
+      ws = 0.98 * (1 - t) + endW * t;
+      hs = 0.96 * (1 - t) + endH * t;
+    } else {
+      // Boom: thin circular tube
+      const u = (eta - 0.36) / 0.64;
+      ws = 0.055 * (1 - 0.25 * u);
+      hs = 0.055 * (1 - 0.25 * u);
     }
     const w = W / 2 * ws;
     const h = H / 2 * hs;
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
-      const y = h * Math.sin(th);
-      const z = w * Math.cos(th);
-      verts.push(xPos, y, z);
+      const st = Math.sin(th), ct = Math.cos(th);
+      const yy = eta < 0.36 && st < 0 ? h * st * 0.30 : h * st;
+      verts.push(xPos, yy, w * ct);
     }
   }
   for (let i = 0; i < nSpan; i++) {
@@ -284,26 +252,32 @@ function buildTwinBoom(geom) {
   const H = geom.fuselage_max_height;
   const nCirc = 20;
 
-  // Center pod (0 → 25% of length)
-  const podEnd = 0.25;
-  const nPod = 20;
+  // Center pod (0 → 20%)
   (function() {
-    const verts = []; const idxs = [];
-    for (let i = 0; i <= nPod; i++) {
-      const eta = i / nPod;
-      const xPos = eta * podEnd * L;
+    const nSegs = 22; const verts = []; const idxs = [];
+    for (let i = 0; i <= nSegs; i++) {
+      const eta = i / nSegs;
+      const xPos = eta * 0.20 * L;
       const u = eta;
-      let ws = u < 0.35 ? Math.sin((u / 0.35) * Math.PI / 2) : 1 - 0.55 * Math.pow((u - 0.35) / 0.65, 1.3);
-      let hs = u < 0.35 ? ws : 1 - 0.50 * Math.pow((u - 0.35) / 0.65, 1.3);
+      let ws, hs;
+      if (u < 0.35) {
+        const t = u / 0.35;
+        const s = Math.sin(t * Math.PI / 2);
+        ws = s; hs = s * 0.75;
+      } else {
+        const t = (u - 0.35) / 0.65;
+        ws = 1 - 0.65 * Math.pow(t, 1.5);
+        hs = 0.75 * (1 - 0.50 * Math.pow(t, 1.5));
+      }
       const w = W / 2 * ws;
       const h = H / 2 * hs;
       for (let j = 0; j < nCirc; j++) {
         const th = (j / nCirc) * 2 * Math.PI;
         const st = Math.sin(th), ct = Math.cos(th);
-        verts.push(xPos, h * st * (st >= 0 ? 1 : 0.25), w * ct);
+        verts.push(xPos, h * st, w * ct);
       }
     }
-    for (let i = 0; i < nPod; i++) {
+    for (let i = 0; i < nSegs; i++) {
       for (let j = 0; j < nCirc; j++) {
         const jn = (j + 1) % nCirc;
         const a = i * nCirc + j, b = i * nCirc + jn;
@@ -314,25 +288,29 @@ function buildTwinBoom(geom) {
     addMeshToFuse(verts, idxs, 0x94a3b8, 0x475569, 0.08);
   })();
 
-  // Two booms
-  const boomR = W * 0.05;
-  const boomOff = W * 0.30;
-  const boomStart = 0.23;
-  const nBoom = 28;
+  // Two booms (18% → 100%)
+  const boomR = W * 0.04;
+  const boomOff = W * 0.26;
+  const nSegs = 30;
 
   const makeBoom = (sign) => {
     const verts = []; const idxs = [];
-    for (let i = 0; i <= nBoom; i++) {
-      const eta = i / nBoom;
-      const xPos = (boomStart + eta * (1 - boomStart)) * L;
-      const r = boomR * (1 - 0.25 * eta);
+    for (let i = 0; i <= nSegs; i++) {
+      const eta = i / nSegs;
+      const xPos = (0.18 + eta * 0.82) * L;
+      let r = boomR;
+      if (eta < 0.10) {
+        const t = eta / 0.10;
+        r *= Math.sin(t * Math.PI / 2);
+      }
+      r *= 1 - 0.15 * eta;
       for (let j = 0; j < nCirc; j++) {
         const th = (j / nCirc) * 2 * Math.PI;
         const st = Math.sin(th), ct = Math.cos(th);
         verts.push(xPos, r * st, sign * boomOff + r * ct);
       }
     }
-    for (let i = 0; i < nBoom; i++) {
+    for (let i = 0; i < nSegs; i++) {
       for (let j = 0; j < nCirc; j++) {
         const jn = (j + 1) % nCirc;
         const a = i * nCirc + j, b = i * nCirc + jn;
@@ -351,48 +329,40 @@ function buildFlyingWing(geom) {
   const L = geom.fuselage_length;
   const W = geom.fuselage_max_width;
   const H = geom.fuselage_max_height;
-  const nSpan = 24;
-  const nCirc = 24;
-  const verts = [];
-  const idxs = [];
+  const nSpan = 18;
+  const nCirc = 18;
+  const verts = []; const idxs = [];
 
-  // Flying wing: short blended center body, wide and flat
-  // Effective length is 30% of normal fuse_length
-  const effLen = L * 0.30;
-  const wingEta = (geom.wing_x_pos || 0.20 * L) / L;
+  // Flying wing: wide flat lenticular centerbody, 20% of L
+  const effLen = L * 0.20;
+  const wMult = 2.0;
+  const hMult = 0.20;
 
   for (let i = 0; i <= nSpan; i++) {
     const eta = i / nSpan;
     const xPos = eta * effLen;
     const u = eta;
-
-    // Teardrop profile but very short and wide
-    let ws = u < 0.2 ? Math.sin((u / 0.2) * Math.PI / 2) : 1 - Math.pow((u - 0.2) / 0.8, 1.8);
-    let hs = u < 0.2 ? Math.sin((u / 0.2) * Math.PI / 2) * 0.5 : (0.5 - 0.4 * Math.pow((u - 0.2) / 0.8, 1.5));
-
-    // Blend into wing at the rear
-    if (u > 0.6) {
-      const t = (u - 0.6) / 0.4;
-      ws *= 1 - 0.5 * t;
-      hs *= 0.3 + 0.7 * (1 - t);
+    let ws, hs;
+    if (u < 0.25) {
+      const t = u / 0.25;
+      const s = Math.sin(t * Math.PI / 2);
+      ws = s; hs = 0.35 * t;
+    } else if (u < 0.65) {
+      const t = (u - 0.25) / 0.40;
+      ws = 1 - 0.02 * t;
+      hs = 0.35 * (1 - 0.30 * t);
+    } else {
+      const t = (u - 0.65) / 0.35;
+      ws = 0.98 * (1 - Math.pow(t, 0.8));
+      hs = 0.35 * 0.70 * (1 - t);
     }
-
-    const dw = (eta - wingEta) / 0.12;
-    if (Math.abs(dw) < 1) {
-      const bell = 0.5 - 0.5 * Math.cos(dw * Math.PI);
-      ws *= 1 - 0.04 * bell;
-    }
-
-    const w = W * 0.7 * ws;
-    const h = H * 0.3 * hs;
+    const w = W / 2 * ws * wMult;
+    const h = H / 2 * hs * hMult;
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
-      // Flat bottom, rounded top profile
-      const st = Math.sin(th);
-      const ct = Math.cos(th);
-      const y = st >= 0 ? h * st : h * st * 0.4;
-      const z = w * ct;
-      verts.push(xPos, y, z);
+      const st = Math.sin(th), ct = Math.cos(th);
+      const yy = st >= 0 ? h * Math.pow(st, 0.6) : h * Math.pow(-st, 0.6) * (-1);
+      verts.push(xPos, yy, w * ct);
     }
   }
   for (let i = 0; i < nSpan; i++) {
