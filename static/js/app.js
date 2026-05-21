@@ -3,6 +3,8 @@ const state = {
   polars: null,
   stability: null,
   airfoilCoords: null,
+  tailCoords: null,
+  vtailCoords: null,
   airfoilCode: '2412',
   darkMode: localStorage.getItem('zeta-dark') === 'true',
 };
@@ -45,8 +47,10 @@ async function loadAirfoils() {
     `<option value="${a.code}">${a.name} (t=${(a.max_thickness*100).toFixed(0)}%)</option>`
   ).join('');
   $('airfoil').innerHTML = opts;
-  $('tailAirfoil').innerHTML = opts;
-  $('tailAirfoil').value = '0012';
+  $('htailAirfoil').innerHTML = opts;
+  $('htailAirfoil').value = '0012';
+  $('vtailAirfoil').innerHTML = opts;
+  $('vtailAirfoil').value = '0010';
 }
 
 function setupDarkMode() {
@@ -139,7 +143,8 @@ async function calculateAll() {
   const wingspan = parseFloat($('wingspan').value);
   const weight = parseFloat($('weight').value);
   const airfoil_code = $('airfoil').value;
-  const tail_airfoil_code = $('tailAirfoil').value;
+  const htail_airfoil = $('htailAirfoil').value;
+  const vtail_airfoil = $('vtailAirfoil').value;
   const wing_position = document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid';
   const tail_type = document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional';
   const wing_junction = document.querySelector('input[name="junction"]:checked')?.value || 'through';
@@ -153,29 +158,34 @@ async function calculateAll() {
   try {
     state.airfoilCode = airfoil_code;
 
-    // Get airfoil coordinates
+    // Get wing airfoil coordinates
     const airfoilId = await getAirfoilId(airfoil_code);
     const airfoilData = await fetchAPI(`/api/airfoil/${airfoilId}`);
     state.airfoilCoords = airfoilData.coordinates;
 
-    // Get tail airfoil coordinates
-    const tailId = await getAirfoilId(tail_airfoil_code);
-    const tailData = await fetchAPI(`/api/airfoil/${tailId}`);
-    state.tailCoords = tailData.coordinates;
+    // Get horizontal tail airfoil coordinates
+    const htailId = await getAirfoilId(htail_airfoil);
+    const htailData = await fetchAPI(`/api/airfoil/${htailId}`);
+    state.tailCoords = htailData.coordinates;
+
+    // Get vertical tail airfoil coordinates
+    const vtailId = await getAirfoilId(vtail_airfoil);
+    const vtailData = await fetchAPI(`/api/airfoil/${vtailId}`);
+    state.vtailCoords = vtailData.coordinates;
 
     // Calculate geometry
     state.geometry = await fetchAPI('/api/calculate', {
-      wingspan, weight, airfoil_code, tail_airfoil_code, wing_position, tail_type, wing_junction
+      wingspan, weight, airfoil_code, wing_position, tail_type, wing_junction
     });
 
-    // Run analysis
+    // Run analysis (uses wing airfoil)
     state.polars = await fetchAPI('/api/analyze', {
       geometry: state.geometry, airfoil_code
     });
 
-    // Run stability test
+    // Run stability test (uses htail airfoil)
     state.stability = await fetchAPI('/api/stability', {
-      geometry: state.geometry, airfoil_code, tail_airfoil_code
+      geometry: state.geometry, airfoil_code, tail_airfoil_code: htail_airfoil
     });
 
     // Save to localStorage
@@ -185,7 +195,7 @@ async function calculateAll() {
     displayResults(state.geometry);
     displayFlightTest(state.stability);
     displayCharts(state.polars);
-    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, airfoil_code, wing_junction, tail_type);
+    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, wing_junction, tail_type);
     hideLoading(btn);
 
     show('results-card');

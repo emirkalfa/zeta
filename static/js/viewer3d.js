@@ -4,7 +4,7 @@ let wingGroup, fuseGroup, tailGroup;
 let autoRotate = false;
 let animFrame;
 
-function initViewer(geom, wingCoords, tailCoords, airfoilCode, junction, tailType) {
+function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, junction, tailType) {
   if (viewer) disposeViewer();
 
   const container = document.getElementById('three-container');
@@ -53,7 +53,7 @@ function initViewer(geom, wingCoords, tailCoords, airfoilCode, junction, tailTyp
 
   buildWing(geom, wingCoords, junction, wingX);
   buildFuselage(geom);
-  buildTail(geom, tailCoords, tailType, tailX);
+  buildTail(geom, tailCoords, vtailCoords, tailType, tailX);
 
   scene.add(wingGroup);
   scene.add(fuseGroup);
@@ -237,11 +237,17 @@ function toggleFuselage() {
 }
 
 // --- TAIL ---
-function buildTail(geom, coords, tailType, tailX) {
+function buildTail(geom, coords, vtailCoords, tailType, tailX) {
   const nSec = 20;
   const nHalf = Math.floor(coords.length / 2);
   const uIdx = Array.from({length: nHalf}, (_, i) => i);
   const lIdx = Array.from({length: nHalf}, (_, i) => coords.length - 1 - i);
+
+  // Vertical tail airfoil indices (may be same or different)
+  const vCoords = vtailCoords || coords;
+  const vHalf = Math.floor(vCoords.length / 2);
+  const vuIdx = Array.from({length: vHalf}, (_, i) => i);
+  const vlIdx = Array.from({length: vHalf}, (_, i) => vCoords.length - 1 - i);
 
   const buildMesh = (secs, color, group, edgeColor) => {
     if (!secs.length) return;
@@ -313,19 +319,19 @@ function buildTail(geom, coords, tailType, tailX) {
       const yPos = eta * vSpan;
       const pts = [];
       // Right side (+Z) from airfoil upper surface
-      for (const idx of uIdx) {
+      for (const idx of vuIdx) {
         pts.push(new THREE.Vector3(
-          coords[idx].x * chord + xOff,
+          vCoords[idx].x * chord + xOff,
           yPos,
-          coords[idx].y_upper * chord * 0.5
+          vCoords[idx].y_upper * chord * 0.5
         ));
       }
       // Left side (-Z) from airfoil lower surface
-      for (const idx of lIdx) {
+      for (const idx of vlIdx) {
         pts.push(new THREE.Vector3(
-          coords[idx].x * chord + xOff,
+          vCoords[idx].x * chord + xOff,
           yPos,
-          coords[idx].y_lower * chord * 0.5
+          vCoords[idx].y_lower * chord * 0.5
         ));
       }
       secs.push(pts);

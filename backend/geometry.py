@@ -21,18 +21,27 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     fuse_max_width = 0.13 * wingspan
     fuse_max_height = 0.09 * wingspan
 
-    htail_span = 0.35 * wingspan
-    htail_root_chord = 0.40 * root_chord
+    # Positioning (needed before tail sizing)
+    wing_x_factors = {'pod_boom': 0.38, 'twin_boom': 0.35, 'flying_wing': 0.20}
+    wing_x_pos = wing_x_factors.get(fuse_type, 0.35) * fuse_length
+    tail_x_pos = 0.82 * fuse_length
+    htail_arm = tail_x_pos - wing_x_pos
+
+    # Tail sizing via volume coefficients (realistic proportions)
+    htail_Vh = 0.55
     htail_taper = 0.5
+    htail_span = 0.35 * wingspan
+    htail_area = htail_Vh * wing_area * mac / max(htail_arm, 0.01)
+    htail_root_chord = 2 * htail_area / (htail_span * (1 + htail_taper))
     htail_tip_chord = htail_root_chord * htail_taper
-    htail_area = htail_span * htail_root_chord
     htail_sweep = 3.0
 
-    vtail_span = 0.20 * wingspan
-    vtail_root_chord = 0.35 * root_chord
+    vtail_Vv = 0.035
     vtail_taper = 0.4
+    vtail_span = 0.20 * wingspan
+    vtail_area = vtail_Vv * wing_area * wingspan / max(htail_arm, 0.01)
+    vtail_root_chord = 2 * vtail_area / (vtail_span * (1 + vtail_taper))
     vtail_tip_chord = vtail_root_chord * vtail_taper
-    vtail_area = vtail_span * vtail_root_chord
 
     cg_position = 0.25 * mac
 
@@ -45,12 +54,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'mid': 0.0,
         'high': fuse_max_height * 0.65,
     }
-
-    # Wing X position varies by fuselage type (real aircraft proportions)
-    wing_x_factors = {'pod_boom': 0.38, 'twin_boom': 0.35, 'flying_wing': 0.20}
-    wing_x_pos = wing_x_factors.get(fuse_type, 0.35) * fuse_length
-    tail_x_pos = 0.82 * fuse_length
-    htail_arm = tail_x_pos - wing_x_pos
 
     result = {
         'wingspan': round(wingspan, 3),
@@ -83,6 +86,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'vtail_chord': round(vtail_root_chord, 3),
         'vtail_tip_chord': round(vtail_tip_chord, 3),
         'vtail_taper': round(vtail_taper, 3),
+        'vtail_area': round(vtail_area, 3),
         'cg_position': round(cg_position, 3),
         'span_efficiency': span_efficiency,
         'taper_ratio_input': taper_ratio,
