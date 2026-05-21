@@ -4,7 +4,7 @@ let wingGroup, fuseGroup, tailGroup;
 let autoRotate = false;
 let animFrame;
 
-function initViewer(geom, wingCoords, tailCoords, airfoilCode, junction, tailType, fuseType) {
+function initViewer(geom, wingCoords, tailCoords, airfoilCode, junction, tailType) {
   if (viewer) disposeViewer();
 
   const container = document.getElementById('three-container');
@@ -52,7 +52,7 @@ function initViewer(geom, wingCoords, tailCoords, airfoilCode, junction, tailTyp
   const tailX = geom.tail_x_pos || geom.fuselage_length * 0.82;
 
   buildWing(geom, wingCoords, junction, wingX);
-  buildFuselage(geom, fuseType || 'elliptic');
+  buildFuselage(geom);
   buildTail(geom, tailCoords, tailType, tailX);
 
   scene.add(wingGroup);
@@ -169,68 +169,44 @@ function buildWing(geom, coords, junction, wingX) {
 }
 
 // --- FUSELAGE ---
-function buildFuselage(geom, fuseType) {
-  if (fuseType === 'pod_boom') buildPodBoom(geom);
-  else if (fuseType === 'twin_boom') buildTwinBoom(geom);
-  else if (fuseType === 'flying_wing') buildFlyingWing(geom);
-}
-
-function addMeshToFuse(verts, idxs, color, edgeColor, opacity) {
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  geo.setIndex(idxs);
-  geo.computeVertexNormals();
-  fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide })));
-  if (edgeColor) {
-    const eg = new THREE.EdgesGeometry(geo);
-    fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: opacity || 0.10 })));
-  }
-}
-
-// === POD & BOOM ===
-function buildPodBoom(geom) {
+// Simple reference fuselage: elliptical ogive body
+function buildFuselage(geom) {
   const L = geom.fuselage_length;
   const W = geom.fuselage_max_width;
   const H = geom.fuselage_max_height;
-  const nSpan = 60;
+  const nSpan = 40;
   const nCirc = 24;
   const verts = []; const idxs = [];
-  const s3 = (t) => t * t * (3 - 2 * t);
+
+  const ss = (t) => t * t * (3 - 2 * t);
 
   for (let i = 0; i <= nSpan; i++) {
     const eta = i / nSpan;
     const xPos = eta * L;
     let ws, hs;
-    if (eta < 0.12) {
-      // Pod nose: rounded bullet
-      const u = eta / 0.12;
-      const s = Math.sin(u * Math.PI / 2);
-      ws = s; hs = s * 0.80;
-    } else if (eta < 0.28) {
-      // Pod body: wide with crown
-      const u = (eta - 0.12) / 0.16;
-      ws = 1 - 0.02 * u;
-      hs = 0.80 + 0.18 * u;
-    } else if (eta < 0.36) {
-      // Pod-to-boom transition
-      const u = (eta - 0.28) / 0.08;
-      const t = s3(u);
-      const endW = 0.055;
-      const endH = 0.055;
-      ws = 0.98 * (1 - t) + endW * t;
-      hs = 0.96 * (1 - t) + endH * t;
+    if (eta < 0.15) {
+      // Ogive nose
+      const u = eta / 0.15;
+      ws = Math.sin(u * Math.PI / 2);
+      hs = ws * 0.85;
+    } else if (eta < 0.60) {
+      // Constant body, slight crown
+      const u = (eta - 0.15) / 0.45;
+      ws = 1 - 0.01 * u * u;
+      hs = 0.85 + 0.13 * u;
     } else {
-      // Boom: thin circular tube
-      const u = (eta - 0.36) / 0.64;
-      ws = 0.055 * (1 - 0.25 * u);
-      hs = 0.055 * (1 - 0.25 * u);
+      // Tail: smooth cosine taper
+      const u = (eta - 0.60) / 0.40;
+      ws = 0.99 * (1 - ss(u)) + 0.01;
+      hs = 0.96 * (1 - ss(u)) + 0.01;
     }
     const w = W / 2 * ws;
     const h = H / 2 * hs;
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
       const st = Math.sin(th), ct = Math.cos(th);
-      const yy = eta < 0.36 && st < 0 ? h * st * 0.30 : h * st;
+      // Gentle flat-bottom
+      const yy = st < 0 ? h * st * 0.5 : h * st;
       verts.push(xPos, yy, w * ct);
     }
   }
@@ -242,138 +218,22 @@ function buildPodBoom(geom) {
       idxs.push(a, b, c); idxs.push(b, d, c);
     }
   }
-  addMeshToFuse(verts, idxs, 0x94a3b8, 0x475569, 0.08);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idxs);
+  geo.computeVertexNormals();
+  fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0x94a3b8, side: THREE.DoubleSide, transparent: true, opacity: 0.55 })));
+  const eg = new THREE.EdgesGeometry(geo);
+  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.12 })));
 }
 
-// === TWIN-BOOM ===
-function buildTwinBoom(geom) {
-  const L = geom.fuselage_length;
-  const W = geom.fuselage_max_width;
-  const H = geom.fuselage_max_height;
-  const nCirc = 20;
-
-  // Center pod (0 → 20%)
-  (function() {
-    const nSegs = 22; const verts = []; const idxs = [];
-    for (let i = 0; i <= nSegs; i++) {
-      const eta = i / nSegs;
-      const xPos = eta * 0.20 * L;
-      const u = eta;
-      let ws, hs;
-      if (u < 0.35) {
-        const t = u / 0.35;
-        const s = Math.sin(t * Math.PI / 2);
-        ws = s; hs = s * 0.75;
-      } else {
-        const t = (u - 0.35) / 0.65;
-        ws = 1 - 0.65 * Math.pow(t, 1.5);
-        hs = 0.75 * (1 - 0.50 * Math.pow(t, 1.5));
-      }
-      const w = W / 2 * ws;
-      const h = H / 2 * hs;
-      for (let j = 0; j < nCirc; j++) {
-        const th = (j / nCirc) * 2 * Math.PI;
-        const st = Math.sin(th), ct = Math.cos(th);
-        verts.push(xPos, h * st, w * ct);
-      }
-    }
-    for (let i = 0; i < nSegs; i++) {
-      for (let j = 0; j < nCirc; j++) {
-        const jn = (j + 1) % nCirc;
-        const a = i * nCirc + j, b = i * nCirc + jn;
-        const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
-        idxs.push(a, b, c); idxs.push(b, d, c);
-      }
-    }
-    addMeshToFuse(verts, idxs, 0x94a3b8, 0x475569, 0.08);
-  })();
-
-  // Two booms (18% → 100%)
-  const boomR = W * 0.04;
-  const boomOff = W * 0.26;
-  const nSegs = 30;
-
-  const makeBoom = (sign) => {
-    const verts = []; const idxs = [];
-    for (let i = 0; i <= nSegs; i++) {
-      const eta = i / nSegs;
-      const xPos = (0.18 + eta * 0.82) * L;
-      let r = boomR;
-      if (eta < 0.10) {
-        const t = eta / 0.10;
-        r *= Math.sin(t * Math.PI / 2);
-      }
-      r *= 1 - 0.15 * eta;
-      for (let j = 0; j < nCirc; j++) {
-        const th = (j / nCirc) * 2 * Math.PI;
-        const st = Math.sin(th), ct = Math.cos(th);
-        verts.push(xPos, r * st, sign * boomOff + r * ct);
-      }
-    }
-    for (let i = 0; i < nSegs; i++) {
-      for (let j = 0; j < nCirc; j++) {
-        const jn = (j + 1) % nCirc;
-        const a = i * nCirc + j, b = i * nCirc + jn;
-        const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
-        idxs.push(a, b, c); idxs.push(b, d, c);
-      }
-    }
-    addMeshToFuse(verts, idxs, 0x8da3b8, 0x475569, 0.08);
-  };
-  makeBoom(-1);
-  makeBoom(1);
-}
-
-// === FLYING WING ===
-function buildFlyingWing(geom) {
-  const L = geom.fuselage_length;
-  const W = geom.fuselage_max_width;
-  const H = geom.fuselage_max_height;
-  const nSpan = 18;
-  const nCirc = 18;
-  const verts = []; const idxs = [];
-
-  // Flying wing: wide flat lenticular centerbody, 20% of L
-  const effLen = L * 0.20;
-  const wMult = 2.0;
-  const hMult = 0.20;
-
-  for (let i = 0; i <= nSpan; i++) {
-    const eta = i / nSpan;
-    const xPos = eta * effLen;
-    const u = eta;
-    let ws, hs;
-    if (u < 0.25) {
-      const t = u / 0.25;
-      const s = Math.sin(t * Math.PI / 2);
-      ws = s; hs = 0.35 * t;
-    } else if (u < 0.65) {
-      const t = (u - 0.25) / 0.40;
-      ws = 1 - 0.02 * t;
-      hs = 0.35 * (1 - 0.30 * t);
-    } else {
-      const t = (u - 0.65) / 0.35;
-      ws = 0.98 * (1 - Math.pow(t, 0.8));
-      hs = 0.35 * 0.70 * (1 - t);
-    }
-    const w = W / 2 * ws * wMult;
-    const h = H / 2 * hs * hMult;
-    for (let j = 0; j < nCirc; j++) {
-      const th = (j / nCirc) * 2 * Math.PI;
-      const st = Math.sin(th), ct = Math.cos(th);
-      const yy = st >= 0 ? h * Math.pow(st, 0.6) : h * Math.pow(-st, 0.6) * (-1);
-      verts.push(xPos, yy, w * ct);
-    }
-  }
-  for (let i = 0; i < nSpan; i++) {
-    for (let j = 0; j < nCirc; j++) {
-      const jn = (j + 1) % nCirc;
-      const a = i * nCirc + j, b = i * nCirc + jn;
-      const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
-      idxs.push(a, b, c); idxs.push(b, d, c);
-    }
-  }
-  addMeshToFuse(verts, idxs, 0xa0aab8, 0x475569, 0.08);
+// Toggle fuselage visibility
+function toggleFuselage() {
+  if (!fuseGroup) return;
+  fuseGroup.visible = !fuseGroup.visible;
+  const btn = document.getElementById('toggleFuse');
+  if (btn) btn.classList.toggle('active');
 }
 
 // --- TAIL ---
