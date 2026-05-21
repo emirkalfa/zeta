@@ -67,8 +67,8 @@ function applyDarkMode() {
 }
 
 function setupSaveLoad() {
-  $('saveBtn').addEventListener('click', saveProject);
-  $('loadBtn').addEventListener('click', loadProject);
+  $('saveBtn')?.addEventListener('click', saveProject);
+  $('loadBtn')?.addEventListener('click', loadProject);
 }
 
 function checkSavedProject() {
@@ -103,8 +103,8 @@ function saveProject() {
     wing_junction: document.querySelector('input[name="junction"]:checked')?.value || 'through',
   };
   localStorage.setItem('zeta-project', JSON.stringify(data));
-  $('saveBtn').textContent = '✅';
-  setTimeout(() => { $('saveBtn').textContent = '💾'; }, 1500);
+  const sb = $('saveBtn');
+  if (sb) { sb.textContent = '✅'; setTimeout(() => { sb.textContent = '💾'; }, 1500); }
 }
 
 function loadProject() {
@@ -112,8 +112,8 @@ function loadProject() {
     const saved = localStorage.getItem('zeta-project');
     if (saved) {
       checkSavedProject();
-      $('loadBtn').textContent = '✅';
-      setTimeout(() => { $('loadBtn').textContent = '📂'; }, 1500);
+      const lb = $('loadBtn');
+      if (lb) { lb.textContent = '✅'; setTimeout(() => { lb.textContent = '📂'; }, 1500); }
     }
   } catch(e) { alert('Kayıtlı proje bulunamadı.'); }
 }
