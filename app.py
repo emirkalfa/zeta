@@ -70,7 +70,7 @@ def api_calculate():
     wing_position = data.get('wing_position', 'mid')
     tail_type = data.get('tail_type', 'conventional')
     wing_junction = data.get('wing_junction', 'through')
-    fuse_type = data.get('fuselage_type', 'cessna')
+    fuse_type = data.get('fuselage_type', 'pod_boom')
 
     geom = calculate_geometry(wingspan, weight, airfoil_code,
                               wing_position, tail_type, wing_junction,

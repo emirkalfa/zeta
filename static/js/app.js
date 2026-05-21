@@ -83,7 +83,7 @@ function checkSavedProject() {
         if (tt) tt.checked = true;
         const wj = document.querySelector(`input[name="junction"][value="${data.wing_junction || 'through'}"]`);
         if (wj) wj.checked = true;
-        const ft = document.querySelector(`input[name="fuse_type"][value="${data.fuselage_type || 'cessna'}"]`);
+        const ft = document.querySelector(`input[name="fuse_type"][value="${data.fuselage_type || 'pod_boom'}"]`);
         if (ft) ft.checked = true;
       }
     }
@@ -99,7 +99,7 @@ function saveProject() {
     wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
     wing_junction: document.querySelector('input[name="junction"]:checked')?.value || 'through',
-    fuselage_type: document.querySelector('input[name="fuse_type"]:checked')?.value || 'cessna',
+    fuselage_type: document.querySelector('input[name="fuse_type"]:checked')?.value || 'pod_boom',
   };
   localStorage.setItem('zeta-project', JSON.stringify(data));
   $('saveBtn').textContent = '✅';
@@ -134,7 +134,7 @@ function setupEventListeners() {
   // Auto-switch wing position when fuselage type changes
   document.querySelectorAll('input[name="fuse_type"]').forEach(el => {
     el.addEventListener('change', () => {
-      const map = { cessna: 'high', cirrus: 'low', gulfstream: 'low' };
+      const map = { pod_boom: 'high', twin_boom: 'low', flying_wing: 'mid' };
       const wp = map[el.value] || 'mid';
       document.querySelector(`input[name="wing_pos"][value="${wp}"]`).checked = true;
     });
@@ -152,7 +152,7 @@ async function calculateAll() {
   const wing_position = document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid';
   const tail_type = document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional';
   const wing_junction = document.querySelector('input[name="junction"]:checked')?.value || 'through';
-  const fuselage_type = document.querySelector('input[name="fuse_type"]:checked')?.value || 'cessna';
+  const fuselage_type = document.querySelector('input[name="fuse_type"]:checked')?.value || 'pod_boom';
 
   if (!wingspan || !weight || wingspan <= 0 || weight <= 0) {
     alert('Lütfen geçerli bir kanat açıklığı ve ağırlık girin.');

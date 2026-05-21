@@ -2,7 +2,7 @@ import numpy as np
 
 def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                        tail_type='conventional', wing_junction='through',
-                       fuse_type='cessna'):
+                       fuse_type='pod_boom'):
     ar = 7.0
     taper_ratio = 0.5
     sweep_angle = 5.0
@@ -47,7 +47,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     }
 
     # Wing X position varies by fuselage type (real aircraft proportions)
-    wing_x_factors = {'cessna': 0.30, 'cirrus': 0.35, 'gulfstream': 0.38}
+    wing_x_factors = {'pod_boom': 0.38, 'twin_boom': 0.35, 'flying_wing': 0.20}
     wing_x_pos = wing_x_factors.get(fuse_type, 0.35) * fuse_length
     tail_x_pos = 0.82 * fuse_length
     htail_arm = tail_x_pos - wing_x_pos

@@ -170,163 +170,240 @@ function buildWing(geom, coords, junction, wingX) {
 
 // --- FUSELAGE ---
 function buildFuselage(geom, fuseType) {
+  if (fuseType === 'pod_boom') buildPodBoom(geom);
+  else if (fuseType === 'twin_boom') buildTwinBoom(geom);
+  else if (fuseType === 'flying_wing') buildFlyingWing(geom);
+}
+
+function addMeshToFuse(verts, idxs, color, edgeColor, opacity) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idxs);
+  geo.computeVertexNormals();
+  fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide })));
+  if (edgeColor) {
+    const eg = new THREE.EdgesGeometry(geo);
+    fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: opacity || 0.10 })));
+  }
+}
+
+function buildCylinderSections(radiusFn, nSegs, nCirc) {
+  // radiusFn(eta) returns radius at normalized position
+  const verts = [];
+  const idxs = [];
+  for (let i = 0; i <= nSegs; i++) {
+    const eta = i / nSegs;
+    const r = radiusFn(eta);
+    const xPos = eta;
+    for (let j = 0; j < nCirc; j++) {
+      const th = (j / nCirc) * 2 * Math.PI;
+      verts.push(xPos, r * Math.sin(th), r * Math.cos(th));
+    }
+  }
+  for (let i = 0; i < nSegs; i++) {
+    for (let j = 0; j < nCirc; j++) {
+      const jn = (j + 1) % nCirc;
+      const a = i * nCirc + j, b = i * nCirc + jn;
+      const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
+      idxs.push(a, b, c); idxs.push(b, d, c);
+    }
+  }
+  return { verts, idxs };
+}
+
+// === POD & BOOM ===
+function buildPodBoom(geom) {
   const L = geom.fuselage_length;
   const W = geom.fuselage_max_width;
   const H = geom.fuselage_max_height;
-  const nSpan = 50;
-  const nCirc = 36;
+  const nSpan = 48;
+  const nCirc = 28;
   const verts = [];
   const idxs = [];
-  // Wing root position along fuselage for waist narrowing
-  const wingEta = (geom.wing_x_pos || 0.35 * L) / L;
-
-  // Smoothstep: C1-continuous cubic blend
   const ss = (t) => t * t * (3 - 2 * t);
-  // Cosine blend: C2-continuous
-  const cs = (t) => 0.5 - 0.5 * Math.cos(t * Math.PI);
 
-  // — Profile generators —
-  // Each returns { ws, hs } at normalized pos eta (0-1)
-  const profile = (eta, type) => {
-    if (type === 'cessna') {
-      // Cessna 172: hemispherical dome, flat belly, long constant cabin, conical tailcone
-      // Width (top view)
-      let ws;
-      if (eta < 0.18) {
-        const u = eta / 0.18;
-        ws = Math.sin(u * Math.PI / 2);
-      } else if (eta < 0.70) {
-        const u = (eta - 0.18) / 0.52;
-        ws = 1 - 0.02 * u * u;
-      } else {
-        const u = (eta - 0.70) / 0.30;
-        ws = 0.98 * (1 - cs(u));
-      }
-      // Height (side view): flat belly, domed top
-      let hs;
-      if (eta < 0.18) {
-        const u = eta / 0.18;
-        hs = Math.sin(u * Math.PI / 2);
-      } else if (eta < 0.42) {
-        // cabin crown: gentle rise
-        const u = (eta - 0.18) / 0.24;
-        hs = 0.93 + 0.07 * ss(u);
-      } else if (eta < 0.70) {
-        // slight downward slope toward tail
-        const u = (eta - 0.42) / 0.28;
-        hs = 1.0 - 0.03 * cs(u);
-      } else {
-        const u = (eta - 0.70) / 0.30;
-        hs = 0.97 * (1 - cs(u));
-      }
-      return { ws, hs };
+  const profile = (eta) => {
+    // Pod: 0 → 0.42, Transition: 0.42 → 0.52, Boom: 0.52 → 1.0
+    let ws, hs;
+    if (eta < 0.42) {
+      // Pod nose: quarter-sine to 1, then hold
+      const u = eta / 0.42;
+      ws = u < 0.35 ? Math.sin((u / 0.35) * Math.PI / 2) : 1 - 0.03 * Math.pow((u - 0.35) / 0.65, 2);
+      hs = u < 0.35 ? Math.sin((u / 0.35) * Math.PI / 2) : 1 - 0.02 * Math.pow((u - 0.35) / 0.65, 2);
+    } else if (eta < 0.52) {
+      // Transition from pod to boom
+      const u = (eta - 0.42) / 0.10;
+      const s = ss(u);
+      ws = (1 - s) * 0.97 + s * 0.08;
+      hs = (1 - s) * 0.98 + s * 0.08;
+    } else {
+      // Boom: thin circular tube, slight taper toward tail
+      const u = (eta - 0.52) / 0.48;
+      ws = 0.08 * (1 - 0.3 * u);
+      hs = 0.08 * (1 - 0.3 * u);
     }
-
-    if (type === 'gulfstream') {
-      // Gulfstream G650: sharp nose, wide flat body, long tailcone
-      let ws;
-      if (eta < 0.22) {
-        const u = eta / 0.22;
-        ws = Math.pow(u, 0.6);
-      } else if (eta < 0.68) {
-        ws = 1 - 0.01 * Math.pow((eta - 0.22) / 0.46, 2);
-      } else {
-        const u = (eta - 0.68) / 0.32;
-        ws = 0.99 * (1 - Math.pow(u, 0.65));
-      }
-      let hs;
-      if (eta < 0.22) {
-        const u = eta / 0.22;
-        hs = Math.pow(u, 0.55);
-      } else if (eta < 0.68) {
-        const u = (eta - 0.22) / 0.46;
-        hs = 1 - 0.02 * u * u;
-      } else {
-        const u = (eta - 0.68) / 0.32;
-        hs = 0.98 * (1 - Math.pow(u, 0.7));
-      }
-      return { ws: ws * 1.12, hs };
-    }
-
-    // Cirrus SR22: smooth NACA teardrop
-    const sqrtE = Math.sqrt(eta);
-    const tDist = 2.969 * sqrtE - 1.260 * eta - 3.516 * eta * eta
-                + 2.843 * eta * eta * eta - 1.015 * eta * eta * eta * eta;
-    const norm = tDist / 0.307;
-    // NACA gives asymmetric shape; apply slight squish
-    return { ws: norm, hs: norm * 0.88 };
+    return { ws, hs };
   };
 
-  // — Cross-section shapes —
-  const crossSection = (ws, hs, th, type) => {
-    const ct = Math.cos(th);
-    const st = Math.sin(th);
-    const w = W / 2 * ws;
-    const h = H / 2 * hs;
-
-    if (type === 'cessna') {
-      // Domed top (half-ellipse), flat bottom, slight tuck-under at belly
-      const y = st >= 0
-        ? h * st
-        : h * st * 0.25;
-      const z = w * ct * (st >= 0 ? 1 : 0.93);
-      return { y, z };
-    }
-
-    if (type === 'gulfstream') {
-      // Flat bottom, bulging sides, oval top
-      const sideBulge = 1 + 0.08 * (1 - Math.abs(ct));
-      const y = st >= 0
-        ? h * st
-        : h * st * 0.30;
-      const z = w * ct * sideBulge * (st >= 0 ? 1 : 0.90);
-      return { y, z };
-    }
-
-    // Cirrus: smooth ellipse, very slight bottom flatten
-    const flatBot = st < -0.15 ? 0.92 : 1;
-    return { y: h * st * flatBot, z: w * ct };
-  };
+  const wingEta = (geom.wing_x_pos || 0.35 * L) / L;
 
   for (let i = 0; i <= nSpan; i++) {
     const eta = i / nSpan;
     const xPos = eta * L;
-    let { ws, hs } = profile(eta, fuseType);
-
-    // Waist: gövde kanat birleşim noktasında incelme
+    let { ws, hs } = profile(eta);
     const dw = (eta - wingEta) / 0.10;
     if (Math.abs(dw) < 1) {
-      const bell = 1 - Math.cos(dw * Math.PI) / 2;
-      ws *= 1 - 0.06 * bell;
+      const bell = 0.5 - 0.5 * Math.cos(dw * Math.PI);
+      ws *= 1 - 0.05 * bell;
       hs *= 1 - 0.02 * bell;
     }
-
+    const w = W / 2 * ws;
+    const h = H / 2 * hs;
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
-      const { y, z } = crossSection(ws, hs, th, fuseType);
+      const y = h * Math.sin(th);
+      const z = w * Math.cos(th);
       verts.push(xPos, y, z);
     }
   }
-
   for (let i = 0; i < nSpan; i++) {
     for (let j = 0; j < nCirc; j++) {
       const jn = (j + 1) % nCirc;
       const a = i * nCirc + j, b = i * nCirc + jn;
       const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
-      idxs.push(a, b, c);
-      idxs.push(b, d, c);
+      idxs.push(a, b, c); idxs.push(b, d, c);
     }
   }
+  addMeshToFuse(verts, idxs, 0x94a3b8, 0x475569, 0.08);
+}
 
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  geo.setIndex(idxs);
-  geo.computeVertexNormals();
+// === TWIN-BOOM ===
+function buildTwinBoom(geom) {
+  const L = geom.fuselage_length;
+  const W = geom.fuselage_max_width;
+  const H = geom.fuselage_max_height;
+  const nCirc = 20;
 
-  const colors = { cessna: 0x94a3b8, cirrus: 0x8ba3b8, gulfstream: 0xa0aab8 };
-  fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: colors[fuseType] || 0x94a3b8, side: THREE.DoubleSide })));
-  const eg = new THREE.EdgesGeometry(geo);
-  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.10 })));
+  // Center pod (0 → 25% of length)
+  const podEnd = 0.25;
+  const nPod = 20;
+  (function() {
+    const verts = []; const idxs = [];
+    for (let i = 0; i <= nPod; i++) {
+      const eta = i / nPod;
+      const xPos = eta * podEnd * L;
+      const u = eta;
+      let ws = u < 0.35 ? Math.sin((u / 0.35) * Math.PI / 2) : 1 - 0.55 * Math.pow((u - 0.35) / 0.65, 1.3);
+      let hs = u < 0.35 ? ws : 1 - 0.50 * Math.pow((u - 0.35) / 0.65, 1.3);
+      const w = W / 2 * ws;
+      const h = H / 2 * hs;
+      for (let j = 0; j < nCirc; j++) {
+        const th = (j / nCirc) * 2 * Math.PI;
+        const st = Math.sin(th), ct = Math.cos(th);
+        verts.push(xPos, h * st * (st >= 0 ? 1 : 0.25), w * ct);
+      }
+    }
+    for (let i = 0; i < nPod; i++) {
+      for (let j = 0; j < nCirc; j++) {
+        const jn = (j + 1) % nCirc;
+        const a = i * nCirc + j, b = i * nCirc + jn;
+        const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
+        idxs.push(a, b, c); idxs.push(b, d, c);
+      }
+    }
+    addMeshToFuse(verts, idxs, 0x94a3b8, 0x475569, 0.08);
+  })();
+
+  // Two booms
+  const boomR = W * 0.05;
+  const boomOff = W * 0.30;
+  const boomStart = 0.23;
+  const nBoom = 28;
+
+  const makeBoom = (sign) => {
+    const verts = []; const idxs = [];
+    for (let i = 0; i <= nBoom; i++) {
+      const eta = i / nBoom;
+      const xPos = (boomStart + eta * (1 - boomStart)) * L;
+      const r = boomR * (1 - 0.25 * eta);
+      for (let j = 0; j < nCirc; j++) {
+        const th = (j / nCirc) * 2 * Math.PI;
+        const st = Math.sin(th), ct = Math.cos(th);
+        verts.push(xPos, r * st, sign * boomOff + r * ct);
+      }
+    }
+    for (let i = 0; i < nBoom; i++) {
+      for (let j = 0; j < nCirc; j++) {
+        const jn = (j + 1) % nCirc;
+        const a = i * nCirc + j, b = i * nCirc + jn;
+        const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
+        idxs.push(a, b, c); idxs.push(b, d, c);
+      }
+    }
+    addMeshToFuse(verts, idxs, 0x8da3b8, 0x475569, 0.08);
+  };
+  makeBoom(-1);
+  makeBoom(1);
+}
+
+// === FLYING WING ===
+function buildFlyingWing(geom) {
+  const L = geom.fuselage_length;
+  const W = geom.fuselage_max_width;
+  const H = geom.fuselage_max_height;
+  const nSpan = 24;
+  const nCirc = 24;
+  const verts = [];
+  const idxs = [];
+
+  // Flying wing: short blended center body, wide and flat
+  // Effective length is 30% of normal fuse_length
+  const effLen = L * 0.30;
+  const wingEta = (geom.wing_x_pos || 0.20 * L) / L;
+
+  for (let i = 0; i <= nSpan; i++) {
+    const eta = i / nSpan;
+    const xPos = eta * effLen;
+    const u = eta;
+
+    // Teardrop profile but very short and wide
+    let ws = u < 0.2 ? Math.sin((u / 0.2) * Math.PI / 2) : 1 - Math.pow((u - 0.2) / 0.8, 1.8);
+    let hs = u < 0.2 ? Math.sin((u / 0.2) * Math.PI / 2) * 0.5 : (0.5 - 0.4 * Math.pow((u - 0.2) / 0.8, 1.5));
+
+    // Blend into wing at the rear
+    if (u > 0.6) {
+      const t = (u - 0.6) / 0.4;
+      ws *= 1 - 0.5 * t;
+      hs *= 0.3 + 0.7 * (1 - t);
+    }
+
+    const dw = (eta - wingEta) / 0.12;
+    if (Math.abs(dw) < 1) {
+      const bell = 0.5 - 0.5 * Math.cos(dw * Math.PI);
+      ws *= 1 - 0.04 * bell;
+    }
+
+    const w = W * 0.7 * ws;
+    const h = H * 0.3 * hs;
+    for (let j = 0; j < nCirc; j++) {
+      const th = (j / nCirc) * 2 * Math.PI;
+      // Flat bottom, rounded top profile
+      const st = Math.sin(th);
+      const ct = Math.cos(th);
+      const y = st >= 0 ? h * st : h * st * 0.4;
+      const z = w * ct;
+      verts.push(xPos, y, z);
+    }
+  }
+  for (let i = 0; i < nSpan; i++) {
+    for (let j = 0; j < nCirc; j++) {
+      const jn = (j + 1) % nCirc;
+      const a = i * nCirc + j, b = i * nCirc + jn;
+      const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
+      idxs.push(a, b, c); idxs.push(b, d, c);
+    }
+  }
+  addMeshToFuse(verts, idxs, 0xa0aab8, 0x475569, 0.08);
 }
 
 // --- TAIL ---
