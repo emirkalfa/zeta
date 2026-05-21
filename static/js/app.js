@@ -134,6 +134,15 @@ function setupEventListeners() {
 
   // Toggle fuselage visibility
   $('toggleFuse').addEventListener('click', toggleFuselage);
+
+  // Mode selector
+  function setMode(mode) {
+    $('autoMode').classList.toggle('active', mode === 'auto');
+    $('manualMode').classList.toggle('active', mode === 'manual');
+    $('manual-inputs').style.display = mode === 'manual' ? '' : 'none';
+  }
+  $('autoMode').addEventListener('click', () => setMode('auto'));
+  $('manualMode').addEventListener('click', () => setMode('manual'));
 }
 
 async function calculateAll() {
@@ -174,9 +183,24 @@ async function calculateAll() {
     state.vtailCoords = vtailData.coordinates;
 
     // Calculate geometry
-    state.geometry = await fetchAPI('/api/calculate', {
-      wingspan, weight, airfoil_code, wing_position, tail_type, wing_junction
-    });
+    const manual_mode = $('manual-inputs').style.display !== 'none';
+    const body = {
+      wingspan, weight, airfoil_code, wing_position, tail_type, wing_junction, manual_mode
+    };
+    if (manual_mode) {
+      body.man_root_chord = parseFloat($('man_root_chord').value) || undefined;
+      body.man_tip_chord = parseFloat($('man_tip_chord').value) || undefined;
+      body.man_sweep = parseFloat($('man_sweep').value) || undefined;
+      body.man_dihedral = parseFloat($('man_dihedral').value) || undefined;
+      body.man_htail_span = parseFloat($('man_htail_span').value) || undefined;
+      body.man_htail_root = parseFloat($('man_htail_root').value) || undefined;
+      body.man_htail_tip = parseFloat($('man_htail_tip').value) || undefined;
+      body.man_htail_sweep = parseFloat($('man_htail_sweep').value) || undefined;
+      body.man_vtail_span = parseFloat($('man_vtail_span').value) || undefined;
+      body.man_vtail_root = parseFloat($('man_vtail_root').value) || undefined;
+      body.man_vtail_tip = parseFloat($('man_vtail_tip').value) || undefined;
+    }
+    state.geometry = await fetchAPI('/api/calculate', body);
 
     // Run analysis (uses wing airfoil)
     state.polars = await fetchAPI('/api/analyze', {

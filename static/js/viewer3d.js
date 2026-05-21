@@ -151,18 +151,6 @@ function buildWing(geom, coords, junction, wingX) {
         idxs.push(b, d, c);
       }
     }
-    // Tip cap — centroid fan
-    const tip = secs[nSec];
-    const cent = new THREE.Vector3(0, 0, 0);
-    for (const p of tip) cent.add(p);
-    cent.divideScalar(nPts);
-    const centIdx = verts.length / 3;
-    verts.push(cent.x, cent.y, cent.z);
-    const tipBase = offset + nSec * nPts;
-    for (let j = 0; j < nPts; j++) {
-      const jn = (j + 1) % nPts;
-      idxs.push(tipBase + j, centIdx, tipBase + jn);
-    }
   }
 
   const geo = new THREE.BufferGeometry();
@@ -175,6 +163,41 @@ function buildWing(geom, coords, junction, wingX) {
     transparent: junction === 'surface', opacity: junction === 'surface' ? 0.9 : 1.0,
   }));
   wingGroup.add(mesh);
+
+  // Tip caps as separate meshes
+  let halfBase = 0;
+  for (const secs of [right, left]) {
+    const tip = secs[nSec];
+    const cv = [];
+    for (const p of tip) cv.push(p.x, p.y, p.z);
+    const cent = new THREE.Vector3(0, 0, 0);
+    for (const p of tip) cent.add(p);
+    cent.divideScalar(nPts);
+    const centIdx = nPts;
+    cv.push(cent.x, cent.y, cent.z);
+    const ci = [];
+    for (let j = 0; j < nPts; j++) {
+      const jn = (j + 1) % nPts;
+      ci.push(j, centIdx, jn);
+    }
+    const capGeo = new THREE.BufferGeometry();
+    capGeo.setAttribute('position', new THREE.Float32BufferAttribute(cv, 3));
+    capGeo.setIndex(ci);
+    capGeo.computeVertexNormals();
+    // Copy skin normals to cap perimeter vertices for smooth shading
+    const tipStart = halfBase + nSec * nPts;
+    const capNrm = capGeo.attributes.normal;
+    const skinNrm = geo.attributes.normal;
+    for (let j = 0; j < nPts; j++) {
+      capNrm.setXYZ(j, skinNrm.getX(tipStart + j), skinNrm.getY(tipStart + j), skinNrm.getZ(tipStart + j));
+    }
+    capNrm.needsUpdate = true;
+    wingGroup.add(new THREE.Mesh(capGeo, new THREE.MeshPhongMaterial({
+      color: 0x3b82f6, side: THREE.DoubleSide,
+      transparent: junction === 'surface', opacity: junction === 'surface' ? 0.9 : 1.0,
+    })));
+    halfBase += (nSec + 1) * nPts;
+  }
 
   const eg = new THREE.EdgesGeometry(geo);
   wingGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x1e40af, transparent: true, opacity: 0.3 })));
@@ -278,6 +301,38 @@ function buildTail(geom, coords, vtailCoords, tailType, tailX) {
     g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
     g.setIndex(ii); g.computeVertexNormals();
     group.add(new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide })));
+
+    // Tip caps as separate meshes
+    const halfSize = nSec + 1;
+    const nHalves = secs.length / halfSize;
+    for (let h = 0; h < nHalves; h++) {
+      const tip = secs[(h + 1) * halfSize - 1];
+      const cv = [];
+      for (const p of tip) cv.push(p.x, p.y, p.z);
+      const cent = new THREE.Vector3(0, 0, 0);
+      for (const p of tip) cent.add(p);
+      cent.divideScalar(nP);
+      const centIdx = nP;
+      cv.push(cent.x, cent.y, cent.z);
+      const ci = [];
+      for (let j = 0; j < nP; j++) {
+        const jn = (j + 1) % nP;
+        ci.push(j, centIdx, jn);
+      }
+      const capGeo = new THREE.BufferGeometry();
+      capGeo.setAttribute('position', new THREE.Float32BufferAttribute(cv, 3));
+      capGeo.setIndex(ci);
+      capGeo.computeVertexNormals();
+      const tipStart = (h + 1) * halfSize * nP - nP;
+      const capNrm = capGeo.attributes.normal;
+      const skinNrm = g.attributes.normal;
+      for (let j = 0; j < nP; j++) {
+        capNrm.setXYZ(j, skinNrm.getX(tipStart + j), skinNrm.getY(tipStart + j), skinNrm.getZ(tipStart + j));
+      }
+      capNrm.needsUpdate = true;
+      group.add(new THREE.Mesh(capGeo, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide })));
+    }
+
     const eg = new THREE.EdgesGeometry(g);
     group.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: edgeColor || 0x92400e, transparent: true, opacity: 0.25 })));
   };

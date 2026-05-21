@@ -204,6 +204,50 @@ header {
   border-color: var(--primary);
 }
 
+#manual-inputs h3 {
+  margin: 16px 0 8px;
+  font-size: 0.95rem;
+  color: var(--primary);
+}
+
+#manual-inputs .form-grid {
+  margin-bottom: 4px;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.mode-selector {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mode-btn {
+  padding: 5px 14px;
+  border: none;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.mode-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.mode-btn:not(.active):hover {
+  background: var(--bg);
+}
+
 /* Results Grid */
 .results-grid {
   display: grid;
