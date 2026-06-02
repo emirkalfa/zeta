@@ -1,3 +1,15 @@
+function getNumSegments(id) {
+  return parseInt(document.getElementById(id).value) || 1;
+}
+
+function checkGeom() {
+  if (!state.geometry) {
+    alert('STL için model bulunamadı. Önce HESAPLA butonuna tıklayın.');
+    return false;
+  }
+  return true;
+}
+
 function exportSTL(part) {
   let meshes = [];
 
@@ -20,7 +32,6 @@ function exportSTL(part) {
     return;
   }
 
-  // Create a merged geometry
   const merged = mergeMeshes(meshes);
   if (!merged) return;
 
@@ -31,6 +42,188 @@ function exportSTL(part) {
   const fileName = `zeta_${part}.stl`;
 
   downloadBlob(stlData, fileName);
+}
+
+function exportSlicedWing() {
+  if (!checkGeom()) return;
+  const n = getNumSegments('sliceCount');
+  if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+
+  const geom = state.geometry;
+  const coords = state.airfoilCoords;
+  const halfSpan = geom.wingspan / 2;
+  const segLen = halfSpan / n;
+
+  const exporter = new THREE.STLExporter();
+
+  for (let side = 0; side < 2; side++) {
+    const sign = side === 0 ? 1 : -1;
+    const sideName = side === 0 ? 'sag' : 'sol';
+
+    for (let seg = 0; seg < n; seg++) {
+      const yStart = seg * segLen;
+      const yEnd = (seg + 1) * segLen;
+      const hasPins = seg < n - 1;
+      const hasHoles = seg > 0;
+
+      const mesh = buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles);
+      const stlData = exporter.parse(mesh, { binary: true });
+      const fileName = `zeta_kanat_${sideName}_${seg+1}of${n}.stl`;
+      downloadBlob(stlData, fileName);
+    }
+  }
+}
+
+function exportSlicedTail() {
+  if (!checkGeom()) return;
+  const n = getNumSegments('tailSliceCount');
+  if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+
+  const geom = state.geometry;
+  const tailType = geom.tail_type || 'conventional';
+  const exporter = new THREE.STLExporter();
+
+  if (tailType === 'vtail') {
+    // V-tail: two surfaces at 35 deg, slice each
+    const vAngle = THREE.MathUtils.degToRad(35);
+    const vHalf = geom.vtail_span * 0.7;
+    const segLen = vHalf / n;
+    for (let side = 0; side < 2; side++) {
+      const sign = side === 0 ? 1 : -1;
+      const sideName = side === 0 ? 'sag' : 'sol';
+      for (let seg = 0; seg < n; seg++) {
+        const ys = seg * segLen;
+        const ye = (seg + 1) * segLen;
+        const hp = seg < n - 1, hh = seg > 0;
+        const secs = [];
+        const nHalf = Math.floor(state.tailCoords.length / 2);
+        const uIdx = Array.from({length: nHalf}, (_, i) => i);
+        const lIdx = Array.from({length: nHalf}, (_, i) => state.tailCoords.length - 1 - i);
+        const nPts = state.tailCoords.length;
+        const nSec = 16;
+        const hChord = geom.htail_chord;
+        const hTaper = geom.htail_taper || 0.5;
+        const hSweep = THREE.MathUtils.degToRad(geom.htail_sweep || 3);
+        const tailX = geom.tail_x_pos || geom.fuselage_length * 0.82;
+
+        for (let i = 0; i <= nSec; i++) {
+          const eta = i / nSec;
+          const rLen = ys + (ye - ys) * eta;
+          const chord = hChord * (1 - (rLen / vHalf) * (1 - hTaper));
+          const xOff = tailX + rLen * Math.tan(hSweep);
+          const pts = [];
+          for (const idx of uIdx) {
+            pts.push(new THREE.Vector3(
+              state.tailCoords[idx].x * chord + xOff,
+              state.tailCoords[idx].y_upper * chord * 0.7 + rLen * Math.sin(vAngle) * 0.3,
+              sign * rLen * Math.cos(vAngle)
+            ));
+          }
+          for (const idx of lIdx) {
+            pts.push(new THREE.Vector3(
+              state.tailCoords[idx].x * chord + xOff,
+              state.tailCoords[idx].y_lower * chord * 0.7 + rLen * Math.sin(vAngle) * 0.3,
+              sign * rLen * Math.cos(vAngle)
+            ));
+          }
+          secs.push(pts);
+        }
+
+        const verts = []; const idxs = [];
+        for (const s of secs) { for (const p of s) verts.push(p.x, p.y, p.z); }
+        for (let i = 0; i < nSec; i++) {
+          for (let j = 0; j < nPts; j++) {
+            const jn = (j + 1) % nPts;
+            const a = i * nPts + j, b = i * nPts + jn, c = (i+1) * nPts + j, d = (i+1) * nPts + jn;
+            idxs.push(a, c, b); idxs.push(b, c, d);
+          }
+        }
+        const sdir = new THREE.Vector3(0, Math.sin(vAngle), sign * Math.cos(vAngle)).normalize();
+        const rc = new THREE.Vector3(0,0,0);
+        for (const p of secs[0]) rc.add(p);
+        rc.divideScalar(nPts);
+        makeCapFan(verts, idxs, 0, nPts, rc, sdir.clone().negate());
+        if (hh) {
+          const crd = hChord * (1 - (ys / vHalf) * (1 - hTaper));
+          const rr = Math.max(crd * 0.02, 0.0015), dd = Math.max(crd * 0.04, 0.003);
+          for (const pct of [0.30, 0.65]) {
+            const cx = pct * crd + tailX + ys * Math.tan(hSweep);
+            const cy = ys * Math.sin(vAngle) * 0.3;
+            const cz = sign * ys * Math.cos(vAngle);
+            addDimple(verts, idxs, new THREE.Vector3(cx, cy, cz), sdir, rr, dd, 8);
+          }
+        }
+        const tc = new THREE.Vector3(0,0,0);
+        for (const p of secs[nSec]) tc.add(p);
+        tc.divideScalar(nPts);
+        makeCapFan(verts, idxs, nSec * nPts, nPts, tc, sdir);
+        if (hp) {
+          const crd = hChord * (1 - (ye / vHalf) * (1 - hTaper));
+          const rr = Math.max(crd * 0.02, 0.0015), hh = Math.max(crd * 0.04, 0.003);
+          for (const pct of [0.30, 0.65]) {
+            const cx = pct * crd + tailX + ye * Math.tan(hSweep);
+            const cy = ye * Math.sin(vAngle) * 0.3;
+            const cz = sign * ye * Math.cos(vAngle);
+            addCylinder(verts, idxs, new THREE.Vector3(cx, cy, cz), sdir, rr, hh, 8);
+          }
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        geo.setIndex(idxs);
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial());
+        const stlData = exporter.parse(mesh, { binary: true });
+        downloadBlob(stlData, `zeta_vtail_${sideName}_${seg+1}of${n}.stl`);
+      }
+    }
+    return;
+  }
+
+  // Horizontal tail
+  const hSpan = geom.htail_span / 2;
+  const segLen = hSpan / n;
+  if (tailType === 'ttail') {
+    // T-tail: horizontal is on top of vertical, same span slicing
+    const vHalf = geom.vtail_span;
+    for (let side = 0; side < 2; side++) {
+      const sign = side === 0 ? 1 : -1;
+      const sn = side === 0 ? 'sag' : 'sol';
+      for (let seg = 0; seg < n; seg++) {
+        const ys = seg * segLen, ye = (seg + 1) * segLen;
+        const hp = seg < n - 1, hh = seg > 0;
+        const mesh = buildHTailSegment(geom, state.tailCoords, ys, ye, sign, hp, hh);
+        // Offset Y for T-tail
+        mesh.position.y += vHalf * 0.6;
+        mesh.position.z *= 0.8;
+        const stlData = exporter.parse(mesh, { binary: true });
+        downloadBlob(stlData, `zeta_htail_${sn}_${seg+1}of${n}.stl`);
+      }
+    }
+  } else {
+    // Conventional: horizontal tail both sides
+    for (let side = 0; side < 2; side++) {
+      const sign = side === 0 ? 1 : -1;
+      const sn = side === 0 ? 'sag' : 'sol';
+      for (let seg = 0; seg < n; seg++) {
+        const ys = seg * segLen, ye = (seg + 1) * segLen;
+        const hp = seg < n - 1, hh = seg > 0;
+        const mesh = buildHTailSegment(geom, state.tailCoords, ys, ye, sign, hp, hh);
+        const stlData = exporter.parse(mesh, { binary: true });
+        downloadBlob(stlData, `zeta_htail_${sn}_${seg+1}of${n}.stl`);
+      }
+    }
+  }
+
+  // Vertical tail
+  const vSpan = geom.vtail_span;
+  const vSegLen = vSpan / n;
+  for (let seg = 0; seg < n; seg++) {
+    const ys = seg * vSegLen, ye = (seg + 1) * vSegLen;
+    const hp = seg < n - 1, hh = seg > 0;
+    const mesh = buildVTailSegment(geom, state.vtailCoords || state.tailCoords, ys, ye, hp, hh);
+    const stlData = exporter.parse(mesh, { binary: true });
+    downloadBlob(stlData, `zeta_vtail_${seg+1}of${n}.stl`);
+  }
 }
 
 function mergeMeshes(meshes) {

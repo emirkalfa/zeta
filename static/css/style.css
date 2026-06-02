@@ -470,6 +470,32 @@ header {
 .tail-btn { border-color: #f59e0b; color: #f59e0b; }
 .tail-btn:hover { background: #f59e0b; color: white; }
 
+/* Slicing UI */
+.slicing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.sliced-btn {
+  border-style: dashed;
+  font-size: 0.9rem;
+  padding: 12px 16px;
+}
+
+.sliced-btn.wing-btn { border-color: #3b82f6; background: #3b82f610; }
+.sliced-btn.wing-btn:hover { background: #3b82f6; color: white; }
+.sliced-btn.tail-btn { border-color: #f59e0b; background: #f59e0b10; }
+.sliced-btn.tail-btn:hover { background: #f59e0b; color: white; }
+
+.stl-info code {
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
 /* Footer */
 footer {
   text-align: center;

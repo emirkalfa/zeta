@@ -54,6 +54,13 @@
           <select id="vtailAirfoil"></select>
         </div>
         <div class="form-group">
+          <label>Kanat Şekli</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="wing_shape" value="tapered" checked> Konik</label>
+            <label class="radio-label"><input type="radio" name="wing_shape" value="rectangular"> Dikdörtgen</label>
+          </div>
+        </div>
+        <div class="form-group">
           <label>Kanat Konumu</label>
           <div class="radio-group">
             <label class="radio-label"><input type="radio" name="wing_pos" value="low"> Alçak</label>
@@ -203,11 +210,36 @@
     <section class="card" id="stl-card" style="display:none">
       <h2>STL İndirme</h2>
       <p class="stl-info">3D modeli 3D yazıcıda basmak için ayrı ayrı STL dosyalarını indirin.</p>
+
+      <!-- Tek Parça STL -->
+      <h3 style="margin-top:0">Tek Parça</h3>
       <div class="stl-buttons">
         <button id="stlWing" class="stl-btn wing-btn">🪽 Kanat STL</button>
         <button id="stlFuselage" class="stl-btn fuse-btn">🛸 Gövde STL</button>
         <button id="stlTail" class="stl-btn tail-btn">🔄 Kuyruk STL</button>
       </div>
+
+      <!-- Dilimleme -->
+      <hr style="margin:20px 0; border-color:var(--border)">
+      <h3>🔪 Dilimleme (Parçalı STL)</h3>
+      <p class="stl-info">Büyük parçaları yazıcıya sığdırmak için eşit parçalara böl. Her parça birleştirme pimleri/delikleri içerir.</p>
+      <div class="slicing-grid">
+        <div class="form-group">
+          <label for="sliceCount">Kanat — Her Yarıdaki Parça Sayısı</label>
+          <input type="number" id="sliceCount" min="1" max="20" value="3" step="1">
+        </div>
+        <div class="form-group">
+          <label for="tailSliceCount">Kuyruk — Parça Sayısı</label>
+          <input type="number" id="tailSliceCount" min="1" max="20" value="2" step="1">
+        </div>
+      </div>
+      <div class="stl-buttons">
+        <button id="stlWingSliced" class="stl-btn wing-btn sliced-btn">🔪 Kanat Dilimli STL</button>
+        <button id="stlTailSliced" class="stl-btn tail-btn sliced-btn">🔪 Kuyruk Dilimli STL</button>
+      </div>
+      <p class="stl-info" style="margin-top:10px; font-size:0.8rem; color:var(--primary)">
+        💡 Dosya adları: <code>zeta_kanat_sag_1of3.stl</code> (1=kök, son=uç)
+      </p>
     </section>
   </main>
 

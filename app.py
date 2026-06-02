@@ -74,6 +74,7 @@ def api_calculate():
     geom = calculate_geometry(wingspan, weight, airfoil_code,
                               wing_position, tail_type, wing_junction,
                               manual_mode=data.get('manual_mode', False),
+                              wing_shape=data.get('wing_shape', 'tapered'),
                               man_root_chord=data.get('man_root_chord'),
                               man_tip_chord=data.get('man_tip_chord'),
                               man_sweep=data.get('man_sweep'),

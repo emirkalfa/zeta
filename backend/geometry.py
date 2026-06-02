@@ -2,7 +2,7 @@ import numpy as np
 
 def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                        tail_type='conventional', wing_junction='through',
-                       manual_mode=False,
+                       manual_mode=False, wing_shape='tapered',
                        man_root_chord=None, man_tip_chord=None,
                        man_sweep=None, man_dihedral=None,
                        man_htail_span=None, man_htail_root=None,
@@ -19,9 +19,13 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         aspect_ratio = wingspan**2 / wing_area if wing_area > 0 else 7.0
     else:
         ar = 7.0
-        taper_ratio = 0.5
         sweep_angle = 5.0
         dihedral_angle = 3.0
+        if wing_shape == 'rectangular':
+            taper_ratio = 1.0
+            sweep_angle = 0.0
+        else:
+            taper_ratio = 0.5
         wing_area = wingspan**2 / ar
         root_chord = 2 * wing_area / (wingspan * (1 + taper_ratio))
         tip_chord = root_chord * taper_ratio
@@ -32,9 +36,9 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     wing_sweep = sweep_angle
 
     fuse_length = 0.80 * wingspan
-    fuse_max_width = 0.13 * wingspan
-    fuse_max_height = 0.09 * wingspan
-    wing_x_pos = 0.35 * fuse_length
+    fuse_max_width = 0.08 * wingspan
+    fuse_max_height = 0.06 * wingspan
+    wing_x_pos = 0.30 * fuse_length
     tail_x_pos = 0.82 * fuse_length
     htail_arm = tail_x_pos - wing_x_pos
 
@@ -83,6 +87,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'wing_position': wing_position,
         'tail_type': tail_type,
         'wing_junction': wing_junction,
+        'wing_shape': wing_shape,
         'root_chord': round(root_chord, 3),
         'tip_chord': round(tip_chord, 3),
         'taper_ratio': round(taper_ratio, 3),
@@ -177,39 +182,54 @@ def generate_wing_mesh_data(geom, airfoil_coords, n_sections=35, n_foil_points=7
         'n_points': n_half,
     }
 
-def generate_fuselage_mesh_data(geom, n_spanwise=32, n_circumferential=24):
+def generate_fuselage_mesh_data(geom, n_circumferential=20):
     length = geom['fuselage_length']
     max_w = geom['fuselage_max_width'] / 2
     max_h = geom['fuselage_max_height'] / 2
+    theta = np.linspace(0, 2 * np.pi, n_circumferential + 1)[:-1]
+
+    def el_pts(x_pos, w, h):
+        ct = np.cos(theta); st = np.sin(theta)
+        return np.column_stack([np.full_like(theta, x_pos), h * st, w * ct])
 
     sections = []
-    for i in range(n_spanwise + 1):
-        eta = i / n_spanwise
-        x_pos = -length * 0.4 + eta * length
+    pod_ratio = 0.32
+    nose_ratio = 0.10
+    n_pod = 20
+    boom_r = max(max_w * 0.055, 0.005)
 
-        if eta < 0.2:
-            r = np.sin(np.pi * eta / 0.4)
-            w = max_w * r
-            h = max_h * r
-        elif eta > 0.8:
-            r = np.sin(np.pi * (1 - eta) / 0.4)
-            w = max_w * r
-            h = max_h * r
+    for i in range(n_pod + 1):
+        eta = i / n_pod
+        x_pos = eta * pod_ratio * length
+        if eta < nose_ratio / pod_ratio:
+            u = eta * pod_ratio / nose_ratio
+            ws = np.sin(u * np.pi / 2)
+            hs = ws * 0.85
+        elif eta > 0.75:
+            u = (eta - 0.75) / 0.25
+            ss = u * u * (3 - 2 * u)
+            ws = 1 - 0.55 * ss
+            hs = 1 - 0.65 * ss
         else:
-            w = max_w
-            h = max_h
+            ws = 1; hs = 1
+        w = max_w * max(ws, boom_r * 1.2 / max_w)
+        h = max_h * max(hs, boom_r * 1.2 / max_h)
+        sections.append(el_pts(x_pos, w, h))
 
-        theta = np.linspace(0, 2 * np.pi, n_circumferential + 1)[:-1]
-        pts = np.column_stack([
-            np.full_like(theta, x_pos),
-            w * np.cos(theta),
-            h * np.sin(theta),
-        ])
-        sections.append(pts)
+    n_boom = 16
+    for i in range(n_boom + 1):
+        eta = i / n_boom
+        x_pos = (pod_ratio + eta * (1 - pod_ratio)) * length
+        r_scale = 1
+        if eta > 0.92:
+            r_scale = 1 - (eta - 0.92) / 0.08 * 0.2
+        r = boom_r * r_scale
+        ct = np.cos(theta); st = np.sin(theta)
+        sections.append(np.column_stack([np.full_like(theta, x_pos), r * st, r * ct]))
 
     return {
         'sections': sections,
-        'n_spanwise': n_spanwise,
+        'n_spanwise': n_pod + n_boom + 2,
         'n_circumferential': n_circumferential,
     }
 

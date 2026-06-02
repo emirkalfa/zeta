@@ -204,63 +204,112 @@ function buildWing(geom, coords, junction, wingX) {
 }
 
 // --- FUSELAGE ---
-// Simple reference fuselage: elliptical ogive body
+// Pod+boom style (Stallion-inspired): short pod + thin tail boom
 function buildFuselage(geom) {
   const L = geom.fuselage_length;
   const W = geom.fuselage_max_width;
   const H = geom.fuselage_max_height;
-  const nSpan = 40;
-  const nCirc = 24;
-  const verts = []; const idxs = [];
+  const nCirc = 20;
 
-  const ss = (t) => t * t * (3 - 2 * t);
+  const ep = (theta, a, b) => {
+    const ct = Math.cos(theta), st = Math.sin(theta);
+    return { x: a * ct, y: b * st };
+  };
 
-  for (let i = 0; i <= nSpan; i++) {
-    const eta = i / nSpan;
-    const xPos = eta * L;
+  const tubeMesh = (sections, color, edgeColor, opacity) => {
+    if (sections.length < 2) return;
+    const nPts = sections[0].length;
+    const v = []; const ii = [];
+    for (const s of sections) { for (const p of s) v.push(p.x, p.y, p.z); }
+    for (let i = 0; i < sections.length - 1; i++) {
+      for (let j = 0; j < nPts; j++) {
+        const jn = (j + 1) % nPts;
+        const a = i * nPts + j, b = i * nPts + jn;
+        const c = (i + 1) * nPts + j, d = (i + 1) * nPts + jn;
+        ii.push(a, b, c); ii.push(b, d, c);
+      }
+    }
+    const addCap = (sec, dir) => {
+      const off = v.length / 3;
+      const c = new THREE.Vector3(0,0,0);
+      for (const p of sec) c.add(p);
+      c.divideScalar(nPts);
+      v.push(c.x, c.y, c.z);
+      let found = false;
+      for (let j = 0; j < nPts; j++) {
+        const pj = sec[j], pjn = sec[(j+1)%nPts];
+        const e1 = new THREE.Vector3().subVectors(pjn, pj);
+        const e2 = new THREE.Vector3().subVectors(c, pj);
+        const nrm = new THREE.Vector3().crossVectors(e1, e2).normalize();
+        if (!found) { found = true; }
+        if (nrm.dot(dir) >= 0) {
+          ii.push(off, pj, pjn);
+        } else {
+          ii.push(off, pjn, pj);
+        }
+      }
+    };
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    g.setIndex(ii); g.computeVertexNormals();
+    fuseGroup.add(new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide, transparent: opacity < 1, opacity })));
+    const eg = new THREE.EdgesGeometry(g);
+    fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.15 })));
+  };
+
+  // ====== POD (front 32%) ======
+  const podRatio = 0.32;
+  const noseRatio = 0.10;
+  const podSections = [];
+  const nPod = 20;
+  const boomRs = Math.max(W * 0.055, 0.005);
+  for (let i = 0; i <= nPod; i++) {
+    const eta = i / nPod;
+    const xPos = eta * podRatio * L;
     let ws, hs;
-    if (eta < 0.15) {
-      // Ogive nose
-      const u = eta / 0.15;
+    if (eta < noseRatio / podRatio) {
+      const u = eta * podRatio / noseRatio;
       ws = Math.sin(u * Math.PI / 2);
       hs = ws * 0.85;
-    } else if (eta < 0.60) {
-      // Constant body, slight crown
-      const u = (eta - 0.15) / 0.45;
-      ws = 1 - 0.01 * u * u;
-      hs = 0.85 + 0.13 * u;
+    } else if (eta > 0.75) {
+      const u = (eta - 0.75) / 0.25;
+      const ss = u * u * (3 - 2 * u);
+      ws = 1 - 0.55 * ss;
+      hs = 1 - 0.65 * ss;
     } else {
-      // Tail: smooth cosine taper
-      const u = (eta - 0.60) / 0.40;
-      ws = 0.99 * (1 - ss(u)) + 0.01;
-      hs = 0.96 * (1 - ss(u)) + 0.01;
+      ws = 1; hs = 1;
     }
-    const w = W / 2 * ws;
-    const h = H / 2 * hs;
+    const w = W / 2 * Math.max(ws, boomRs * 1.2 / (W/2));
+    const h = H / 2 * Math.max(hs, boomRs * 1.2 / (H/2));
+    const pts = [];
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
-      const st = Math.sin(th), ct = Math.cos(th);
-      // Gentle flat-bottom
-      const yy = st < 0 ? h * st * 0.5 : h * st;
-      verts.push(xPos, yy, w * ct);
+      const p = ep(th, w, h);
+      pts.push(new THREE.Vector3(xPos, p.y, p.x));
     }
-  }
-  for (let i = 0; i < nSpan; i++) {
-    for (let j = 0; j < nCirc; j++) {
-      const jn = (j + 1) % nCirc;
-      const a = i * nCirc + j, b = i * nCirc + jn;
-      const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
-      idxs.push(a, b, c); idxs.push(b, d, c);
-    }
+    podSections.push(pts);
   }
 
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  geo.setIndex(idxs);
-  geo.computeVertexNormals();
-  fuseGroup.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0x94a3b8, side: THREE.DoubleSide, transparent: true, opacity: 0.55 })));
-  const eg = new THREE.EdgesGeometry(geo);
-  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.12 })));
+  // ====== BOOM (rear 32% to 100%) ======
+  const boomR = boomRs;
+  const boomSections = [];
+  const nBoom = 16;
+  for (let i = 0; i <= nBoom; i++) {
+    const eta = i / nBoom;
+    const xPos = (podRatio + eta * (1 - podRatio)) * L;
+    let rScale = 1;
+    if (eta > 0.92) rScale = 1 - (eta - 0.92) / 0.08 * 0.2;
+    const r = boomR * rScale;
+    const pts = [];
+    for (let j = 0; j < nCirc; j++) {
+      const th = (j / nCirc) * 2 * Math.PI;
+      pts.push(new THREE.Vector3(xPos, r * Math.sin(th), r * Math.cos(th)));
+    }
+    boomSections.push(pts);
+  }
+
+  tubeMesh(podSections, 0x94a3b8, 0x475569, 0.55);
+  tubeMesh(boomSections, 0x94a3b8, 0x475569, 0.55);
 }
 
 // Toggle fuselage visibility
@@ -499,6 +548,435 @@ function getWingMesh() { return wingGroup ? wingGroup.children.filter(c => c.isM
 function getFuselageMesh() { return fuseGroup ? fuseGroup.children.filter(c => c.isMesh) : []; }
 function getTailMesh() { return tailGroup ? tailGroup.children.filter(c => c.isMesh) : []; }
 function getAllMeshes() { return [...getWingMesh(), ...getFuselageMesh(), ...getTailMesh()]; }
+
+// ========== SLICED SEGMENT GENERATORS ==========
+
+function makeCapFan(verts, idxs, perimeterStart, nPts, center, outwardDir) {
+  const cOff = verts.length / 3;
+  verts.push(center.x, center.y, center.z);
+  const triBase = [];
+  for (let j = 0; j < nPts; j++) {
+    const jn = (j + 1) % nPts;
+    triBase.push(perimeterStart + j, cOff, perimeterStart + jn);
+  }
+  const refTri = new THREE.Vector3();
+  const a = new THREE.Vector3(verts[triBase[1]*3], verts[triBase[1]*3+1], verts[triBase[1]*3+2]);
+  const b = new THREE.Vector3(verts[triBase[0]*3], verts[triBase[0]*3+1], verts[triBase[0]*3+2]);
+  const c = new THREE.Vector3(verts[triBase[2]*3], verts[triBase[2]*3+1], verts[triBase[2]*3+2]);
+  refTri.crossVectors(
+    new THREE.Vector3().subVectors(c, b),
+    new THREE.Vector3().subVectors(a, b)
+  ).normalize();
+  if (refTri.dot(outwardDir) < 0) {
+    for (let i = 0; i < triBase.length; i += 3) {
+      idxs.push(triBase[i], triBase[i+2], triBase[i+1]);
+    }
+  } else {
+    for (let i = 0; i < triBase.length; i += 3) {
+      idxs.push(triBase[i], triBase[i+1], triBase[i+2]);
+    }
+  }
+}
+
+function addCylinder(verts, idxs, baseCenter, axis, radius, height, nRadial) {
+  const ax = axis.clone().normalize();
+  let ref = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(ax.dot(ref)) > 0.95) ref.set(1, 0, 0);
+  const right = new THREE.Vector3().crossVectors(ax, ref).normalize();
+  const fwd = new THREE.Vector3().crossVectors(right, ax).normalize();
+
+  const start = verts.length / 3;
+  const nStacks = 4;
+
+  for (let i = 0; i <= nStacks; i++) {
+    const t = i / nStacks;
+    const h = t * height;
+    for (let j = 0; j < nRadial; j++) {
+      const theta = (j / nRadial) * Math.PI * 2;
+      const p = baseCenter.clone()
+        .add(right.clone().multiplyScalar(Math.cos(theta) * radius))
+        .add(fwd.clone().multiplyScalar(Math.sin(theta) * radius))
+        .add(ax.clone().multiplyScalar(h));
+      verts.push(p.x, p.y, p.z);
+    }
+  }
+
+  for (let i = 0; i < nStacks; i++) {
+    for (let j = 0; j < nRadial; j++) {
+      const jn = (j + 1) % nRadial;
+      const a = start + i * nRadial + j;
+      const b = start + i * nRadial + jn;
+      const c = start + (i + 1) * nRadial + j;
+      const d = start + (i + 1) * nRadial + jn;
+      idxs.push(a, c, b);
+      idxs.push(b, c, d);
+    }
+  }
+
+  const botOff = verts.length / 3;
+  verts.push(baseCenter.x, baseCenter.y, baseCenter.z);
+  for (let j = 0; j < nRadial; j++) {
+    const jn = (j + 1) % nRadial;
+    idxs.push(botOff, start + j, start + jn);  // base: faces outward (away from wing)
+  }
+
+  const topC = baseCenter.clone().add(ax.clone().multiplyScalar(height));
+  const topOff = verts.length / 3;
+  verts.push(topC.x, topC.y, topC.z);
+  const topRing = start + nStacks * nRadial;
+  for (let j = 0; j < nRadial; j++) {
+    const jn = (j + 1) % nRadial;
+    idxs.push(topOff, topRing + jn, topRing + j);
+  }
+}
+
+function addDimple(verts, idxs, baseCenter, axis, radius, depth, nRadial) {
+  const ax = axis.clone().normalize();
+  let ref = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(ax.dot(ref)) > 0.95) ref.set(1, 0, 0);
+  const right = new THREE.Vector3().crossVectors(ax, ref).normalize();
+  const fwd = new THREE.Vector3().crossVectors(right, ax).normalize();
+
+  const start = verts.length / 3;
+  const nStacks = 4;
+
+  for (let i = 0; i <= nStacks; i++) {
+    const t = i / nStacks;
+    const d = t * depth;
+    for (let j = 0; j < nRadial; j++) {
+      const theta = (j / nRadial) * Math.PI * 2;
+      const p = baseCenter.clone()
+        .add(right.clone().multiplyScalar(Math.cos(theta) * radius))
+        .add(fwd.clone().multiplyScalar(Math.sin(theta) * radius))
+        .add(ax.clone().multiplyScalar(-d));
+      verts.push(p.x, p.y, p.z);
+    }
+  }
+
+  for (let i = 0; i < nStacks; i++) {
+    for (let j = 0; j < nRadial; j++) {
+      const jn = (j + 1) % nRadial;
+      const a = start + i * nRadial + j;
+      const b = start + i * nRadial + jn;
+      const c = start + (i + 1) * nRadial + j;
+      const d = start + (i + 1) * nRadial + jn;
+      idxs.push(a, b, c);
+      idxs.push(b, d, c);
+    }
+  }
+
+  const botC = baseCenter.clone().add(ax.clone().multiplyScalar(-depth));
+  const botOff = verts.length / 3;
+  verts.push(botC.x, botC.y, botC.z);
+  const botRing = start + nStacks * nRadial;
+  for (let j = 0; j < nRadial; j++) {
+    const jn = (j + 1) % nRadial;
+    idxs.push(botOff, botRing + jn, botRing + j);
+  }
+}
+
+// Build a single wing segment as a closed manifold mesh
+function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) {
+  const halfSpan = geom.wingspan / 2;
+  const rootChord = geom.root_chord;
+  const taper = geom.taper_ratio || 0.5;
+  const sweep = THREE.MathUtils.degToRad(geom.sweep_angle || 5);
+  const dihedral = THREE.MathUtils.degToRad(geom.dihedral_angle || 3);
+  const wingPos = geom.wing_position_offset || 0;
+  const wingX = geom.wing_x_pos || geom.fuselage_length * 0.35;
+
+  const nHalf = Math.floor(coords.length / 2);
+  const uIdx = Array.from({length: nHalf}, (_, i) => i);
+  const lIdx = Array.from({length: nHalf}, (_, i) => coords.length - 1 - i);
+  const nPts = coords.length;
+  const nSec = 20;
+
+  const secs = [];
+  for (let i = 0; i <= nSec; i++) {
+    const eta = i / nSec;
+    const yPos = yStart + (yEnd - yStart) * eta;
+    const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
+    const xOff = yPos * Math.tan(sweep) + wingX;
+    const zOff = yPos * Math.sin(dihedral);
+    const pts = [];
+    for (const idx of uIdx) {
+      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_upper * chord + wingPos, sign * (yPos + zOff)));
+    }
+    for (const idx of lIdx) {
+      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_lower * chord + wingPos, sign * (yPos + zOff)));
+    }
+    secs.push(pts);
+  }
+
+  const verts = [];
+  const idxs = [];
+
+  // Tube
+  for (const sec of secs) {
+    for (const p of sec) verts.push(p.x, p.y, p.z);
+  }
+  for (let i = 0; i < secs.length - 1; i++) {
+    for (let j = 0; j < nPts; j++) {
+      const jn = (j + 1) % nPts;
+      const a = i * nPts + j;
+      const b = i * nPts + jn;
+      const c = (i + 1) * nPts + j;
+      const d = (i + 1) * nPts + jn;
+      idxs.push(a, c, b);
+      idxs.push(b, c, d);
+    }
+  }
+
+  const spanDir = new THREE.Vector3(Math.tan(sweep), Math.sin(dihedral), sign).normalize();
+
+  // Root cap (at yStart) — outward normal = -spanDir (toward root)
+  const rootSec = secs[0];
+  const rootC = new THREE.Vector3(0, 0, 0);
+  for (const p of rootSec) rootC.add(p);
+  rootC.divideScalar(nPts);
+  makeCapFan(verts, idxs, 0, nPts, rootC, spanDir.clone().negate());
+
+  // Holes on root cap (recess into the segment)
+  if (hasHoles) {
+    const yPos = yStart;
+    const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
+    const pinRadius = Math.max(chord * 0.015, 0.0015);
+    const pinDepth = Math.max(chord * 0.035, 0.0035);
+    const pinPositions = [0.30, 0.65];
+    for (const pct of pinPositions) {
+      const xPos = pct * chord + yPos * Math.tan(sweep) + wingX;
+      const zPos = sign * (yPos + yPos * Math.sin(dihedral));
+      const pinCenter = new THREE.Vector3(xPos, wingPos, zPos);
+      addDimple(verts, idxs, pinCenter, spanDir, pinRadius, pinDepth, 8);
+    }
+  }
+
+  // Tip cap (at yEnd) — outward normal = +spanDir (toward tip)
+  const tipSec = secs[nSec];
+  const tipC = new THREE.Vector3(0, 0, 0);
+  for (const p of tipSec) tipC.add(p);
+  tipC.divideScalar(nPts);
+  const tipStart = nSec * nPts;
+  makeCapFan(verts, idxs, tipStart, nPts, tipC, spanDir);
+
+  // Pins on tip cap
+  if (hasPins) {
+    const yPos = yEnd;
+    const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
+    const pinRadius = Math.max(chord * 0.015, 0.0015);
+    const pinHeight = Math.max(chord * 0.035, 0.0035);
+    const pinPositions = [0.30, 0.65];
+    for (const pct of pinPositions) {
+      const xPos = pct * chord + yPos * Math.tan(sweep) + wingX;
+      const zPos = sign * (yPos + yPos * Math.sin(dihedral));
+      const pinCenter = new THREE.Vector3(xPos, wingPos, zPos);
+      addCylinder(verts, idxs, pinCenter, spanDir, pinRadius, pinHeight, 8);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idxs);
+  geo.computeVertexNormals();
+
+  return new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+    color: 0x3b82f6, side: THREE.DoubleSide, flatShading: false,
+  }));
+}
+
+// Build a single horizontal tail segment
+function buildHTailSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) {
+  const hSpan = geom.htail_span / 2;
+  const hChord = geom.htail_chord;
+  const hTaper = geom.htail_taper || 0.5;
+  const hSweep = THREE.MathUtils.degToRad(geom.htail_sweep || 3);
+  const tailX = geom.tail_x_pos || geom.fuselage_length * 0.82;
+
+  const nHalf = Math.floor(coords.length / 2);
+  const uIdx = Array.from({length: nHalf}, (_, i) => i);
+  const lIdx = Array.from({length: nHalf}, (_, i) => coords.length - 1 - i);
+  const nPts = coords.length;
+  const nSec = 16;
+
+  const secs = [];
+  for (let i = 0; i <= nSec; i++) {
+    const eta = i / nSec;
+    const spanPos = yStart + (yEnd - yStart) * eta;
+    const chord = hChord * (1 - (spanPos / hSpan) * (1 - hTaper));
+    const xOff = tailX + spanPos * Math.tan(hSweep);
+    const pts = [];
+    for (const idx of uIdx) {
+      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_upper * chord * 0.8, sign * spanPos));
+    }
+    for (const idx of lIdx) {
+      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_lower * chord * 0.8, sign * spanPos));
+    }
+    secs.push(pts);
+  }
+
+  const verts = [];
+  const idxs = [];
+
+  for (const sec of secs) {
+    for (const p of sec) verts.push(p.x, p.y, p.z);
+  }
+  for (let i = 0; i < secs.length - 1; i++) {
+    for (let j = 0; j < nPts; j++) {
+      const jn = (j + 1) % nPts;
+      const a = i * nPts + j;
+      const b = i * nPts + jn;
+      const c = (i + 1) * nPts + j;
+      const d = (i + 1) * nPts + jn;
+      idxs.push(a, c, b);
+      idxs.push(b, c, d);
+    }
+  }
+
+  const spanDir = new THREE.Vector3(Math.tan(hSweep), 0, sign).normalize();
+
+  // Root cap
+  const rootSec = secs[0];
+  const rootC = new THREE.Vector3(0, 0, 0);
+  for (const p of rootSec) rootC.add(p);
+  rootC.divideScalar(nPts);
+  makeCapFan(verts, idxs, 0, nPts, rootC, spanDir.clone().negate());
+
+  if (hasHoles) {
+    const spanPos = yStart;
+    const chord = hChord * (1 - (spanPos / hSpan) * (1 - hTaper));
+    const r = Math.max(chord * 0.02, 0.0015);
+    const d = Math.max(chord * 0.04, 0.003);
+    for (const pct of [0.30, 0.65]) {
+      const cx = pct * chord + tailX + spanPos * Math.tan(hSweep);
+      const cz = sign * spanPos;
+      addDimple(verts, idxs, new THREE.Vector3(cx, 0, cz), spanDir, r, d, 8);
+    }
+  }
+
+  // Tip cap
+  const tipSec = secs[nSec];
+  const tipC = new THREE.Vector3(0, 0, 0);
+  for (const p of tipSec) tipC.add(p);
+  tipC.divideScalar(nPts);
+  const tipStart = nSec * nPts;
+  makeCapFan(verts, idxs, tipStart, nPts, tipC, spanDir);
+
+  if (hasPins) {
+    const spanPos = yEnd;
+    const chord = hChord * (1 - (spanPos / hSpan) * (1 - hTaper));
+    const r = Math.max(chord * 0.02, 0.0015);
+    const h = Math.max(chord * 0.04, 0.003);
+    for (const pct of [0.30, 0.65]) {
+      const cx = pct * chord + tailX + spanPos * Math.tan(hSweep);
+      const cz = sign * spanPos;
+      addCylinder(verts, idxs, new THREE.Vector3(cx, 0, cz), spanDir, r, h, 8);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idxs);
+  geo.computeVertexNormals();
+
+  return new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+    color: 0xf59e0b, side: THREE.DoubleSide, flatShading: false,
+  }));
+}
+
+// Build a single vertical tail segment
+function buildVTailSegment(geom, vCoords, yStart, yEnd, hasPins, hasHoles) {
+  const vSpan = geom.vtail_span;
+  const vChord = geom.vtail_chord;
+  const vTaper = geom.vtail_taper || 0.4;
+  const hSweep = THREE.MathUtils.degToRad(geom.htail_sweep || 3);
+  const tailX = geom.tail_x_pos || geom.fuselage_length * 0.82;
+
+  const nHalf = Math.floor(vCoords.length / 2);
+  const vuIdx = Array.from({length: nHalf}, (_, i) => i);
+  const vlIdx = Array.from({length: nHalf}, (_, i) => vCoords.length - 1 - i);
+  const nPts = vCoords.length;
+  const nSec = 16;
+
+  const secs = [];
+  for (let i = 0; i <= nSec; i++) {
+    const eta = i / nSec;
+    const spanPos = yStart + (yEnd - yStart) * eta;
+    const chord = vChord * (1 - (spanPos / vSpan) * (1 - vTaper));
+    const xOff = tailX + spanPos * Math.tan(hSweep);
+    const pts = [];
+    for (const idx of vuIdx) {
+      pts.push(new THREE.Vector3(vCoords[idx].x * chord + xOff, spanPos, vCoords[idx].y_upper * chord * 0.5));
+    }
+    for (const idx of vlIdx) {
+      pts.push(new THREE.Vector3(vCoords[idx].x * chord + xOff, spanPos, vCoords[idx].y_lower * chord * 0.5));
+    }
+    secs.push(pts);
+  }
+
+  const verts = [];
+  const idxs = [];
+
+  for (const sec of secs) {
+    for (const p of sec) verts.push(p.x, p.y, p.z);
+  }
+  for (let i = 0; i < secs.length - 1; i++) {
+    for (let j = 0; j < nPts; j++) {
+      const jn = (j + 1) % nPts;
+      const a = i * nPts + j;
+      const b = i * nPts + jn;
+      const c = (i + 1) * nPts + j;
+      const d = (i + 1) * nPts + jn;
+      idxs.push(a, c, b);
+      idxs.push(b, c, d);
+    }
+  }
+
+  const spanDir = new THREE.Vector3(Math.tan(hSweep), 1, 0).normalize();
+
+  const rootSec = secs[0];
+  const rootC = new THREE.Vector3(0, 0, 0);
+  for (const p of rootSec) rootC.add(p);
+  rootC.divideScalar(nPts);
+  makeCapFan(verts, idxs, 0, nPts, rootC, spanDir.clone().negate());
+
+  if (hasHoles) {
+    const spanPos = yStart;
+    const chord = vChord * (1 - (spanPos / vSpan) * (1 - vTaper));
+    const r = Math.max(chord * 0.02, 0.0015);
+    const d = Math.max(chord * 0.04, 0.003);
+    for (const pct of [0.30, 0.65]) {
+      const cx = pct * chord + tailX + spanPos * Math.tan(hSweep);
+      addDimple(verts, idxs, new THREE.Vector3(cx, spanPos, 0), spanDir, r, d, 8);
+    }
+  }
+
+  const tipSec = secs[nSec];
+  const tipC = new THREE.Vector3(0, 0, 0);
+  for (const p of tipSec) tipC.add(p);
+  tipC.divideScalar(nPts);
+  const tipStart = nSec * nPts;
+  makeCapFan(verts, idxs, tipStart, nPts, tipC, spanDir);
+
+  if (hasPins) {
+    const spanPos = yEnd;
+    const chord = vChord * (1 - (spanPos / vSpan) * (1 - vTaper));
+    const r = Math.max(chord * 0.02, 0.0015);
+    const h = Math.max(chord * 0.04, 0.003);
+    for (const pct of [0.30, 0.65]) {
+      const cx = pct * chord + tailX + spanPos * Math.tan(hSweep);
+      addCylinder(verts, idxs, new THREE.Vector3(cx, spanPos, 0), spanDir, r, h, 8);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idxs);
+  geo.computeVertexNormals();
+
+  return new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+    color: 0xf59e0b, side: THREE.DoubleSide, flatShading: false,
+  }));
+}
 
 function disposeViewer() {
   if (animFrame) cancelAnimationFrame(animFrame);
