@@ -89,6 +89,7 @@ function checkSavedProject() {
         if (tt) tt.checked = true;
         const wj = document.querySelector(`input[name="junction"][value="${data.wing_junction || 'through'}"]`);
         if (wj) wj.checked = true;
+
       }
     }
   } catch(e) {}
@@ -104,6 +105,7 @@ function saveProject() {
     wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
     wing_junction: document.querySelector('input[name="junction"]:checked')?.value || 'through',
+    fuse_type: 'conventional',
   };
   localStorage.setItem('zeta-project', JSON.stringify(data));
   const sb = $('saveBtn');
@@ -132,7 +134,6 @@ function setupEventListeners() {
   });
   $('viewReset').addEventListener('click', () => viewerReset());
   $('stlWing').addEventListener('click', () => exportSTL('wing'));
-  $('stlFuselage').addEventListener('click', () => exportSTL('fuselage'));
   $('stlTail').addEventListener('click', () => exportSTL('tail'));
   $('stlWingSliced').addEventListener('click', exportSlicedWing);
   $('stlTailSliced').addEventListener('click', exportSlicedTail);
@@ -191,7 +192,7 @@ async function calculateAll() {
     // Calculate geometry
     const manual_mode = $('manual-inputs').style.display !== 'none';
     const body = {
-      wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, wing_junction, manual_mode
+      wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, wing_junction, manual_mode, fuse_type: 'conventional'
     };
     if (manual_mode) {
       body.man_root_chord = parseFloat($('man_root_chord').value) || undefined;

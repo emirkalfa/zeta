@@ -8,7 +8,8 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                        man_htail_span=None, man_htail_root=None,
                        man_htail_tip=None, man_htail_sweep=None,
                        man_vtail_span=None, man_vtail_root=None,
-                       man_vtail_tip=None):
+                       man_vtail_tip=None,
+                       fuse_type='conventional'):
     if manual_mode:
         root_chord = float(man_root_chord or 0.2)
         tip_chord = float(man_tip_chord or 0.1)
@@ -36,8 +37,8 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     wing_sweep = sweep_angle
 
     fuse_length = 0.80 * wingspan
-    fuse_max_width = 0.08 * wingspan
-    fuse_max_height = 0.06 * wingspan
+    fuse_max_width = 0.09 * wingspan
+    fuse_max_height = 0.05 * wingspan
     wing_x_pos = 0.30 * fuse_length
     tail_x_pos = 0.82 * fuse_length
     htail_arm = tail_x_pos - wing_x_pos
@@ -80,6 +81,15 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'high': fuse_max_height * 0.65,
     }
 
+    # Conventional fuselage parameters
+    fuse_diameter = 0.09 * wingspan
+    nose_length = 2.0 * fuse_diameter
+    tailcone_length = 3.5 * fuse_diameter
+    cylindrical_length = fuse_length - nose_length - tailcone_length
+    if fuse_type == 'conventional':
+        fuse_max_width = fuse_diameter
+        fuse_max_height = fuse_diameter
+
     result = {
         'wingspan': round(wingspan, 3),
         'weight': round(weight, 3),
@@ -88,6 +98,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'tail_type': tail_type,
         'wing_junction': wing_junction,
         'wing_shape': wing_shape,
+        'fuse_type': fuse_type,
         'root_chord': round(root_chord, 3),
         'tip_chord': round(tip_chord, 3),
         'taper_ratio': round(taper_ratio, 3),
@@ -101,6 +112,10 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'fuselage_length': round(fuse_length, 3),
         'fuselage_max_width': round(fuse_max_width, 3),
         'fuselage_max_height': round(fuse_max_height, 3),
+        'nose_length': round(nose_length, 3),
+        'tailcone_length': round(tailcone_length, 3),
+        'cylindrical_length': round(cylindrical_length, 3),
+        'fuse_diameter': round(fuse_diameter, 3),
         'htail_span': round(htail_span, 3),
         'htail_chord': round(htail_root_chord, 3),
         'htail_tip_chord': round(htail_tip_chord, 3),
@@ -182,7 +197,7 @@ def generate_wing_mesh_data(geom, airfoil_coords, n_sections=35, n_foil_points=7
         'n_points': n_half,
     }
 
-def generate_fuselage_mesh_data(geom, n_circumferential=20):
+def generate_fuselage_mesh_data(geom, n_circumferential=24):
     length = geom['fuselage_length']
     max_w = geom['fuselage_max_width'] / 2
     max_h = geom['fuselage_max_height'] / 2
@@ -193,45 +208,96 @@ def generate_fuselage_mesh_data(geom, n_circumferential=20):
         return np.column_stack([np.full_like(theta, x_pos), h * st, w * ct])
 
     sections = []
-    pod_ratio = 0.32
-    nose_ratio = 0.10
-    n_pod = 20
-    boom_r = max(max_w * 0.055, 0.005)
+    pod_ratio = 0.35
+    nose_ratio = 0.18
+    n_pod = 25
+    boom_w = max(max_w * 0.045, 0.008)
+    boom_h = max(max_h * 0.035, 0.006)
 
     for i in range(n_pod + 1):
         eta = i / n_pod
         x_pos = eta * pod_ratio * length
         if eta < nose_ratio / pod_ratio:
             u = eta * pod_ratio / nose_ratio
-            ws = np.sin(u * np.pi / 2)
-            hs = ws * 0.85
-        elif eta > 0.75:
-            u = (eta - 0.75) / 0.25
+            t = u * u * (3 - 2 * u)
+            ws = t
+            hs = t * 0.70
+        elif eta > 0.80:
+            u = (eta - 0.80) / 0.20
             ss = u * u * (3 - 2 * u)
-            ws = 1 - 0.55 * ss
-            hs = 1 - 0.65 * ss
+            ws = 1 - 0.45 * ss
+            hs = 1 - 0.55 * ss
         else:
             ws = 1; hs = 1
-        w = max_w * max(ws, boom_r * 1.2 / max_w)
-        h = max_h * max(hs, boom_r * 1.2 / max_h)
+        w = max_w * max(ws, boom_w / max_w * 0.8)
+        h = max_h * max(hs, boom_h / max_h * 0.8)
         sections.append(el_pts(x_pos, w, h))
 
-    n_boom = 16
+    n_boom = 20
     for i in range(n_boom + 1):
         eta = i / n_boom
         x_pos = (pod_ratio + eta * (1 - pod_ratio)) * length
         r_scale = 1
-        if eta > 0.92:
-            r_scale = 1 - (eta - 0.92) / 0.08 * 0.2
-        r = boom_r * r_scale
+        if eta > 0.88:
+            r_scale = 1 - (eta - 0.88) / 0.12 * 0.3
+        bw = boom_w * r_scale
+        bh = boom_h * r_scale
         ct = np.cos(theta); st = np.sin(theta)
-        sections.append(np.column_stack([np.full_like(theta, x_pos), r * st, r * ct]))
+        sections.append(np.column_stack([np.full_like(theta, x_pos), bh * st, bw * ct]))
 
     return {
         'sections': sections,
         'n_spanwise': n_pod + n_boom + 2,
         'n_circumferential': n_circumferential,
     }
+
+def generate_conventional_fuselage_mesh_data(geom, n_circumferential=28):
+    length = geom['fuselage_length']
+    radius = geom['fuse_diameter'] / 2
+    max_w = geom['fuselage_max_width'] / 2
+    max_h = geom['fuselage_max_height'] / 2
+    nose_len = geom['nose_length']
+    tailcone_len = geom['tailcone_length']
+    cyl_len = geom['cylindrical_length']
+    theta = np.linspace(0, 2 * np.pi, n_circumferential + 1)[:-1]
+
+    def el_pts(x_pos, w, h):
+        ct = np.cos(theta); st = np.sin(theta)
+        return np.column_stack([np.full_like(theta, x_pos), h * st, w * ct])
+
+    n_nose = 24
+    n_cyl = 16
+    n_tail = 30
+    sections = []
+
+    # Nose: aerodynamic ogive shape
+    for i in range(n_nose + 1):
+        eta = i / n_nose
+        x_pos = eta * nose_len
+        t = eta * eta * (3 - 2 * eta)
+        w = max_w * t
+        h = max_h * t
+        sections.append(el_pts(x_pos, w, h))
+
+    # Cylindrical section — elliptical
+    for i in range(n_cyl + 1):
+        eta = i / n_cyl
+        x_pos = nose_len + eta * cyl_len
+        sections.append(el_pts(x_pos, max_w, max_h))
+
+    # Tail cone: smooth taper
+    for i in range(n_tail + 1):
+        eta = i / n_tail
+        x_pos = nose_len + cyl_len + eta * tailcone_len
+        t = 1 - eta * eta * (3 - 2 * eta)
+        sections.append(el_pts(x_pos, max_w * t, max_h * t))
+
+    return {
+        'sections': sections,
+        'n_spanwise': n_nose + n_cyl + n_tail + 3,
+        'n_circumferential': n_circumferential,
+    }
+
 
 def generate_tail_mesh_data(geom, airfoil_coords, n_sections=20, n_foil_points=38):
     result = {}

@@ -52,7 +52,7 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, junc
   const tailX = geom.tail_x_pos || geom.fuselage_length * 0.82;
 
   buildWing(geom, wingCoords, junction, wingX);
-  buildFuselage(geom);
+  buildFuselage(geom, junction);
   buildTail(geom, tailCoords, vtailCoords, tailType, tailX);
 
   scene.add(wingGroup);
@@ -98,10 +98,10 @@ function makeTextSprite(text, color) {
 function buildWing(geom, coords, junction, wingX) {
   const halfSpan = geom.wingspan / 2;
   const rootChord = geom.root_chord;
-  const taper = geom.taper_ratio || 0.5;
-  const sweep = THREE.MathUtils.degToRad(geom.sweep_angle || 5);
-  const dihedral = THREE.MathUtils.degToRad(geom.dihedral_angle || 3);
-  const wingPos = geom.wing_position_offset || 0;
+  const taper = geom.taper_ratio != null ? geom.taper_ratio : 0.5;
+  const sweep = THREE.MathUtils.degToRad(geom.sweep_angle != null ? geom.sweep_angle : 5);
+  const dihedral = THREE.MathUtils.degToRad(geom.dihedral_angle != null ? geom.dihedral_angle : 3);
+  const wingPos = geom.wing_position_offset != null ? geom.wing_position_offset : 0;
 
   const nSec = 35;
   const nHalf = Math.floor(coords.length / 2);
@@ -204,112 +204,131 @@ function buildWing(geom, coords, junction, wingX) {
 }
 
 // --- FUSELAGE ---
-// Pod+boom style (Stallion-inspired): short pod + thin tail boom
-function buildFuselage(geom) {
+function buildFuselage(geom, junction) {
+  buildConventionalFuselage(geom, junction);
+}
+
+function tubeMesh(sections, color, edgeColor, opacity) {
+  if (sections.length < 2) return null;
+  const nPts = sections[0].length;
+  const v = []; const ii = [];
+  for (const s of sections) { for (const p of s) v.push(p.x, p.y, p.z); }
+  for (let i = 0; i < sections.length - 1; i++) {
+    for (let j = 0; j < nPts; j++) {
+      const jn = (j + 1) % nPts;
+      const a = i * nPts + j, b = i * nPts + jn;
+      const c = (i + 1) * nPts + j, d = (i + 1) * nPts + jn;
+      ii.push(a, b, c); ii.push(b, d, c);
+    }
+  }
+  const addCap = (sec, dir) => {
+    const off = v.length / 3;
+    const c = new THREE.Vector3(0,0,0);
+    for (const p of sec) c.add(p);
+    c.divideScalar(nPts);
+    v.push(c.x, c.y, c.z);
+    for (let j = 0; j < nPts; j++) {
+      const pj = sec[j], pjn = sec[(j+1)%nPts];
+      const e1 = new THREE.Vector3().subVectors(pjn, pj);
+      const e2 = new THREE.Vector3().subVectors(c, pj);
+      const nrm = new THREE.Vector3().crossVectors(e1, e2).normalize();
+      if (nrm.dot(dir) >= 0) {
+        ii.push(off, pj, pjn);
+      } else {
+        ii.push(off, pjn, pj);
+      }
+    }
+  };
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  g.setIndex(ii); g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide, transparent: opacity < 1, opacity }));
+  fuseGroup.add(mesh);
+  const eg = new THREE.EdgesGeometry(g);
+  fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.15 })));
+  return mesh;
+}
+
+// Conventional tube fuselage (İHA/drone optimized): elliptical cross-section, smoother curves
+function buildConventionalFuselage(geom, junction) {
   const L = geom.fuselage_length;
   const W = geom.fuselage_max_width;
   const H = geom.fuselage_max_height;
-  const nCirc = 20;
+  const noseLen = geom.nose_length;
+  const cylLen = geom.cylindrical_length;
+  const tailLen = geom.tailcone_length;
+  const nCirc = 28;
 
   const ep = (theta, a, b) => {
     const ct = Math.cos(theta), st = Math.sin(theta);
     return { x: a * ct, y: b * st };
   };
 
-  const tubeMesh = (sections, color, edgeColor, opacity) => {
-    if (sections.length < 2) return;
-    const nPts = sections[0].length;
-    const v = []; const ii = [];
-    for (const s of sections) { for (const p of s) v.push(p.x, p.y, p.z); }
-    for (let i = 0; i < sections.length - 1; i++) {
-      for (let j = 0; j < nPts; j++) {
-        const jn = (j + 1) % nPts;
-        const a = i * nPts + j, b = i * nPts + jn;
-        const c = (i + 1) * nPts + j, d = (i + 1) * nPts + jn;
-        ii.push(a, b, c); ii.push(b, d, c);
-      }
-    }
-    const addCap = (sec, dir) => {
-      const off = v.length / 3;
-      const c = new THREE.Vector3(0,0,0);
-      for (const p of sec) c.add(p);
-      c.divideScalar(nPts);
-      v.push(c.x, c.y, c.z);
-      let found = false;
-      for (let j = 0; j < nPts; j++) {
-        const pj = sec[j], pjn = sec[(j+1)%nPts];
-        const e1 = new THREE.Vector3().subVectors(pjn, pj);
-        const e2 = new THREE.Vector3().subVectors(c, pj);
-        const nrm = new THREE.Vector3().crossVectors(e1, e2).normalize();
-        if (!found) { found = true; }
-        if (nrm.dot(dir) >= 0) {
-          ii.push(off, pj, pjn);
-        } else {
-          ii.push(off, pjn, pj);
-        }
-      }
-    };
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
-    g.setIndex(ii); g.computeVertexNormals();
-    fuseGroup.add(new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide, transparent: opacity < 1, opacity })));
-    const eg = new THREE.EdgesGeometry(g);
-    fuseGroup.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.15 })));
-  };
-
-  // ====== POD (front 32%) ======
-  const podRatio = 0.32;
-  const noseRatio = 0.10;
-  const podSections = [];
-  const nPod = 20;
-  const boomRs = Math.max(W * 0.055, 0.005);
-  for (let i = 0; i <= nPod; i++) {
-    const eta = i / nPod;
-    const xPos = eta * podRatio * L;
-    let ws, hs;
-    if (eta < noseRatio / podRatio) {
-      const u = eta * podRatio / noseRatio;
-      ws = Math.sin(u * Math.PI / 2);
-      hs = ws * 0.85;
-    } else if (eta > 0.75) {
-      const u = (eta - 0.75) / 0.25;
-      const ss = u * u * (3 - 2 * u);
-      ws = 1 - 0.55 * ss;
-      hs = 1 - 0.65 * ss;
-    } else {
-      ws = 1; hs = 1;
-    }
-    const w = W / 2 * Math.max(ws, boomRs * 1.2 / (W/2));
-    const h = H / 2 * Math.max(hs, boomRs * 1.2 / (H/2));
+  // Nose — more aerodynamic ogive shape
+  const noseSections = [];
+  const nNose = 24;
+  for (let i = 0; i <= nNose; i++) {
+    const eta = i / nNose;
+    const xPos = eta * noseLen;
+    const t = eta * eta * (3 - 2 * eta);
+    const w = W / 2 * t;
+    const h = H / 2 * t;
     const pts = [];
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
       const p = ep(th, w, h);
       pts.push(new THREE.Vector3(xPos, p.y, p.x));
     }
-    podSections.push(pts);
+    noseSections.push(pts);
   }
 
-  // ====== BOOM (rear 32% to 100%) ======
-  const boomR = boomRs;
-  const boomSections = [];
-  const nBoom = 16;
-  for (let i = 0; i <= nBoom; i++) {
-    const eta = i / nBoom;
-    const xPos = (podRatio + eta * (1 - podRatio)) * L;
-    let rScale = 1;
-    if (eta > 0.92) rScale = 1 - (eta - 0.92) / 0.08 * 0.2;
-    const r = boomR * rScale;
+  // Cylindrical section — elliptical
+  const wingX = geom.wing_x_pos || L * 0.30;
+  const halfSpan = geom.wingspan / 2;
+  const cylSections = [];
+  const nCyl = 16;
+  for (let i = 0; i <= nCyl; i++) {
+    const eta = i / nCyl;
+    const xPos = noseLen + eta * cylLen;
+    let w = W / 2;
+    let h = H / 2;
+    if (junction === 'through' || junction === 'surface') {
+      const dx = Math.abs(xPos - wingX);
+      const influence = Math.max(0, 1 - dx / (halfSpan * 0.12));
+      if (influence > 0) {
+        const pinch = 1 - influence * 0.15 * (1 - influence);
+        w *= pinch;
+      }
+    }
     const pts = [];
     for (let j = 0; j < nCirc; j++) {
       const th = (j / nCirc) * 2 * Math.PI;
-      pts.push(new THREE.Vector3(xPos, r * Math.sin(th), r * Math.cos(th)));
+      const p = ep(th, w, h);
+      pts.push(new THREE.Vector3(xPos, p.y, p.x));
     }
-    boomSections.push(pts);
+    cylSections.push(pts);
   }
 
-  tubeMesh(podSections, 0x94a3b8, 0x475569, 0.55);
-  tubeMesh(boomSections, 0x94a3b8, 0x475569, 0.55);
+  // Tail cone — longer, smoother taper
+  const tailSections = [];
+  const nTail = 30;
+  for (let i = 0; i <= nTail; i++) {
+    const eta = i / nTail;
+    const xPos = noseLen + cylLen + eta * tailLen;
+    const t = 1 - eta * eta * (3 - 2 * eta);
+    const w = W / 2 * t;
+    const h = H / 2 * t;
+    const pts = [];
+    for (let j = 0; j < nCirc; j++) {
+      const th = (j / nCirc) * 2 * Math.PI;
+      const p = ep(th, w, h);
+      pts.push(new THREE.Vector3(xPos, p.y, p.x));
+    }
+    tailSections.push(pts);
+  }
+
+  const allSections = [...noseSections, ...cylSections, ...tailSections];
+  tubeMesh(allSections, 0x94a3b8, 0x475569, 0.55);
 }
 
 // Toggle fuselage visibility
@@ -679,11 +698,11 @@ function addDimple(verts, idxs, baseCenter, axis, radius, depth, nRadial) {
 function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) {
   const halfSpan = geom.wingspan / 2;
   const rootChord = geom.root_chord;
-  const taper = geom.taper_ratio || 0.5;
-  const sweep = THREE.MathUtils.degToRad(geom.sweep_angle || 5);
-  const dihedral = THREE.MathUtils.degToRad(geom.dihedral_angle || 3);
-  const wingPos = geom.wing_position_offset || 0;
-  const wingX = geom.wing_x_pos || geom.fuselage_length * 0.35;
+  const taper = geom.taper_ratio != null ? geom.taper_ratio : 0.5;
+  const sweep = THREE.MathUtils.degToRad(geom.sweep_angle != null ? geom.sweep_angle : 5);
+  const dihedral = THREE.MathUtils.degToRad(geom.dihedral_angle != null ? geom.dihedral_angle : 3);
+  const wingPos = geom.wing_position_offset != null ? geom.wing_position_offset : 0;
+  const wingX = geom.wing_x_pos != null ? geom.wing_x_pos : geom.fuselage_length * 0.35;
 
   const nHalf = Math.floor(coords.length / 2);
   const uIdx = Array.from({length: nHalf}, (_, i) => i);

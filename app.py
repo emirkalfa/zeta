@@ -85,7 +85,8 @@ def api_calculate():
                               man_htail_sweep=data.get('man_htail_sweep'),
                               man_vtail_span=data.get('man_vtail_span'),
                               man_vtail_root=data.get('man_vtail_root'),
-                              man_vtail_tip=data.get('man_vtail_tip'))
+                              man_vtail_tip=data.get('man_vtail_tip'),
+                               fuse_type='conventional')
     return jsonify(geom)
 
 @app.route('/api/analyze', methods=['POST'])
