@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Surum (orn. v0.2.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Stripped=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate VERSION file
+        run: |
+          FILE_VER=$(cat VERSION | tr -d '[:space:]')
+          TAG_VER="${{ steps.version.outputs.stripped }}"
+          if [ "$FILE_VER" != "$TAG_VER" ]; then
+            echo "::error::VERSION file ($FILE_VER) != tag ($TAG_VER)"
+            exit 1
+          fi
+          echo "VERSION=$FILE_VER tag=$TAG_VER — uyuyor"
+
+      - name: Install + run tests
+        run: |
+          pip install -e ".[dev]"
+          python -m pytest -q
+
+      - name: Build source tarball
+        run: |
+          mkdir -p dist
+          tar --exclude='./dist' --exclude='./.git' --exclude='./venv' \
+              --exclude='./.venv' --exclude='./__pycache__' --exclude='./*.db' \
+              --exclude='./.pytest_cache' --exclude='./node_modules' \
+              --transform "s,^,zeta-${{ steps.version.outputs.stripped }}/," \
+              -czf "dist/zeta-${{ steps.version.outputs.stripped }}-source.tar.gz" \
+              $(git ls-files)
+
+      - name: Build sdist + wheel
+        run: |
+          pip install build
+          python -m build --sdist --wheel
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeta-release-${{ steps.version.outputs.stripped }}
+          path: |
+            dist/zeta-${{ steps.version.outputs.stripped }}-source.tar.gz
+            dist/*.whl
+            dist/*.tar.gz
+
+  publish-github:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: zeta-release-${{ steps.version.outputs.stripped }}
+          path: artifacts
+
+      - name: Generate changelog excerpt
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.stripped }}"
+          awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]")) { found=1; next }
+            }
+            found { print }
+          ' CHANGELOG.md > /tmp/changelog-excerpt.md
+          echo "Excerpt:"
+          cat /tmp/changelog-excerpt.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "ZETA ${{ steps.version.outputs.stripped }}"
+          body_path: /tmp/changelog-excerpt.md
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/*

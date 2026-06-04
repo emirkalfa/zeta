@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zeta-aircraft-designer"
+dynamic = ["version"]
+description = "Web tabanli ucak tasarim ve analiz araci (lifting-line theory, STL export)"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [
+    { name = "emirkalfa", email = "emirkalfa@users.noreply.github.com" },
+]
+keywords = [
+    "aircraft-design", "naca", "lifting-line", "aerodynamics",
+    "stl-export", "three-js", "flask", "education",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Education",
+]
+dependencies = [
+    "flask>=3.0",
+    "numpy>=2.0",
+    "scipy>=1.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/emirkalfa/zeta"
+Issues = "https://github.com/emirkalfa/zeta/issues"
+Changelog = "https://github.com/emirkalfa/zeta/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+packages = ["backend"]
+
+[tool.setuptools.package-data]
+backend = ["*.sql", "*.json"]
+
+[tool.setuptools.dynamic]
+version = { file = "VERSION" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra --strict-markers"

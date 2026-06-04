@@ -11,6 +11,19 @@ app = Flask(__name__, static_url_path='')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'database', 'zeta.db')
 
+
+def _read_version():
+    version_path = os.path.join(BASE_DIR, 'VERSION')
+    try:
+        with open(version_path, encoding='utf-8') as f:
+            return f.read().strip()
+    except OSError:
+        return '0.0.0'
+
+
+APP_VERSION = _read_version()
+
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -113,6 +126,19 @@ def api_stability():
 def api_airfoil_props(code):
     props = get_airfoil_properties(code)
     return jsonify(props)
+
+@app.route('/api/version')
+def api_version():
+    import time
+    return jsonify({
+        'version': APP_VERSION,
+        'name': 'zeta-aircraft-designer',
+    })
+
+
+@app.route('/healthz')
+def healthz():
+    return 'ok', 200
 
 @app.route('/static/<path:path>')
 def serve_static(path):
