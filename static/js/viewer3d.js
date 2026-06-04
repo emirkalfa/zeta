@@ -568,6 +568,83 @@ function getFuselageMesh() { return fuseGroup ? fuseGroup.children.filter(c => c
 function getTailMesh() { return tailGroup ? tailGroup.children.filter(c => c.isMesh) : []; }
 function getAllMeshes() { return [...getWingMesh(), ...getFuselageMesh(), ...getTailMesh()]; }
 
+// ========== WALL THICKNESS HELPERS ==========
+
+function offsetSectionInward(sec, wallM, nHalf, nPts, axis) {
+  const inner = new Array(nPts);
+  if (axis === 'z') {
+    for (let i = 0; i < nHalf; i++) {
+      const u = sec[i];
+      const l = sec[nPts - 1 - i];
+      const halfThick = Math.abs(u.z - l.z) / 2;
+      const off = Math.min(wallM, halfThick * 0.99);
+      inner[i] = new THREE.Vector3(u.x, u.y, u.z - off);
+      inner[nPts - 1 - i] = new THREE.Vector3(l.x, l.y, l.z + off);
+    }
+  } else {
+    for (let i = 0; i < nHalf; i++) {
+      const u = sec[i];
+      const l = sec[nPts - 1 - i];
+      const halfThick = Math.abs(u.y - l.y) / 2;
+      const off = Math.min(wallM, halfThick * 0.99);
+      inner[i] = new THREE.Vector3(u.x, u.y - off, u.z);
+      inner[nPts - 1 - i] = new THREE.Vector3(l.x, l.y + off, l.z);
+    }
+  }
+  return inner;
+}
+
+function buildTubeSkin(verts, idxs, sections, nPts, reverse) {
+  const start = verts.length / 3;
+  for (const sec of sections) {
+    for (const p of sec) verts.push(p.x, p.y, p.z);
+  }
+  for (let i = 0; i < sections.length - 1; i++) {
+    for (let j = 0; j < nPts; j++) {
+      const jn = (j + 1) % nPts;
+      const a = start + i * nPts + j;
+      const b = start + i * nPts + jn;
+      const c = start + (i + 1) * nPts + j;
+      const d = start + (i + 1) * nPts + jn;
+      if (reverse) {
+        idxs.push(a, b, c);
+        idxs.push(c, b, d);
+      } else {
+        idxs.push(a, c, b);
+        idxs.push(b, c, d);
+      }
+    }
+  }
+  return start;
+}
+
+function buildAnnulus(verts, idxs, outerStart, innerStart, nPts, reverse) {
+  for (let j = 0; j < nPts; j++) {
+    const jn = (j + 1) % nPts;
+    const a = outerStart + j;
+    const b = outerStart + jn;
+    const c = innerStart + j;
+    const d = innerStart + jn;
+    if (reverse) {
+      idxs.push(a, b, c);
+      idxs.push(c, b, d);
+    } else {
+      idxs.push(a, c, b);
+      idxs.push(b, c, d);
+    }
+  }
+}
+
+function buildThickWingSeg(verts, idxs, secs, innerSecs, nPts) {
+  buildTubeSkin(verts, idxs, secs, nPts, false);
+  const innerStart = buildTubeSkin(verts, idxs, innerSecs, nPts, true);
+  const outerRootStart = 0;
+  buildAnnulus(verts, idxs, outerRootStart, innerStart, nPts, false);
+  const outerTipStart = (secs.length - 1) * nPts;
+  const innerTipStart = innerStart + (innerSecs.length - 1) * nPts;
+  buildAnnulus(verts, idxs, outerTipStart, innerTipStart, nPts, true);
+}
+
 // ========== SLICED SEGMENT GENERATORS ==========
 
 function makeCapFan(verts, idxs, perimeterStart, nPts, center, outwardDir) {
@@ -695,7 +772,7 @@ function addDimple(verts, idxs, baseCenter, axis, radius, depth, nRadial) {
 }
 
 // Build a single wing segment as a closed manifold mesh
-function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) {
+function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, wallM) {
   const halfSpan = geom.wingspan / 2;
   const rootChord = geom.root_chord;
   const taper = geom.taper_ratio != null ? geom.taper_ratio : 0.5;
@@ -730,30 +807,44 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) {
   const verts = [];
   const idxs = [];
 
-  // Tube
-  for (const sec of secs) {
-    for (const p of sec) verts.push(p.x, p.y, p.z);
-  }
-  for (let i = 0; i < secs.length - 1; i++) {
-    for (let j = 0; j < nPts; j++) {
-      const jn = (j + 1) % nPts;
-      const a = i * nPts + j;
-      const b = i * nPts + jn;
-      const c = (i + 1) * nPts + j;
-      const d = (i + 1) * nPts + jn;
-      idxs.push(a, c, b);
-      idxs.push(b, c, d);
+  const wallMeters = (wallM > 0) ? wallM : 0;
+
+  if (wallMeters > 0) {
+    const innerSecs = secs.map(s => offsetSectionInward(s, wallMeters, nHalf, nPts, 'y'));
+    buildThickWingSeg(verts, idxs, secs, innerSecs, nPts);
+  } else {
+    for (const sec of secs) {
+      for (const p of sec) verts.push(p.x, p.y, p.z);
+    }
+    for (let i = 0; i < secs.length - 1; i++) {
+      for (let j = 0; j < nPts; j++) {
+        const jn = (j + 1) % nPts;
+        const a = i * nPts + j;
+        const b = i * nPts + jn;
+        const c = (i + 1) * nPts + j;
+        const d = (i + 1) * nPts + jn;
+        idxs.push(a, c, b);
+        idxs.push(b, c, d);
+      }
     }
   }
 
   const spanDir = new THREE.Vector3(Math.tan(sweep), Math.sin(dihedral), sign).normalize();
 
-  // Root cap (at yStart) — outward normal = -spanDir (toward root)
-  const rootSec = secs[0];
-  const rootC = new THREE.Vector3(0, 0, 0);
-  for (const p of rootSec) rootC.add(p);
-  rootC.divideScalar(nPts);
-  makeCapFan(verts, idxs, 0, nPts, rootC, spanDir.clone().negate());
+  if (wallMeters <= 0) {
+    // Surface-only mode: makeCapFan caps
+    const rootSec = secs[0];
+    const rootC = new THREE.Vector3(0, 0, 0);
+    for (const p of rootSec) rootC.add(p);
+    rootC.divideScalar(nPts);
+    makeCapFan(verts, idxs, 0, nPts, rootC, spanDir.clone().negate());
+
+    const tipSec = secs[nSec];
+    const tipC = new THREE.Vector3(0, 0, 0);
+    for (const p of tipSec) tipC.add(p);
+    tipC.divideScalar(nPts);
+    makeCapFan(verts, idxs, nSec * nPts, nPts, tipC, spanDir);
+  }
 
   // Holes on root cap (recess into the segment)
   if (hasHoles) {
@@ -769,14 +860,6 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) {
       addDimple(verts, idxs, pinCenter, spanDir, pinRadius, pinDepth, 8);
     }
   }
-
-  // Tip cap (at yEnd) — outward normal = +spanDir (toward tip)
-  const tipSec = secs[nSec];
-  const tipC = new THREE.Vector3(0, 0, 0);
-  for (const p of tipSec) tipC.add(p);
-  tipC.divideScalar(nPts);
-  const tipStart = nSec * nPts;
-  makeCapFan(verts, idxs, tipStart, nPts, tipC, spanDir);
 
   // Pins on tip cap
   if (hasPins) {
@@ -804,7 +887,7 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) {
 }
 
 // Build a single horizontal tail segment
-function buildHTailSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) {
+function buildHTailSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, wallM) {
   const hSpan = geom.htail_span / 2;
   const hChord = geom.htail_chord;
   const hTaper = geom.htail_taper || 0.5;
@@ -836,29 +919,43 @@ function buildHTailSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) 
   const verts = [];
   const idxs = [];
 
-  for (const sec of secs) {
-    for (const p of sec) verts.push(p.x, p.y, p.z);
-  }
-  for (let i = 0; i < secs.length - 1; i++) {
-    for (let j = 0; j < nPts; j++) {
-      const jn = (j + 1) % nPts;
-      const a = i * nPts + j;
-      const b = i * nPts + jn;
-      const c = (i + 1) * nPts + j;
-      const d = (i + 1) * nPts + jn;
-      idxs.push(a, c, b);
-      idxs.push(b, c, d);
+  const wallMeters = (wallM > 0) ? wallM : 0;
+
+  if (wallMeters > 0) {
+    const innerSecs = secs.map(s => offsetSectionInward(s, wallMeters, nHalf, nPts, 'y'));
+    buildThickWingSeg(verts, idxs, secs, innerSecs, nPts);
+  } else {
+    for (const sec of secs) {
+      for (const p of sec) verts.push(p.x, p.y, p.z);
+    }
+    for (let i = 0; i < secs.length - 1; i++) {
+      for (let j = 0; j < nPts; j++) {
+        const jn = (j + 1) % nPts;
+        const a = i * nPts + j;
+        const b = i * nPts + jn;
+        const c = (i + 1) * nPts + j;
+        const d = (i + 1) * nPts + jn;
+        idxs.push(a, c, b);
+        idxs.push(b, c, d);
+      }
     }
   }
 
   const spanDir = new THREE.Vector3(Math.tan(hSweep), 0, sign).normalize();
 
-  // Root cap
-  const rootSec = secs[0];
-  const rootC = new THREE.Vector3(0, 0, 0);
-  for (const p of rootSec) rootC.add(p);
-  rootC.divideScalar(nPts);
-  makeCapFan(verts, idxs, 0, nPts, rootC, spanDir.clone().negate());
+  if (wallMeters <= 0) {
+    const rootSec = secs[0];
+    const rootC = new THREE.Vector3(0, 0, 0);
+    for (const p of rootSec) rootC.add(p);
+    rootC.divideScalar(nPts);
+    makeCapFan(verts, idxs, 0, nPts, rootC, spanDir.clone().negate());
+
+    const tipSec = secs[nSec];
+    const tipC = new THREE.Vector3(0, 0, 0);
+    for (const p of tipSec) tipC.add(p);
+    tipC.divideScalar(nPts);
+    makeCapFan(verts, idxs, nSec * nPts, nPts, tipC, spanDir);
+  }
 
   if (hasHoles) {
     const spanPos = yStart;
@@ -871,14 +968,6 @@ function buildHTailSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) 
       addDimple(verts, idxs, new THREE.Vector3(cx, 0, cz), spanDir, r, d, 8);
     }
   }
-
-  // Tip cap
-  const tipSec = secs[nSec];
-  const tipC = new THREE.Vector3(0, 0, 0);
-  for (const p of tipSec) tipC.add(p);
-  tipC.divideScalar(nPts);
-  const tipStart = nSec * nPts;
-  makeCapFan(verts, idxs, tipStart, nPts, tipC, spanDir);
 
   if (hasPins) {
     const spanPos = yEnd;
@@ -903,7 +992,7 @@ function buildHTailSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles) 
 }
 
 // Build a single vertical tail segment
-function buildVTailSegment(geom, vCoords, yStart, yEnd, hasPins, hasHoles) {
+function buildVTailSegment(geom, vCoords, yStart, yEnd, hasPins, hasHoles, wallM) {
   const vSpan = geom.vtail_span;
   const vChord = geom.vtail_chord;
   const vTaper = geom.vtail_taper || 0.4;
@@ -935,28 +1024,43 @@ function buildVTailSegment(geom, vCoords, yStart, yEnd, hasPins, hasHoles) {
   const verts = [];
   const idxs = [];
 
-  for (const sec of secs) {
-    for (const p of sec) verts.push(p.x, p.y, p.z);
-  }
-  for (let i = 0; i < secs.length - 1; i++) {
-    for (let j = 0; j < nPts; j++) {
-      const jn = (j + 1) % nPts;
-      const a = i * nPts + j;
-      const b = i * nPts + jn;
-      const c = (i + 1) * nPts + j;
-      const d = (i + 1) * nPts + jn;
-      idxs.push(a, c, b);
-      idxs.push(b, c, d);
+  const wallMeters = (wallM > 0) ? wallM : 0;
+
+  if (wallMeters > 0) {
+    const innerSecs = secs.map(s => offsetSectionInward(s, wallMeters, nHalf, nPts, 'z'));
+    buildThickWingSeg(verts, idxs, secs, innerSecs, nPts);
+  } else {
+    for (const sec of secs) {
+      for (const p of sec) verts.push(p.x, p.y, p.z);
+    }
+    for (let i = 0; i < secs.length - 1; i++) {
+      for (let j = 0; j < nPts; j++) {
+        const jn = (j + 1) % nPts;
+        const a = i * nPts + j;
+        const b = i * nPts + jn;
+        const c = (i + 1) * nPts + j;
+        const d = (i + 1) * nPts + jn;
+        idxs.push(a, c, b);
+        idxs.push(b, c, d);
+      }
     }
   }
 
   const spanDir = new THREE.Vector3(Math.tan(hSweep), 1, 0).normalize();
 
-  const rootSec = secs[0];
-  const rootC = new THREE.Vector3(0, 0, 0);
-  for (const p of rootSec) rootC.add(p);
-  rootC.divideScalar(nPts);
-  makeCapFan(verts, idxs, 0, nPts, rootC, spanDir.clone().negate());
+  if (wallMeters <= 0) {
+    const rootSec = secs[0];
+    const rootC = new THREE.Vector3(0, 0, 0);
+    for (const p of rootSec) rootC.add(p);
+    rootC.divideScalar(nPts);
+    makeCapFan(verts, idxs, 0, nPts, rootC, spanDir.clone().negate());
+
+    const tipSec = secs[nSec];
+    const tipC = new THREE.Vector3(0, 0, 0);
+    for (const p of tipSec) tipC.add(p);
+    tipC.divideScalar(nPts);
+    makeCapFan(verts, idxs, nSec * nPts, nPts, tipC, spanDir);
+  }
 
   if (hasHoles) {
     const spanPos = yStart;
@@ -968,13 +1072,6 @@ function buildVTailSegment(geom, vCoords, yStart, yEnd, hasPins, hasHoles) {
       addDimple(verts, idxs, new THREE.Vector3(cx, spanPos, 0), spanDir, r, d, 8);
     }
   }
-
-  const tipSec = secs[nSec];
-  const tipC = new THREE.Vector3(0, 0, 0);
-  for (const p of tipSec) tipC.add(p);
-  tipC.divideScalar(nPts);
-  const tipStart = nSec * nPts;
-  makeCapFan(verts, idxs, tipStart, nPts, tipC, spanDir);
 
   if (hasPins) {
     const spanPos = yEnd;

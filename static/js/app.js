@@ -7,6 +7,7 @@ const state = {
   vtailCoords: null,
   airfoilCode: '2412',
   darkMode: localStorage.getItem('zeta-dark') === 'true',
+  wallThickness: 1.2,
 };
 
 async function fetchAPI(url, body = null) {
@@ -207,6 +208,7 @@ async function calculateAll() {
       body.man_vtail_root = parseFloat($('man_vtail_root').value) || undefined;
       body.man_vtail_tip = parseFloat($('man_vtail_tip').value) || undefined;
     }
+    state.wallThickness = parseFloat($('wallThickness').value) || 0;
     state.geometry = await fetchAPI('/api/calculate', body);
 
     // Run analysis (uses wing airfoil)
