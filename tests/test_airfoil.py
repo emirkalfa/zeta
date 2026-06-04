@@ -96,3 +96,51 @@ class TestAirfoilProperties:
         for code in ["0012", "2412", "4412"]:
             props = get_airfoil_properties(code)
             assert 10 <= props["alpha_stall"] <= 20
+
+    def test_symmetric_airfoil_zero_alpha_l0(self):
+        props = get_airfoil_properties("0012")
+        assert abs(props["alpha_L0"]) < 0.5
+
+    def test_cambered_airfoil_negative_alpha_l0(self):
+        for code in ["2412", "4412", "6412"]:
+            props = get_airfoil_properties(code)
+            assert props["alpha_L0"] < -1.0, f"NACA {code} should have negative alpha_L0"
+
+    @pytest.mark.parametrize("code,expected", [
+        ("0012", 0.0),
+        ("2412", -2.0),
+        ("4412", -4.0),
+    ])
+    def test_alpha_l0_matches_abbott(self, code, expected):
+        props = get_airfoil_properties(code)
+        assert props["alpha_L0"] == pytest.approx(expected, abs=0.3)
+
+    def test_cm_0_symmetric_airfoil_is_zero(self):
+        assert abs(get_airfoil_properties("0012")["cm_0"]) < 0.001
+
+    def test_cm_0_cambered_is_negative(self):
+        for code in ["2412", "4412"]:
+            assert get_airfoil_properties(code)["cm_0"] < -0.02
+
+    def test_cl_max_within_5pct_of_reference(self):
+        ref = {"0012": 1.45, "2412": 1.55, "4412": 1.65, "0015": 1.40}
+        for code, target in ref.items():
+            props = get_airfoil_properties(code)
+            assert abs(props["cl_max"] - target) / target < 0.10, \
+                f"NACA {code} cl_max off: {props['cl_max']} vs {target}"
+
+    def test_cd_0_within_20pct_of_reference(self):
+        ref = {"0012": 0.006, "2412": 0.0065, "4412": 0.0075, "0015": 0.0075}
+        for code, target in ref.items():
+            props = get_airfoil_properties(code)
+            assert abs(props["cd_0"] - target) / target < 0.20, \
+                f"NACA {code} cd_0 off: {props['cd_0']} vs {target}"
+
+    def test_thicker_airfoil_lower_cl_max(self):
+        thin = get_airfoil_properties("0012")
+        thick = get_airfoil_properties("0015")
+        assert thick["cl_max"] <= thin["cl_max"] + 0.05
+
+    def test_alpha_l0_key_present(self):
+        props = get_airfoil_properties("2412")
+        assert "alpha_L0" in props

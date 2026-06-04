@@ -40,12 +40,13 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225):
     climb_rate = excess_power / W if excess_power > 0 else 0
 
     # Static stability
-    # Neutral point (simplified, uses tail airfoil lift curve slope)
+    # Downwash gradient from lifting-line theory (Anderson Eq. 6.27):
+    #   d_eps/d_alpha = 2 * a_w_3d / (pi * AR)
+    # For typical AR=5-10, this gives 0.40-0.50, not 0.5 flat.
     v_h = (htail_area * htail_arm) / (S * mac)
-    d_epsilon_d_alpha = 0.5
+    d_epsilon_d_alpha = 2.0 * cl_alpha_3d / (np.pi * AR)
     a_t = tail_props['cl_alpha']
-    a_w = airfoil_props['cl_alpha']
-    np_position = 0.25 + v_h * (a_t / a_w) * (1 - d_epsilon_d_alpha)
+    np_position = 0.25 + v_h * (a_t / cl_alpha_3d) * (1 - d_epsilon_d_alpha)
 
     # CG at 25% MAC
     cg_percent = cg / mac

@@ -77,3 +77,43 @@ class TestPolars:
         p = calculate_polars(default_geom, airfoil_props_0012)
         at_zero = next(pt for pt in p["cl_vs_alpha"] if pt["x"] == 0.0)
         assert abs(at_zero["y"]) < 0.05
+
+    def test_cambered_airfoil_has_positive_cl_at_zero_alpha(self, default_geom, airfoil_props_2412):
+        p = calculate_polars(default_geom, airfoil_props_2412)
+        at_zero = next(pt for pt in p["cl_vs_alpha"] if pt["x"] == 0.0)
+        assert at_zero["y"] > 0.1, f"NACA 2412 should have CL>0.1 at alpha=0, got {at_zero['y']}"
+
+    def test_3d_cl_alpha_matches_prandtl_within_10pct(self, default_geom, airfoil_props_2412):
+        import numpy as np
+        results = lifting_line_analysis(default_geom, airfoil_props_2412)
+        r0 = next(r for r in results if r["alpha"] == 0.0)
+        r2 = next(r for r in results if r["alpha"] == 2.0)
+        slope = (r2["CL"] - r0["CL"]) / 2.0
+        AR = default_geom["aspect_ratio"]
+        prandtl = (2 * np.pi) / (1 + 2 / AR) / 57.2958
+        assert abs(slope - prandtl) / prandtl < 0.10, \
+            f"CL_alpha 3D off: {slope:.4f} vs Prandtl {prandtl:.4f}"
+
+    def test_lift_distribution_has_positive_cambered_lift(self, default_geom, airfoil_props_4412):
+        """NACA 4412 at α=5° should have non-trivial positive cl_local across mid-span."""
+        results = lifting_line_analysis(default_geom, airfoil_props_4412)
+        r5 = next(r for r in results if r["alpha"] == 5.0)
+        cls = [pt["cl_local"] for pt in r5["lift_distribution"]]
+        # Lifting-line gives zero cl at tips (y=±b/2, vortex trails off).
+        # At mid-span, cl should be substantial and positive.
+        mid_idx = len(cls) // 2
+        assert cls[mid_idx] > 0.3, f"cl at mid-span too low: {cls[mid_idx]}"
+
+    def test_cambered_wing_lifts_more_than_symmetric(self, default_geom, airfoil_props_2412, airfoil_props_0012):
+        r_cambered = lifting_line_analysis(default_geom, airfoil_props_2412)
+        r_symmetric = lifting_line_analysis(default_geom, airfoil_props_0012)
+        c5 = next(r for r in r_cambered if r["alpha"] == 5.0)
+        s5 = next(r for r in r_symmetric if r["alpha"] == 5.0)
+        assert c5["CL"] > s5["CL"], \
+            f"Cambered wing should produce more lift: {c5['CL']} vs {s5['CL']}"
+
+    def test_cd_increases_with_alpha(self, default_geom, airfoil_props_2412):
+        results = lifting_line_analysis(default_geom, airfoil_props_2412)
+        linear = [r for r in results if 0 <= r["alpha"] <= 8]
+        cds = [r["CD"] for r in linear]
+        assert cds == sorted(cds), "CD should increase with alpha in linear regime"

@@ -40,3 +40,9 @@ def airfoil_props_2412():
 def airfoil_props_0012():
     from backend.airfoil import get_airfoil_properties
     return get_airfoil_properties("0012")
+
+
+@pytest.fixture()
+def airfoil_props_4412():
+    from backend.airfoil import get_airfoil_properties
+    return get_airfoil_properties("4412")
