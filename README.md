@@ -5,6 +5,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-124%20passed-brightgreen)](tests/)
+[![Release](https://img.shields.io/badge/release-v1.0.0-blue)](https://github.com/emirkalfa/zeta/releases/tag/v1.0.0)
 
 **ZETA**, üniversite seviyesindeki projeler için **uçak tasarımı** yapmanızı sağlayan bir web uygulamasıdır. Kanat açıklığı, ağırlık ve airfoil profili gibi temel parametreleri girerek bir uçağın tüm geometrik ölçülerini hesaplar, aerodinamik analizini yapar ve 3 boyutlu modelini oluşturur.
 
@@ -14,7 +15,7 @@
 - **3D Model Görüntüleme**: Three.js ile interaktif 3D model (döndürme, zoom, eksen seçimi)
 - **Aerodinamik Analiz**: Lifting-line teorisi ile Cl, Cd, Cm hesaplamaları ve grafikler
 - **Uçabilirlik Testi**: Stall hızı, seyir hızı, tırmanma oranı, statik stabilite
-- **STL İndirme**: 3D yazıcıda basmak için ayrı ayrı STL dosyaları (kanat, gövde, kuyruk)
+- **STL İndirme**: 3D yazıcıda basmak için ayrı ayrı STL dosyaları (kanat, gövde, kuyruk) — doğru dihedral ve mm hassasiyetinde
 - **8 NACA Profili**: 0012, 2412, 4412, 2415, 0015, 4415, 23012, 6412
 - **Karanlık Mod**: Göz yormayan koyu tema
 - **Proje Kaydetme**: localStorage ile otomatik kaydetme

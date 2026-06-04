@@ -4,6 +4,11 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-04
+
+### Fixed
+- **Dihedral hatası**: Kanat dihedral offset'i yanlışlıkla açıklık (Z) eksenine ekleniyordu. 2m kanat açıklığında ~10.5cm hata oluşuyordu (`viewer3d.js`, `geometry.py`). Dihedral artık dikey (Y) eksenine uygulanıyor, kanat açıklığı girilen değerle birebir eşleşiyor.
+
 ## [0.2.0] - 2026-06-04
 
 ### Fixed
@@ -43,6 +48,7 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - MIT lisansı.
 - Karanlık mod, favicon, profil README.
 
-[Unreleased]: https://github.com/emirkalfa/zeta/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/emirkalfa/zeta/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/emirkalfa/zeta/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/emirkalfa/zeta/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/emirkalfa/zeta/releases/tag/v0.1.0
