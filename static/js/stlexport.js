@@ -1,3 +1,5 @@
+const STL_SCALE = 1000;
+
 function getNumSegments(id) {
   return parseInt(document.getElementById(id).value) || 1;
 }
@@ -8,6 +10,13 @@ function checkGeom() {
     return false;
   }
   return true;
+}
+
+function exportMeshAsSTL(mesh, fileName) {
+  mesh.scale.setScalar(STL_SCALE);
+  mesh.updateMatrixWorld(true);
+  const stlData = new THREE.STLExporter().parse(mesh, { binary: true });
+  downloadBlob(stlData, fileName);
 }
 
 function exportSTL(part) {
@@ -61,13 +70,7 @@ function exportSTL(part) {
   const merged = mergeMeshes(meshes);
   if (!merged) return;
 
-  const exporter = new THREE.STLExporter();
-  const stlData = exporter.parse(merged, { binary: true });
-
-  const partNames = { wing: 'Kanat', fuselage: 'Govde', tail: 'Kuyruk' };
-  const fileName = `zeta_${part}.stl`;
-
-  downloadBlob(stlData, fileName);
+  exportMeshAsSTL(merged, `zeta_${part}.stl`);
 }
 
 function exportSlicedWing() {
@@ -81,8 +84,6 @@ function exportSlicedWing() {
   const segLen = halfSpan / n;
   const wallM = (state.wallThickness || 0) / 1000;
 
-  const exporter = new THREE.STLExporter();
-
   for (let side = 0; side < 2; side++) {
     const sign = side === 0 ? 1 : -1;
     const sideName = side === 0 ? 'sag' : 'sol';
@@ -90,13 +91,9 @@ function exportSlicedWing() {
     for (let seg = 0; seg < n; seg++) {
       const yStart = seg * segLen;
       const yEnd = (seg + 1) * segLen;
-      const hasPins = seg < n - 1;
-      const hasHoles = seg > 0;
 
-      const mesh = buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, wallM);
-      const stlData = exporter.parse(mesh, { binary: true });
-      const fileName = `zeta_kanat_${sideName}_${seg+1}of${n}.stl`;
-      downloadBlob(stlData, fileName);
+      const mesh = buildWingSegment(geom, coords, yStart, yEnd, sign, false, false, wallM);
+      exportMeshAsSTL(mesh, `zeta_kanat_${sideName}_${seg+1}of${n}.stl`);
     }
   }
 }
@@ -109,7 +106,6 @@ function exportSlicedTail() {
   const geom = state.geometry;
   const tailType = geom.tail_type || 'conventional';
   const wallM = (state.wallThickness || 0) / 1000;
-  const exporter = new THREE.STLExporter();
 
   if (tailType === 'vtail') {
     const vAngle = THREE.MathUtils.degToRad(35);
@@ -121,7 +117,7 @@ function exportSlicedTail() {
       for (let seg = 0; seg < n; seg++) {
         const ys = seg * segLen;
         const ye = (seg + 1) * segLen;
-        const hp = seg < n - 1, hh = seg > 0;
+        const hp = false, hh = false;
         const secs = [];
         const nHalf = Math.floor(state.tailCoords.length / 2);
         const uIdx = Array.from({length: nHalf}, (_, i) => i);
@@ -210,8 +206,7 @@ function exportSlicedTail() {
         geo.setIndex(idxs);
         geo.computeVertexNormals();
         const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial());
-        const stlData = exporter.parse(mesh, { binary: true });
-        downloadBlob(stlData, `zeta_vtail_${sideName}_${seg+1}of${n}.stl`);
+        exportMeshAsSTL(mesh, `zeta_vtail_${sideName}_${seg+1}of${n}.stl`);
       }
     }
     return;
@@ -226,12 +221,11 @@ function exportSlicedTail() {
       const sn = side === 0 ? 'sag' : 'sol';
       for (let seg = 0; seg < n; seg++) {
         const ys = seg * segLen, ye = (seg + 1) * segLen;
-        const hp = seg < n - 1, hh = seg > 0;
+        const hp = false, hh = false;
         const mesh = buildHTailSegment(geom, state.tailCoords, ys, ye, sign, hp, hh, wallM);
         mesh.position.y += vHalf * 0.6;
         mesh.position.z *= 0.8;
-        const stlData = exporter.parse(mesh, { binary: true });
-        downloadBlob(stlData, `zeta_htail_${sn}_${seg+1}of${n}.stl`);
+        exportMeshAsSTL(mesh, `zeta_htail_${sn}_${seg+1}of${n}.stl`);
       }
     }
   } else {
@@ -240,10 +234,9 @@ function exportSlicedTail() {
       const sn = side === 0 ? 'sag' : 'sol';
       for (let seg = 0; seg < n; seg++) {
         const ys = seg * segLen, ye = (seg + 1) * segLen;
-        const hp = seg < n - 1, hh = seg > 0;
+        const hp = false, hh = false;
         const mesh = buildHTailSegment(geom, state.tailCoords, ys, ye, sign, hp, hh, wallM);
-        const stlData = exporter.parse(mesh, { binary: true });
-        downloadBlob(stlData, `zeta_htail_${sn}_${seg+1}of${n}.stl`);
+        exportMeshAsSTL(mesh, `zeta_htail_${sn}_${seg+1}of${n}.stl`);
       }
     }
   }
@@ -252,10 +245,9 @@ function exportSlicedTail() {
   const vSegLen = vSpan / n;
   for (let seg = 0; seg < n; seg++) {
     const ys = seg * vSegLen, ye = (seg + 1) * vSegLen;
-    const hp = seg < n - 1, hh = seg > 0;
+    const hp = false, hh = false;
     const mesh = buildVTailSegment(geom, state.vtailCoords || state.tailCoords, ys, ye, hp, hh, wallM);
-    const stlData = exporter.parse(mesh, { binary: true });
-    downloadBlob(stlData, `zeta_vtail_${seg+1}of${n}.stl`);
+    exportMeshAsSTL(mesh, `zeta_vtail_${seg+1}of${n}.stl`);
   }
 }
 
