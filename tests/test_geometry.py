@@ -1,0 +1,188 @@
+"""Tests for backend/geometry.py - auto and manual aircraft geometry."""
+import pytest
+
+from backend.geometry import (
+    calculate_geometry,
+    generate_wing_mesh_data,
+    generate_fuselage_mesh_data,
+    generate_conventional_fuselage_mesh_data,
+    generate_tail_mesh_data,
+)
+from backend.airfoil import naca_4_digit_coordinates
+
+
+REQUIRED_KEYS = {
+    "wingspan", "weight", "airfoil", "root_chord", "tip_chord", "taper_ratio",
+    "wing_area", "aspect_ratio", "mac", "mac_y", "sweep_angle", "dihedral_angle",
+    "fuselage_length", "fuselage_max_width", "fuselage_max_height",
+    "htail_span", "htail_chord", "htail_area", "htail_arm",
+    "vtail_span", "vtail_chord", "vtail_area",
+    "cg_position", "wing_position", "tail_type", "wing_junction",
+    "manual_mode", "wing_shape",
+}
+
+
+class TestAutoMode:
+    def test_all_required_keys_present(self, default_geom):
+        assert REQUIRED_KEYS.issubset(default_geom.keys())
+
+    def test_default_wingspan_and_weight_round_trip(self, default_geom):
+        assert default_geom["wingspan"] == 1.5
+        assert default_geom["weight"] == 2.5
+
+    def test_aspect_ratio_default_is_7(self, default_geom):
+        assert default_geom["aspect_ratio"] == pytest.approx(7.0, rel=1e-3)
+
+    def test_wing_area_formula(self, default_geom):
+        b = default_geom["wingspan"]
+        ar = default_geom["aspect_ratio"]
+        assert default_geom["wing_area"] == pytest.approx(b ** 2 / ar, rel=1e-2)
+
+    def test_tip_chord_smaller_than_root(self, default_geom):
+        assert default_geom["tip_chord"] < default_geom["root_chord"]
+
+    def test_taper_ratio_matches_chord_ratio(self, default_geom):
+        ratio = default_geom["tip_chord"] / default_geom["root_chord"]
+        assert ratio == pytest.approx(default_geom["taper_ratio"], rel=1e-2)
+
+    def test_mac_between_tip_and_root(self, default_geom):
+        assert default_geom["tip_chord"] <= default_geom["mac"] <= default_geom["root_chord"]
+
+    def test_fuselage_length_proportional_to_wingspan(self, default_geom):
+        assert default_geom["fuselage_length"] == pytest.approx(0.80 * default_geom["wingspan"], rel=1e-2)
+
+    def test_tail_arm_positive(self, default_geom):
+        assert default_geom["htail_arm"] > 0
+
+    def test_htail_smaller_than_main_wing(self, default_geom):
+        assert default_geom["htail_area"] < default_geom["wing_area"]
+        assert default_geom["htail_span"] < default_geom["wingspan"]
+
+    def test_vtail_smaller_than_htail(self, default_geom):
+        assert default_geom["vtail_area"] < default_geom["htail_area"]
+
+
+class TestWingShape:
+    def test_rectangular_has_taper_one(self):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_shape="rectangular")
+        assert g["taper_ratio"] == pytest.approx(1.0)
+        assert g["root_chord"] == pytest.approx(g["tip_chord"])
+
+    def test_rectangular_has_zero_sweep(self):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_shape="rectangular")
+        assert g["sweep_angle"] == 0.0
+
+    def test_tapered_has_partial_taper(self):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_shape="tapered")
+        assert 0.0 < g["taper_ratio"] < 1.0
+
+
+class TestScaling:
+    @pytest.mark.parametrize("wingspan", [0.3, 1.0, 1.5, 3.0, 5.0, 10.0])
+    def test_all_outputs_positive(self, wingspan):
+        g = calculate_geometry(wingspan, 2.5, "2412")
+        for key in ("root_chord", "tip_chord", "mac", "wing_area",
+                    "fuselage_length", "htail_span", "vtail_span"):
+            assert g[key] > 0, f"{key} should be positive at wingspan={wingspan}"
+
+    @pytest.mark.parametrize("wingspan", [0.5, 1.5, 3.0, 10.0])
+    def test_geometry_scales_linearly_with_wingspan(self, wingspan):
+        g1 = calculate_geometry(1.5, 2.5, "2412")
+        g2 = calculate_geometry(wingspan, 2.5, "2412")
+        ratio = wingspan / 1.5
+        assert g2["root_chord"] == pytest.approx(g1["root_chord"] * ratio, rel=1e-2)
+        assert g2["fuselage_length"] == pytest.approx(g1["fuselage_length"] * ratio, rel=1e-2)
+        assert g2["wing_area"] == pytest.approx(g1["wing_area"] * ratio ** 2, rel=1e-2)
+
+
+class TestManualMode:
+    def test_manual_uses_supplied_chords(self):
+        g = calculate_geometry(
+            1.5, 2.5, "2412",
+            manual_mode=True,
+            man_root_chord=0.30, man_tip_chord=0.10,
+            man_sweep=10, man_dihedral=5,
+            man_htail_span=0.5, man_htail_root=0.15, man_htail_tip=0.08,
+            man_htail_sweep=4,
+            man_vtail_span=0.3, man_vtail_root=0.15, man_vtail_tip=0.05,
+        )
+        assert g["root_chord"] == pytest.approx(0.30)
+        assert g["tip_chord"] == pytest.approx(0.10)
+        assert g["sweep_angle"] == pytest.approx(10.0)
+        assert g["dihedral_angle"] == pytest.approx(5.0)
+        assert g["htail_span"] == pytest.approx(0.5)
+        assert g["vtail_span"] == pytest.approx(0.3)
+
+    def test_manual_taper_derived_from_chords(self):
+        g = calculate_geometry(
+            1.5, 2.5, "2412",
+            manual_mode=True,
+            man_root_chord=0.20, man_tip_chord=0.10,
+        )
+        assert g["taper_ratio"] == pytest.approx(0.5)
+
+    def test_manual_mode_flag_propagated(self, default_geom):
+        assert default_geom["manual_mode"] is False
+        g = calculate_geometry(1.5, 2.5, "2412", manual_mode=True,
+                               man_root_chord=0.2, man_tip_chord=0.1)
+        assert g["manual_mode"] is True
+
+
+class TestConfigPassthrough:
+    @pytest.mark.parametrize("pos", ["low", "mid", "high"])
+    def test_wing_position(self, pos):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_position=pos)
+        assert g["wing_position"] == pos
+
+    @pytest.mark.parametrize("tail", ["conventional", "ttail", "vtail"])
+    def test_tail_type(self, tail):
+        g = calculate_geometry(1.5, 2.5, "2412", tail_type=tail)
+        assert g["tail_type"] == tail
+
+    @pytest.mark.parametrize("jct", ["through", "surface", "separate"])
+    def test_junction(self, jct):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_junction=jct)
+        assert g["wing_junction"] == jct
+
+    def test_wing_position_offset_signs(self):
+        low = calculate_geometry(1.5, 2.5, "2412", wing_position="low")
+        mid = calculate_geometry(1.5, 2.5, "2412", wing_position="mid")
+        high = calculate_geometry(1.5, 2.5, "2412", wing_position="high")
+        assert low["wing_position_offset"] < 0
+        assert mid["wing_position_offset"] == 0
+        assert high["wing_position_offset"] > 0
+
+
+class TestMeshGeneration:
+    def test_wing_mesh_returns_right_and_left(self, default_geom):
+        coords = [{"x": x, "y_upper": y, "y_lower": -y}
+                  for x, y in naca_4_digit_coordinates("2412")]
+        m = generate_wing_mesh_data(default_geom, coords, n_sections=10)
+        assert "right" in m and "left" in m
+        assert len(m["right"]) == 11
+        assert len(m["left"]) == 11
+
+    def test_wing_mesh_left_is_mirror_of_right(self, default_geom):
+        coords = [{"x": x, "y_upper": y, "y_lower": -y}
+                  for x, y in naca_4_digit_coordinates("2412")]
+        m = generate_wing_mesh_data(default_geom, coords, n_sections=5)
+        r0 = m["right"][3]["upper"]
+        l0 = m["left"][3]["upper"]
+        assert (r0[:, 2] == -l0[:, 2]).all()
+
+    def test_pod_boom_fuselage_has_sections(self, default_geom):
+        m = generate_fuselage_mesh_data(default_geom)
+        assert len(m["sections"]) == m["n_spanwise"]
+        assert m["n_circumferential"] == 24
+
+    def test_conventional_fuselage_has_sections(self, default_geom):
+        m = generate_conventional_fuselage_mesh_data(default_geom)
+        assert len(m["sections"]) == m["n_spanwise"]
+
+    def test_tail_mesh_has_horizontal_and_vertical(self, default_geom):
+        coords = [{"x": x, "y_upper": y, "y_lower": -y}
+                  for x, y in naca_4_digit_coordinates("0012")]
+        m = generate_tail_mesh_data(default_geom, coords, n_sections=8)
+        assert "horizontal" in m and "vertical" in m
+        assert "right" in m["horizontal"] and "left" in m["horizontal"]
+        assert len(m["vertical"]) == 9
