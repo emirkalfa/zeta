@@ -117,13 +117,13 @@ function buildWing(geom, coords, junction, wingX) {
       const yPos = eta * halfSpan;
       const chord = rootChord * (1 - eta * (1 - taper));
       const xOff = yPos * Math.tan(sweep) + wingX;
-      const zOff = yPos * Math.sin(dihedral);
+      const yOff = yPos * Math.sin(dihedral);
       const pts = [];
       for (const idx of uIdx) {
-        pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_upper * chord + wingPos, sign * (yPos + zOff)));
+        pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_upper * chord + wingPos + yOff, sign * yPos));
       }
       for (const idx of lIdx) {
-        pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_lower * chord + wingPos, sign * (yPos + zOff)));
+        pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_lower * chord + wingPos + yOff, sign * yPos));
       }
       secs.push(pts);
     }
@@ -795,13 +795,13 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
     const yPos = yStart + (yEnd - yStart) * eta;
     const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
     const xOff = yPos * Math.tan(sweep) + wingX;
-    const zOff = yPos * Math.sin(dihedral);
+    const yOff = yPos * Math.sin(dihedral);
     const pts = [];
     for (const idx of uIdx) {
-      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_upper * chord + wingPos, sign * (yPos + zOff)));
+      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_upper * chord + wingPos + yOff, sign * yPos));
     }
     for (const idx of lIdx) {
-      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_lower * chord + wingPos, sign * (yPos + zOff)));
+      pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_lower * chord + wingPos + yOff, sign * yPos));
     }
     secs.push(pts);
   }

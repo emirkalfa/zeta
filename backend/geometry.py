@@ -164,15 +164,15 @@ def generate_wing_mesh_data(geom, airfoil_coords, n_sections=35, n_foil_points=7
 
         chord = root_chord * (1 - eta * (1 - taper))
         x_offset = y_pos * np.tan(sweep)
-        z_offset = y_pos * np.sin(dihedral)
+        y_offset = y_pos * np.sin(dihedral)
 
         x_upper = foil_x[upper_idx] * chord + x_offset
-        y_upper = foil_y_upper[upper_idx] * chord
-        z_upper = np.full_like(x_upper, y_pos + z_offset)
+        y_upper = foil_y_upper[upper_idx] * chord + y_offset
+        z_upper = np.full_like(x_upper, y_pos)
 
         x_lower = foil_x[lower_idx] * chord + x_offset
-        y_lower = foil_y_lower[lower_idx] * chord
-        z_lower = np.full_like(x_lower, y_pos + z_offset)
+        y_lower = foil_y_lower[lower_idx] * chord + y_offset
+        z_lower = np.full_like(x_lower, y_pos)
 
         sec_right = {
             'upper': np.column_stack([x_upper, y_upper, z_upper]),
