@@ -36,7 +36,9 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, junc
   const dl = new THREE.DirectionalLight(0xffffff, 0.8);
   dl.position.set(5, 10, 7);
   scene.add(dl);
-  scene.add(new THREE.DirectionalLight(0xffffff, 0.3).position.set(-5, 0, -5));
+  const dl2 = new THREE.DirectionalLight(0xffffff, 0.3);
+  dl2.position.set(-5, 0, -5);
+  scene.add(dl2);
 
   const grid = new THREE.GridHelper(5, 20, 0x888888, 0x444444);
   grid.position.y = -0.3;
