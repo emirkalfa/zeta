@@ -4,6 +4,13 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-06-05
+
+### Added
+- Kanat ucu (tip cap) desteği: dilimlenmiş (sliced) ve dilimlenmemiş (thick) STL dışa aktarımda tüm kanat/kuyruk segmentlerine entegre tip cap eklendi.
+- STL dosya adları İngilizleştirildi: `z_wing_*` ön eki kullanılıyor.
+- Tip cap duvar kalınlığı artık `wallMeters` parametresine bağlı ve içe ofsetli.
+
 ## [1.0.0] - 2026-06-04
 
 ### Fixed
@@ -48,7 +55,8 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - MIT lisansı.
 - Karanlık mod, favicon, profil README.
 
-[Unreleased]: https://github.com/emirkalfa/zeta/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/emirkalfa/zeta/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/emirkalfa/zeta/compare/v1.0.0...v1.0.2
 [1.0.0]: https://github.com/emirkalfa/zeta/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/emirkalfa/zeta/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/emirkalfa/zeta/releases/tag/v0.1.0
