@@ -817,15 +817,40 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
     const innerSecs = secs.map(s => offsetSectionInward(s, wallMeters, nHalf, nPts, 'y'));
     const tipInfo = buildThickWingSeg(verts, idxs, secs, innerSecs, nPts);
     if (capTip) {
-      const tipCenter = new THREE.Vector3(0, 0, 0);
+      const inwardDir = spanDir.clone().negate();
+      const capDepth = wallMeters;
+
+      const capBackStart = verts.length / 3;
       for (let j = 0; j < nPts; j++) {
         const idx = (tipInfo.innerTipStart + j) * 3;
-        tipCenter.x += verts[idx];
-        tipCenter.y += verts[idx + 1];
-        tipCenter.z += verts[idx + 2];
+        verts.push(
+          verts[idx] + inwardDir.x * capDepth,
+          verts[idx+1] + inwardDir.y * capDepth,
+          verts[idx+2] + inwardDir.z * capDepth
+        );
       }
-      tipCenter.divideScalar(nPts);
-      makeCapFan(verts, idxs, tipInfo.innerTipStart, nPts, tipCenter, spanDir);
+
+      buildAnnulus(verts, idxs, tipInfo.innerTipStart, capBackStart, nPts, true);
+
+      const backCenter = new THREE.Vector3(0, 0, 0);
+      for (let j = 0; j < nPts; j++) {
+        const idx = (capBackStart + j) * 3;
+        backCenter.x += verts[idx];
+        backCenter.y += verts[idx+1];
+        backCenter.z += verts[idx+2];
+      }
+      backCenter.divideScalar(nPts);
+      makeCapFan(verts, idxs, capBackStart, nPts, backCenter, inwardDir);
+
+      const frontCenter = new THREE.Vector3(0, 0, 0);
+      for (let j = 0; j < nPts; j++) {
+        const idx = (tipInfo.innerTipStart + j) * 3;
+        frontCenter.x += verts[idx];
+        frontCenter.y += verts[idx+1];
+        frontCenter.z += verts[idx+2];
+      }
+      frontCenter.divideScalar(nPts);
+      makeCapFan(verts, idxs, tipInfo.innerTipStart, nPts, frontCenter, spanDir);
     }
   } else {
     for (const sec of secs) {
