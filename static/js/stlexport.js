@@ -70,7 +70,11 @@ function exportSTL(part) {
   const merged = mergeMeshes(meshes);
   if (!merged) return;
 
-  exportMeshAsSTL(merged, `zeta_${part}.stl`);
+  if (part === 'wing') {
+    exportMeshAsSTL(merged, `z_wing.stl`);
+  } else {
+    exportMeshAsSTL(merged, `zeta_${part}.stl`);
+  }
 }
 
 function exportSlicedWing() {
@@ -86,7 +90,7 @@ function exportSlicedWing() {
 
   for (let side = 0; side < 2; side++) {
     const sign = side === 0 ? 1 : -1;
-    const sideName = side === 0 ? 'sag' : 'sol';
+    const sideName = side === 0 ? 'right' : 'left';
 
     for (let seg = 0; seg < n; seg++) {
       const yStart = seg * segLen;
@@ -94,7 +98,7 @@ function exportSlicedWing() {
       const capTip = seg === n - 1;
 
       const mesh = buildWingSegment(geom, coords, yStart, yEnd, sign, false, false, wallM, capTip);
-      exportMeshAsSTL(mesh, `zeta_kanat_${sideName}_${seg+1}of${n}.stl`);
+      exportMeshAsSTL(mesh, `z_wing_${sideName}_${seg+1}of${n}.stl`);
     }
   }
 }
