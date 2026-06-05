@@ -645,6 +645,7 @@ function buildThickWingSeg(verts, idxs, secs, innerSecs, nPts) {
   const outerTipStart = (secs.length - 1) * nPts;
   const innerTipStart = innerStart + (innerSecs.length - 1) * nPts;
   buildAnnulus(verts, idxs, outerTipStart, innerTipStart, nPts, true);
+  return { innerTipStart };
 }
 
 // ========== SLICED SEGMENT GENERATORS ==========
@@ -774,7 +775,7 @@ function addDimple(verts, idxs, baseCenter, axis, radius, depth, nRadial) {
 }
 
 // Build a single wing segment as a closed manifold mesh
-function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, wallM) {
+function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, wallM, capTip) {
   const halfSpan = geom.wingspan / 2;
   const rootChord = geom.root_chord;
   const taper = geom.taper_ratio != null ? geom.taper_ratio : 0.5;
@@ -810,10 +811,22 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
   const idxs = [];
 
   const wallMeters = (wallM > 0) ? wallM : 0;
+  const spanDir = new THREE.Vector3(Math.tan(sweep), Math.sin(dihedral), sign).normalize();
 
   if (wallMeters > 0) {
     const innerSecs = secs.map(s => offsetSectionInward(s, wallMeters, nHalf, nPts, 'y'));
-    buildThickWingSeg(verts, idxs, secs, innerSecs, nPts);
+    const tipInfo = buildThickWingSeg(verts, idxs, secs, innerSecs, nPts);
+    if (capTip) {
+      const tipCenter = new THREE.Vector3(0, 0, 0);
+      for (let j = 0; j < nPts; j++) {
+        const idx = (tipInfo.innerTipStart + j) * 3;
+        tipCenter.x += verts[idx];
+        tipCenter.y += verts[idx + 1];
+        tipCenter.z += verts[idx + 2];
+      }
+      tipCenter.divideScalar(nPts);
+      makeCapFan(verts, idxs, tipInfo.innerTipStart, nPts, tipCenter, spanDir);
+    }
   } else {
     for (const sec of secs) {
       for (const p of sec) verts.push(p.x, p.y, p.z);
@@ -830,8 +843,6 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
       }
     }
   }
-
-  const spanDir = new THREE.Vector3(Math.tan(sweep), Math.sin(dihedral), sign).normalize();
 
   if (wallMeters <= 0) {
     // Surface-only mode: makeCapFan caps

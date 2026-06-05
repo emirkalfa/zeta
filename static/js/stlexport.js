@@ -91,8 +91,9 @@ function exportSlicedWing() {
     for (let seg = 0; seg < n; seg++) {
       const yStart = seg * segLen;
       const yEnd = (seg + 1) * segLen;
+      const capTip = seg === n - 1;
 
-      const mesh = buildWingSegment(geom, coords, yStart, yEnd, sign, false, false, wallM);
+      const mesh = buildWingSegment(geom, coords, yStart, yEnd, sign, false, false, wallM, capTip);
       exportMeshAsSTL(mesh, `zeta_kanat_${sideName}_${seg+1}of${n}.stl`);
     }
   }
