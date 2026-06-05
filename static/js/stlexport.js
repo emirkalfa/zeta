@@ -158,10 +158,43 @@ function exportSlicedTail() {
         }
 
         const verts = []; const idxs = [];
+        const sdir = new THREE.Vector3(0, Math.sin(vAngle), sign * Math.cos(vAngle)).normalize();
 
         if (wallM > 0) {
           const innerSecs = secs.map(s => offsetSectionInward(s, wallM, nHalf, nPts, 'y'));
-          buildThickWingSeg(verts, idxs, secs, innerSecs, nPts);
+          const tipInfo = buildThickWingSeg(verts, idxs, secs, innerSecs, nPts);
+          if (seg === n - 1) {
+            const inwardDir = sdir.clone().negate();
+            const capDepth = wallM;
+            const capBackStart = verts.length / 3;
+            for (let j = 0; j < nPts; j++) {
+              const idx = (tipInfo.innerTipStart + j) * 3;
+              verts.push(
+                verts[idx] + inwardDir.x * capDepth,
+                verts[idx+1] + inwardDir.y * capDepth,
+                verts[idx+2] + inwardDir.z * capDepth
+              );
+            }
+            buildAnnulus(verts, idxs, tipInfo.innerTipStart, capBackStart, nPts, true);
+            const backCenter = new THREE.Vector3(0, 0, 0);
+            for (let j = 0; j < nPts; j++) {
+              const idx = (capBackStart + j) * 3;
+              backCenter.x += verts[idx];
+              backCenter.y += verts[idx+1];
+              backCenter.z += verts[idx+2];
+            }
+            backCenter.divideScalar(nPts);
+            makeCapFan(verts, idxs, capBackStart, nPts, backCenter, inwardDir);
+            const frontCenter = new THREE.Vector3(0, 0, 0);
+            for (let j = 0; j < nPts; j++) {
+              const idx = (tipInfo.innerTipStart + j) * 3;
+              frontCenter.x += verts[idx];
+              frontCenter.y += verts[idx+1];
+              frontCenter.z += verts[idx+2];
+            }
+            frontCenter.divideScalar(nPts);
+            makeCapFan(verts, idxs, tipInfo.innerTipStart, nPts, frontCenter, sdir);
+          }
         } else {
           for (const s of secs) { for (const p of s) verts.push(p.x, p.y, p.z); }
           for (let i = 0; i < nSec; i++) {
@@ -172,8 +205,6 @@ function exportSlicedTail() {
             }
           }
         }
-
-        const sdir = new THREE.Vector3(0, Math.sin(vAngle), sign * Math.cos(vAngle)).normalize();
         if (wallM <= 0) {
           const rc = new THREE.Vector3(0,0,0);
           for (const p of secs[0]) rc.add(p);
@@ -227,7 +258,8 @@ function exportSlicedTail() {
       for (let seg = 0; seg < n; seg++) {
         const ys = seg * segLen, ye = (seg + 1) * segLen;
         const hp = false, hh = false;
-        const mesh = buildHTailSegment(geom, state.tailCoords, ys, ye, sign, hp, hh, wallM);
+        const capTip = seg === n - 1;
+        const mesh = buildHTailSegment(geom, state.tailCoords, ys, ye, sign, hp, hh, wallM, capTip);
         mesh.position.y += vHalf * 0.6;
         mesh.position.z *= 0.8;
         exportMeshAsSTL(mesh, `zeta_htail_${sn}_${seg+1}of${n}.stl`);
@@ -240,7 +272,8 @@ function exportSlicedTail() {
       for (let seg = 0; seg < n; seg++) {
         const ys = seg * segLen, ye = (seg + 1) * segLen;
         const hp = false, hh = false;
-        const mesh = buildHTailSegment(geom, state.tailCoords, ys, ye, sign, hp, hh, wallM);
+        const capTip = seg === n - 1;
+        const mesh = buildHTailSegment(geom, state.tailCoords, ys, ye, sign, hp, hh, wallM, capTip);
         exportMeshAsSTL(mesh, `zeta_htail_${sn}_${seg+1}of${n}.stl`);
       }
     }
@@ -251,7 +284,8 @@ function exportSlicedTail() {
   for (let seg = 0; seg < n; seg++) {
     const ys = seg * vSegLen, ye = (seg + 1) * vSegLen;
     const hp = false, hh = false;
-    const mesh = buildVTailSegment(geom, state.vtailCoords || state.tailCoords, ys, ye, hp, hh, wallM);
+    const capTip = seg === n - 1;
+    const mesh = buildVTailSegment(geom, state.vtailCoords || state.tailCoords, ys, ye, hp, hh, wallM, capTip);
     exportMeshAsSTL(mesh, `zeta_vtail_${seg+1}of${n}.stl`);
   }
 }
