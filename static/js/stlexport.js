@@ -30,17 +30,17 @@ function exportSTL(part) {
       case 'wing': {
         const coords = state.airfoilCoords;
         const halfSpan = geom.wingspan / 2;
-        meshes.push(buildWingSegment(geom, coords, 0, halfSpan, 1, false, false, wallM));
-        meshes.push(buildWingSegment(geom, coords, 0, halfSpan, -1, false, false, wallM));
+        meshes.push(buildWingSegment(geom, coords, 0, halfSpan, 1, false, false, wallM, true));
+        meshes.push(buildWingSegment(geom, coords, 0, halfSpan, -1, false, false, wallM, true));
         break;
       }
       case 'tail': {
         const coords = state.tailCoords;
         const vCoords = state.vtailCoords || state.tailCoords;
         const hHalf = geom.htail_span / 2;
-        meshes.push(buildHTailSegment(geom, coords, 0, hHalf, 1, false, false, wallM));
-        meshes.push(buildHTailSegment(geom, coords, 0, hHalf, -1, false, false, wallM));
-        meshes.push(buildVTailSegment(geom, vCoords, 0, geom.vtail_span, false, false, wallM));
+        meshes.push(buildHTailSegment(geom, coords, 0, hHalf, 1, false, false, wallM, true));
+        meshes.push(buildHTailSegment(geom, coords, 0, hHalf, -1, false, false, wallM, true));
+        meshes.push(buildVTailSegment(geom, vCoords, 0, geom.vtail_span, false, false, wallM, true));
         break;
       }
       default:
