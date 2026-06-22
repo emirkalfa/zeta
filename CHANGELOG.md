@@ -4,6 +4,18 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-06-22
+
+### Added
+- Reynolds sayısına bağlı kanat profili özellikleri: `cd_0`, `cl_max`, `cm_0` artık Re ile ölçekleniyor (`airfoil.py`).
+- Ok açısı (sweep) düzeltmesi: lifting-line çözümüne Λ düzeltmesi eklendi (`analysis.py`).
+- Post-stall modeli: maksimum CL sonrası davranış tanımlandı (`airfoil.cl`).
+- Gövde (fuselage) mesh görselleştirmesi: `viewer3d.js`'de kesitler artık doğru hizalanıyor.
+
+### Fixed
+- Gövde mesh'inde mükerrer kesitler kaldırıldı, kanat gövdeye doğru pozisyonda birleşiyor.
+- `wing_junction` kaldırıldı (kullanılmayan özellik).
+
 ## [1.0.2] - 2026-06-05
 
 ### Added
@@ -55,7 +67,8 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - MIT lisansı.
 - Karanlık mod, favicon, profil README.
 
-[Unreleased]: https://github.com/emirkalfa/zeta/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/emirkalfa/zeta/compare/v1.2.2...HEAD
+[1.2.2]: https://github.com/emirkalfa/zeta/compare/v1.0.2...v1.2.2
 [1.0.2]: https://github.com/emirkalfa/zeta/compare/v1.0.0...v1.0.2
 [1.0.0]: https://github.com/emirkalfa/zeta/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/emirkalfa/zeta/compare/v0.1.0...v0.2.0
