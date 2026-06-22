@@ -1,7 +1,7 @@
 import numpy as np
 
 def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
-                       tail_type='conventional', wing_junction='through',
+                       tail_type='conventional',
                        manual_mode=False, wing_shape='tapered',
                        man_root_chord=None, man_tip_chord=None,
                        man_sweep=None, man_dihedral=None,
@@ -96,7 +96,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'airfoil': airfoil_code,
         'wing_position': wing_position,
         'tail_type': tail_type,
-        'wing_junction': wing_junction,
         'wing_shape': wing_shape,
         'fuse_type': fuse_type,
         'root_chord': round(root_chord, 3),

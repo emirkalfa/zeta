@@ -82,10 +82,8 @@ def api_calculate():
     airfoil_code = data.get('airfoil_code', '2412')
     wing_position = data.get('wing_position', 'mid')
     tail_type = data.get('tail_type', 'conventional')
-    wing_junction = data.get('wing_junction', 'through')
-
     geom = calculate_geometry(wingspan, weight, airfoil_code,
-                              wing_position, tail_type, wing_junction,
+                              wing_position, tail_type,
                               manual_mode=data.get('manual_mode', False),
                               wing_shape=data.get('wing_shape', 'tapered'),
                               man_root_chord=data.get('man_root_chord'),
@@ -107,8 +105,11 @@ def api_analyze():
     data = request.get_json()
     geom = data.get('geometry', {})
     airfoil_code = data.get('airfoil_code', '2412')
-    props = get_airfoil_properties(airfoil_code)
+    Re = float(data.get('reynolds_number', 200000))
+    props = get_airfoil_properties(airfoil_code, Re=Re)
     polars = calculate_polars(geom, props)
+    polars['Reynolds'] = int(Re)
+    polars['cd_0'] = round(props['cd_0'], 5)
     return jsonify(polars)
 
 @app.route('/api/stability', methods=['POST'])
@@ -117,14 +118,17 @@ def api_stability():
     geom = data.get('geometry', {})
     airfoil_code = data.get('airfoil_code', '2412')
     tail_airfoil_code = data.get('tail_airfoil_code', '0012')
-    props = get_airfoil_properties(airfoil_code)
-    tail_props = get_airfoil_properties(tail_airfoil_code)
+    Re = float(data.get('reynolds_number', 200000))
+    props = get_airfoil_properties(airfoil_code, Re=Re)
+    tail_props = get_airfoil_properties(tail_airfoil_code, Re=Re)
     result = flight_test(geom, props, tail_props)
+    result['Reynolds'] = int(Re)
     return jsonify(result)
 
 @app.route('/api/airfoil_props/<code>')
 def api_airfoil_props(code):
-    props = get_airfoil_properties(code)
+    Re = request.args.get('Re', 200000, type=float)
+    props = get_airfoil_properties(code, Re=Re)
     return jsonify(props)
 
 @app.route('/api/version')

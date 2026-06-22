@@ -13,7 +13,12 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225):
 
     # Cl_max
     cl_max = airfoil_props['cl_max']
-    cl_alpha = airfoil_props['cl_alpha']
+    cl_alpha_2d = airfoil_props['cl_alpha']
+    # Sweep correction (simple sweep theory)
+    sweep_deg = geom.get('sweep_angle', 0.0)
+    cl_alpha = cl_alpha_2d * np.cos(np.radians(sweep_deg))
+    if cl_alpha < 0.01:
+        cl_alpha = cl_alpha_2d
 
     cl_alpha_3d = cl_alpha / (1 + cl_alpha / (np.pi * AR))
 

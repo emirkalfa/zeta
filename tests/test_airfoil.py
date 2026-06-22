@@ -93,8 +93,9 @@ class TestAirfoilProperties:
         assert required.issubset(props.keys())
 
     def test_stall_angle_within_reasonable_range(self):
+        # High Re (1e6) gives higher stall angles; low Re reduces them.
         for code in ["0012", "2412", "4412"]:
-            props = get_airfoil_properties(code)
+            props = get_airfoil_properties(code, Re=1000000)
             assert 10 <= props["alpha_stall"] <= 20
 
     def test_symmetric_airfoil_zero_alpha_l0(self):
@@ -123,16 +124,18 @@ class TestAirfoilProperties:
             assert get_airfoil_properties(code)["cm_0"] < -0.02
 
     def test_cl_max_within_5pct_of_reference(self):
+        # Reference values from Abbott & von Doenhoff at Re ~ 3e6
         ref = {"0012": 1.45, "2412": 1.55, "4412": 1.65, "0015": 1.40}
         for code, target in ref.items():
-            props = get_airfoil_properties(code)
+            props = get_airfoil_properties(code, Re=3000000)
             assert abs(props["cl_max"] - target) / target < 0.10, \
                 f"NACA {code} cl_max off: {props['cl_max']} vs {target}"
 
     def test_cd_0_within_20pct_of_reference(self):
+        # Reference values from Abbott & von Doenhoff at Re ~ 3e6
         ref = {"0012": 0.006, "2412": 0.0065, "4412": 0.0075, "0015": 0.0075}
         for code, target in ref.items():
-            props = get_airfoil_properties(code)
+            props = get_airfoil_properties(code, Re=3000000)
             assert abs(props["cd_0"] - target) / target < 0.20, \
                 f"NACA {code} cd_0 off: {props['cd_0']} vs {target}"
 

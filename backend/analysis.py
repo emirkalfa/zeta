@@ -7,8 +7,17 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
     taper = geom['taper_ratio_input']
     S = geom['wing_area']
     cg = geom['cg_position']
+    sweep_deg = geom.get('sweep_angle', 0.0)
+    sweep_rad = np.radians(sweep_deg)
 
-    cl_alpha_2d = airfoil_props['cl_alpha']
+    cl_alpha_2d_raw = airfoil_props['cl_alpha']
+    # Sweep correction: simple sweep theory reduces effective cl_alpha
+    # (Anderson Eq. 8.41, 8.42).
+    cl_alpha_2d = cl_alpha_2d_raw * np.cos(sweep_rad)
+    # Avoid degenerate case
+    if cl_alpha_2d < 0.01:
+        cl_alpha_2d = cl_alpha_2d_raw
+
     cl_max = airfoil_props['cl_max']
     alpha_stall = np.radians(airfoil_props['alpha_stall'])
     alpha_L0 = np.radians(airfoil_props['alpha_L0'])
@@ -55,12 +64,25 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
             CDi += k * coeffs[n]**2
         CDi *= np.pi * ar
 
-        # Stall: clip CL to cl_max (no post-stall model).
+        CD = cd_0 + CDi
+
+        # Post-stall model: CL drops and CD rises beyond stall angle.
+        alpha_eff_deg = np.degrees(alpha_eff)
+        stall_overshoot = max(0, abs(alpha_eff_deg) - airfoil_props['alpha_stall'])
+        if stall_overshoot > 0:
+            sign = 1 if alpha_eff_deg > 0 else -1
+            # Gradual CL drop (van Dam, Torenbeek post-stall model)
+            cl_post = cl_max * (1 - 0.12 * stall_overshoot - 0.02 * stall_overshoot**2)
+            if cl_post < 0.05:
+                cl_post = 0.05
+            CL = sign * min(abs(CL), cl_post)
+            # Quadratic drag rise in post-stall
+            CD += 0.05 * stall_overshoot + 0.08 * stall_overshoot**2
+
         CL = np.clip(CL, -cl_max, cl_max)
-        CL_3d = CL
+
         CL_2d = cl_alpha_2d * alpha_eff
 
-        CD = cd_0 + CDi
         # Pitching moment about CG with aero center at quarter-chord.
         # Cm_cg = cm_ac + CL * (x_cg - x_ac) / c_ref
         Cm = cm_0 + CL * (cg - 0.25 * mac) / mac
@@ -85,10 +107,10 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
 
         results.append({
             'alpha': round(alpha_deg, 1),
-            'CL': round(float(CL_3d), 4),
+            'CL': round(float(CL), 4),
             'CD': round(float(CD), 4),
             'Cm': round(float(Cm), 4),
-            'CL_CD': round(float(CL_3d / CD if CD != 0 else 0), 2),
+            'CL_CD': round(float(CL / CD if CD != 0 else 0), 2),
             'CL_2d': round(float(CL_2d), 4),
             'lift_distribution': lift_dist,
         })

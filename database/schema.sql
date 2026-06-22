@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS projects (
     airfoil_id INTEGER,
     wing_position TEXT DEFAULT 'mid',
     tail_type TEXT DEFAULT 'conventional',
-    wing_junction TEXT DEFAULT 'through',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (airfoil_id) REFERENCES airfoils(id)
 );

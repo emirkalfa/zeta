@@ -17,7 +17,7 @@ REQUIRED_KEYS = {
     "fuselage_length", "fuselage_max_width", "fuselage_max_height",
     "htail_span", "htail_chord", "htail_area", "htail_arm",
     "vtail_span", "vtail_chord", "vtail_area",
-    "cg_position", "wing_position", "tail_type", "wing_junction",
+    "cg_position", "wing_position", "tail_type",
     "manual_mode", "wing_shape",
 }
 
@@ -138,11 +138,6 @@ class TestConfigPassthrough:
     def test_tail_type(self, tail):
         g = calculate_geometry(1.5, 2.5, "2412", tail_type=tail)
         assert g["tail_type"] == tail
-
-    @pytest.mark.parametrize("jct", ["through", "surface", "separate"])
-    def test_junction(self, jct):
-        g = calculate_geometry(1.5, 2.5, "2412", wing_junction=jct)
-        assert g["wing_junction"] == jct
 
     def test_wing_position_offset_signs(self):
         low = calculate_geometry(1.5, 2.5, "2412", wing_position="low")

@@ -4,7 +4,7 @@ let wingGroup, fuseGroup, tailGroup;
 let autoRotate = false;
 let animFrame;
 
-function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, junction, tailType) {
+function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tailType) {
   if (viewer) disposeViewer();
 
   const container = document.getElementById('three-container');
@@ -53,8 +53,8 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, junc
   const wingX = geom.wing_x_pos || geom.fuselage_length * 0.35;
   const tailX = geom.tail_x_pos || geom.fuselage_length * 0.82;
 
-  buildWing(geom, wingCoords, junction, wingX);
-  buildFuselage(geom, junction);
+  buildWing(geom, wingCoords, wingX);
+  buildFuselage(geom);
   buildTail(geom, tailCoords, vtailCoords, tailType, tailX);
 
   scene.add(wingGroup);
@@ -97,7 +97,7 @@ function makeTextSprite(text, color) {
 }
 
 // --- WING ---
-function buildWing(geom, coords, junction, wingX) {
+function buildWing(geom, coords, wingX) {
   const halfSpan = geom.wingspan / 2;
   const rootChord = geom.root_chord;
   const taper = geom.taper_ratio != null ? geom.taper_ratio : 0.5;
@@ -162,7 +162,6 @@ function buildWing(geom, coords, junction, wingX) {
 
   const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
     color: 0x3b82f6, side: THREE.DoubleSide, flatShading: false,
-    transparent: junction === 'surface', opacity: junction === 'surface' ? 0.9 : 1.0,
   }));
   wingGroup.add(mesh);
 
@@ -196,7 +195,6 @@ function buildWing(geom, coords, junction, wingX) {
     capNrm.needsUpdate = true;
     wingGroup.add(new THREE.Mesh(capGeo, new THREE.MeshPhongMaterial({
       color: 0x3b82f6, side: THREE.DoubleSide,
-      transparent: junction === 'surface', opacity: junction === 'surface' ? 0.9 : 1.0,
     })));
     halfBase += (nSec + 1) * nPts;
   }
@@ -206,8 +204,8 @@ function buildWing(geom, coords, junction, wingX) {
 }
 
 // --- FUSELAGE ---
-function buildFuselage(geom, junction) {
-  buildConventionalFuselage(geom, junction);
+function buildFuselage(geom) {
+  buildConventionalFuselage(geom);
 }
 
 function tubeMesh(sections, color, edgeColor, opacity) {
@@ -252,7 +250,7 @@ function tubeMesh(sections, color, edgeColor, opacity) {
 }
 
 // Conventional tube fuselage (İHA/drone optimized): elliptical cross-section, smoother curves
-function buildConventionalFuselage(geom, junction) {
+function buildConventionalFuselage(geom) {
   const L = geom.fuselage_length;
   const W = geom.fuselage_max_width;
   const H = geom.fuselage_max_height;
@@ -294,13 +292,11 @@ function buildConventionalFuselage(geom, junction) {
     const xPos = noseLen + eta * cylLen;
     let w = W / 2;
     let h = H / 2;
-    if (junction === 'through' || junction === 'surface') {
-      const dx = Math.abs(xPos - wingX);
-      const influence = Math.max(0, 1 - dx / (halfSpan * 0.12));
-      if (influence > 0) {
-        const pinch = 1 - influence * 0.15 * (1 - influence);
-        w *= pinch;
-      }
+    const dx = Math.abs(xPos - wingX);
+    const influence = Math.max(0, 1 - dx / (halfSpan * 0.12));
+    if (influence > 0) {
+      const pinch = 1 - influence * 0.15 * (1 - influence);
+      w *= pinch;
     }
     const pts = [];
     for (let j = 0; j < nCirc; j++) {

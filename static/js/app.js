@@ -88,8 +88,7 @@ function checkSavedProject() {
         if (wp) wp.checked = true;
         const tt = document.querySelector(`input[name="tail_type"][value="${data.tail_type || 'conventional'}"]`);
         if (tt) tt.checked = true;
-        const wj = document.querySelector(`input[name="junction"][value="${data.wing_junction || 'through'}"]`);
-        if (wj) wj.checked = true;
+        if (data.reynolds) $('reynolds').value = data.reynolds;
 
       }
     }
@@ -105,8 +104,8 @@ function saveProject() {
     wing_shape: document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered',
     wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
-    wing_junction: document.querySelector('input[name="junction"]:checked')?.value || 'through',
     fuse_type: 'conventional',
+    reynolds: parseInt($('reynolds').value) || 200000,
   };
   localStorage.setItem('zeta-project', JSON.stringify(data));
   const sb = $('saveBtn');
@@ -164,8 +163,6 @@ async function calculateAll() {
   const wing_position = document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid';
   const wing_shape = document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered';
   const tail_type = document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional';
-  const wing_junction = document.querySelector('input[name="junction"]:checked')?.value || 'through';
-
   if (!wingspan || !weight || wingspan <= 0 || weight <= 0) {
     alert('Lütfen geçerli bir kanat açıklığı ve ağırlık girin.');
     hideLoading(btn);
@@ -193,7 +190,7 @@ async function calculateAll() {
     // Calculate geometry
     const manual_mode = $('manual-inputs').style.display !== 'none';
     const body = {
-      wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, wing_junction, manual_mode, fuse_type: 'conventional'
+      wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, manual_mode, fuse_type: 'conventional'
     };
     if (manual_mode) {
       body.man_root_chord = parseFloat($('man_root_chord').value) || undefined;
@@ -209,16 +206,17 @@ async function calculateAll() {
       body.man_vtail_tip = parseFloat($('man_vtail_tip').value) || undefined;
     }
     state.wallThickness = parseFloat($('wallThickness').value) || 0;
+    const reynolds_number = parseInt($('reynolds').value) || 200000;
     state.geometry = await fetchAPI('/api/calculate', body);
 
     // Run analysis (uses wing airfoil)
     state.polars = await fetchAPI('/api/analyze', {
-      geometry: state.geometry, airfoil_code
+      geometry: state.geometry, airfoil_code, reynolds_number
     });
 
     // Run stability test (uses htail airfoil)
     state.stability = await fetchAPI('/api/stability', {
-      geometry: state.geometry, airfoil_code, tail_airfoil_code: htail_airfoil
+      geometry: state.geometry, airfoil_code, tail_airfoil_code: htail_airfoil, reynolds_number
     });
 
     // Save to localStorage
@@ -234,7 +232,7 @@ async function calculateAll() {
     show('flight-card');
     show('stl-card');
 
-    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, wing_junction, tail_type);
+    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, tail_type);
     hideLoading(btn);
 
     // Scroll to results
@@ -301,7 +299,8 @@ function displayFlightTest(stab) {
     { label: 'Tırmanma Oranı', value: stab.climb_rate + ' m/s', cls: stab.climb_rate > 2 ? 'pass' : 'warn' },
     { label: 'Static Margin', value: '%' + stab.static_margin, cls: stab.static_margin >= 5 ? 'pass' : 'fail' },
     { label: 'CL Maks', value: stab.cl_max, cls: 'pass' },
-    { label: 'Seyir CD', value: stab.cd_cruise, cls: 'pass' },
+    { label: 'Seyir CD (total)', value: stab.cd_cruise, cls: 'pass' },
+    { label: 'Reynolds (Re)', value: (stab.Reynolds || '').toLocaleString(), cls: 'pass' },
   ];
 
   const assessments = stab.assessments || [];

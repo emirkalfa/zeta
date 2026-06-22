@@ -32,7 +32,28 @@ def naca_4_digit_coordinates(code, n=150):
 
     return np.vstack([upper, lower])
 
-def get_airfoil_properties(code):
+def _cd_0_at_re(Re, t, m):
+    """Profile drag at design Re using flat-plate skin friction analogy.
+
+    Reference formula calibrated at Re_ref = 3e6 (Abbott & von Doenhoff).
+    Scales with Re^(−0.3) for mixed boundary layer (Schlichting, Hoerner).
+    """
+    Re = max(Re, 10000)
+    Re_ref = 3000000
+    cd_0_ref = 0.0055 + 0.011 * t + 0.02 * m
+    scale = (Re_ref / Re) ** 0.3
+    return min(cd_0_ref * scale, 0.12)
+
+
+def _cl_max_at_re(Re, cl_max_base, t):
+    """CL_max drops at low Re due to early separation."""
+    Re = max(Re, 10000)
+    # Gentle reduction below Re=1e6
+    factor = 1.0 - 0.15 * max(0, 1 - Re / 1000000)
+    return cl_max_base * factor
+
+
+def get_airfoil_properties(code, Re=200000):
     m = int(code[0]) / 100.0
     p = int(code[1]) / 10.0
     t = int(code[2:4]) / 100.0
@@ -55,6 +76,8 @@ def get_airfoil_properties(code):
     alpha_L0_deg = float(np.degrees(alpha_L0))
 
     # 2D lift-curve slope from thin airfoil theory (per radian).
+    # Inviscid value is 2π regardless of Re. Sweep correction applied
+    # in lifting-line analysis.
     cl_alpha = 2 * np.pi
 
     # Pitching moment about aerodynamic center from thin airfoil theory:
@@ -70,14 +93,16 @@ def get_airfoil_properties(code):
     # Empirical CL_max for NACA 4-digit at Re ~ 1e6 (smooth surface).
     # Fits Abbott & von Doenhoff data within +/- 5%:
     #   thicker -> slightly lower, more camber -> higher.
-    cl_max = 1.50 + 4.0 * m - 1.0 * max(t - 0.12, 0.0)
+    cl_max_base = 1.50 + 4.0 * m - 1.0 * max(t - 0.12, 0.0)
+    cl_max = _cl_max_at_re(Re, cl_max_base, t)
 
-    # Empirical Cd_0 for NACA 4-digit at Re ~ 1e6.
-    # Linear in thickness, weak camber penalty.
-    cd_0 = 0.0055 + 0.011 * t + 0.02 * m
+    # Profile drag at design Reynolds number.
+    cd_0 = _cd_0_at_re(Re, t, m)
 
     # Stall angle: thicker airfoils stall later, camber shifts curve.
-    alpha_stall = 12.0 + 30.0 * t - 50.0 * m
+    # Reduced at low Re (gentle drop below Re=1e6).
+    alpha_stall_base = 12.0 + 30.0 * t - 50.0 * m
+    alpha_stall = alpha_stall_base * (1.0 - 0.2 * max(0, 1 - Re / 1000000))
 
     return {
         'max_camber': m,

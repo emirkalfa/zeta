@@ -78,12 +78,17 @@
           </div>
         </div>
         <input type="hidden" name="fuse_type" value="conventional">
-        <div class="form-group">
-          <label>Kanat-Gövde Birleşimi</label>
-          <div class="radio-group">
-            <label class="radio-label"><input type="radio" name="junction" value="through" checked> İçten Geçen</label>
-            <label class="radio-label"><input type="radio" name="junction" value="surface"> Yüzeyde Biten</label>
-            <label class="radio-label"><input type="radio" name="junction" value="separate"> Ayrı</label>
+      </div>
+
+      <!-- Reynolds Number (visible in both modes) -->
+      <hr style="margin:12px 0; border-color:var(--border)" id="re-separator">
+      <div id="reynolds-inputs">
+        <h3 style="margin-top:0">Viskozite Ayarları</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="reynolds">Reynolds Sayısı (Re)</label>
+            <input type="number" id="reynolds" step="10000" min="10000" max="5000000" value="200000">
+            <small style="color:var(--muted)">10.000 – 5.000.000 (Model uçak: 50k–500k)</small>
           </div>
         </div>
       </div>
