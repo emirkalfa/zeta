@@ -221,24 +221,6 @@ function tubeMesh(sections, color, edgeColor, opacity) {
       ii.push(a, b, c); ii.push(b, d, c);
     }
   }
-  const addCap = (sec, dir) => {
-    const off = v.length / 3;
-    const c = new THREE.Vector3(0,0,0);
-    for (const p of sec) c.add(p);
-    c.divideScalar(nPts);
-    v.push(c.x, c.y, c.z);
-    for (let j = 0; j < nPts; j++) {
-      const pj = sec[j], pjn = sec[(j+1)%nPts];
-      const e1 = new THREE.Vector3().subVectors(pjn, pj);
-      const e2 = new THREE.Vector3().subVectors(c, pj);
-      const nrm = new THREE.Vector3().crossVectors(e1, e2).normalize();
-      if (nrm.dot(dir) >= 0) {
-        ii.push(off, pj, pjn);
-      } else {
-        ii.push(off, pjn, pj);
-      }
-    }
-  };
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
   g.setIndex(ii); g.computeVertexNormals();
@@ -284,6 +266,8 @@ function buildConventionalFuselage(geom) {
 
   // Cylindrical section — elliptical
   const wingX = geom.wing_x_pos || L * 0.30;
+  const rootChord = geom.root_chord || 0.2;
+  const wingMaxThickX = wingX + 0.30 * rootChord;
   const halfSpan = geom.wingspan / 2;
   const cylSections = [];
   const nCyl = 16;
@@ -292,7 +276,7 @@ function buildConventionalFuselage(geom) {
     const xPos = noseLen + eta * cylLen;
     let w = W / 2;
     let h = H / 2;
-    const dx = Math.abs(xPos - wingX);
+    const dx = Math.abs(xPos - wingMaxThickX);
     const influence = Math.max(0, 1 - dx / (halfSpan * 0.12));
     if (influence > 0) {
       const pinch = 1 - influence * 0.15 * (1 - influence);
@@ -325,7 +309,8 @@ function buildConventionalFuselage(geom) {
     tailSections.push(pts);
   }
 
-  const allSections = [...noseSections, ...cylSections, ...tailSections];
+  // Skip duplicate sections at nose/cyl and cyl/tail boundaries
+  const allSections = [...noseSections, ...cylSections.slice(1), ...tailSections.slice(1)];
   tubeMesh(allSections, 0x94a3b8, 0x475569, 0.55);
 }
 

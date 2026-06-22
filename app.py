@@ -97,7 +97,10 @@ def api_calculate():
                               man_vtail_span=data.get('man_vtail_span'),
                               man_vtail_root=data.get('man_vtail_root'),
                               man_vtail_tip=data.get('man_vtail_tip'),
-                               fuse_type='conventional')
+                                fuse_type='conventional')
+    cg_pct = data.get('cg_percent')
+    if cg_pct is not None:
+        geom['cg_position'] = round(float(cg_pct) / 100.0 * geom['mac'], 3)
     return jsonify(geom)
 
 @app.route('/api/analyze', methods=['POST'])
@@ -106,8 +109,9 @@ def api_analyze():
     geom = data.get('geometry', {})
     airfoil_code = data.get('airfoil_code', '2412')
     Re = float(data.get('reynolds_number', 200000))
+    max_alpha = float(data.get('max_alpha', 20))
     props = get_airfoil_properties(airfoil_code, Re=Re)
-    polars = calculate_polars(geom, props)
+    polars = calculate_polars(geom, props, max_alpha=max_alpha)
     polars['Reynolds'] = int(Re)
     polars['cd_0'] = round(props['cd_0'], 5)
     return jsonify(polars)

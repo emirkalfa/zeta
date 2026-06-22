@@ -1,6 +1,6 @@
 import numpy as np
 
-def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.225):
+def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.225, max_alpha=20):
     b = geom['wingspan']
     ar = geom['aspect_ratio']
     root_c = geom['root_chord']
@@ -25,7 +25,7 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
     cd_0 = airfoil_props['cd_0']
     mac = geom['mac']
 
-    alphas = np.linspace(-5, 20, 51)
+    alphas = np.linspace(-5, max_alpha, 51)
     results = []
 
     for alpha_deg in alphas:
@@ -117,8 +117,8 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
 
     return results
 
-def calculate_polars(geom, airfoil_props):
-    results = lifting_line_analysis(geom, airfoil_props)
+def calculate_polars(geom, airfoil_props, max_alpha=20):
+    results = lifting_line_analysis(geom, airfoil_props, max_alpha=max_alpha)
 
     polars = {
         'cl_vs_alpha': [],

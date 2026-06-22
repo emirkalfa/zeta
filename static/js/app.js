@@ -89,6 +89,8 @@ function checkSavedProject() {
         const tt = document.querySelector(`input[name="tail_type"][value="${data.tail_type || 'conventional'}"]`);
         if (tt) tt.checked = true;
         if (data.reynolds) $('reynolds').value = data.reynolds;
+        if (data.cg_percent) { $('cgSlider').value = data.cg_percent; updateCGDisplay(); }
+        if (data.max_alpha) $('maxAlpha').value = data.max_alpha;
 
       }
     }
@@ -106,6 +108,8 @@ function saveProject() {
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
     fuse_type: 'conventional',
     reynolds: parseInt($('reynolds').value) || 200000,
+    cg_percent: parseInt($('cgSlider').value) || 25,
+    max_alpha: parseInt($('maxAlpha').value) || 20,
   };
   localStorage.setItem('zeta-project', JSON.stringify(data));
   const sb = $('saveBtn');
@@ -123,8 +127,14 @@ function loadProject() {
   } catch(e) { alert('Kayıtlı proje bulunamadı.'); }
 }
 
+function updateCGDisplay() {
+  const val = $('cgSlider').value;
+  $('cgValue').textContent = val;
+}
+
 function setupEventListeners() {
   $('calculateBtn').addEventListener('click', calculateAll);
+  $('cgSlider').addEventListener('input', updateCGDisplay);
   $('viewX').addEventListener('click', () => viewerSetView('x'));
   $('viewY').addEventListener('click', () => viewerSetView('y'));
   $('viewZ').addEventListener('click', () => viewerSetView('z'));
@@ -163,6 +173,9 @@ async function calculateAll() {
   const wing_position = document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid';
   const wing_shape = document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered';
   const tail_type = document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional';
+  const cg_percent = parseInt($('cgSlider').value) || 25;
+  const max_alpha = parseInt($('maxAlpha').value) || 20;
+
   if (!wingspan || !weight || wingspan <= 0 || weight <= 0) {
     alert('Lütfen geçerli bir kanat açıklığı ve ağırlık girin.');
     hideLoading(btn);
@@ -207,11 +220,12 @@ async function calculateAll() {
     }
     state.wallThickness = parseFloat($('wallThickness').value) || 0;
     const reynolds_number = parseInt($('reynolds').value) || 200000;
+    body.cg_percent = cg_percent;
     state.geometry = await fetchAPI('/api/calculate', body);
 
     // Run analysis (uses wing airfoil)
     state.polars = await fetchAPI('/api/analyze', {
-      geometry: state.geometry, airfoil_code, reynolds_number
+      geometry: state.geometry, airfoil_code, reynolds_number, max_alpha
     });
 
     // Run stability test (uses htail airfoil)
