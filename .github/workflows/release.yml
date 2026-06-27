@@ -86,6 +86,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Read version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Stripped=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/download-artifact@v4
         with:
           name: zeta-release-${{ steps.version.outputs.stripped }}
