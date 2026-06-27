@@ -63,20 +63,35 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         vtail_taper = vtail_tip_chord / vtail_root_chord if vtail_root_chord > 0 else 0.4
         vtail_area = (vtail_root_chord + vtail_tip_chord) / 2 * vtail_span if vtail_span > 0 else 0
     else:
-        htail_Vh = 0.55
+        htail_Vh = 0.70
         htail_taper = 0.5
-        htail_span = 0.35 * wingspan
+        htail_span = 0.40 * wingspan
         htail_area = htail_Vh * wing_area * mac / max(htail_arm, 0.01)
         htail_root_chord = 2 * htail_area / (htail_span * (1 + htail_taper))
         htail_tip_chord = htail_root_chord * htail_taper
         htail_sweep = 3.0
 
-        vtail_Vv = 0.035
+        vtail_Vv = 0.045
         vtail_taper = 0.4
-        vtail_span = 0.20 * wingspan
+        vtail_span = 0.25 * wingspan
         vtail_area = vtail_Vv * wing_area * wingspan / max(htail_arm, 0.01)
         vtail_root_chord = 2 * vtail_area / (vtail_span * (1 + vtail_taper))
         vtail_tip_chord = vtail_root_chord * vtail_taper
+
+    # V-tail override: replaces both horizontal and vertical
+    if tail_type == 'vtail':
+        vgamma = np.radians(35)
+        cos2 = np.cos(vgamma) ** 2
+        sin2 = np.sin(vgamma) ** 2
+        vtail_span = 0.40 * wingspan
+        vtail_taper = 0.6
+        vtail_area = max(htail_area / cos2, vtail_area / sin2)
+        vtail_root_chord = 2 * vtail_area / (vtail_span * (1 + vtail_taper))
+        vtail_tip_chord = vtail_root_chord * vtail_taper
+        htail_span = 0
+        htail_area = 0
+        htail_root_chord = 0
+        htail_tip_chord = 0
 
     cg_position = 0.25 * mac
     span_efficiency = 0.85
@@ -87,12 +102,26 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'high': fuse_max_height * 0.65,
     }
 
-    # Conventional fuselage parameters
+    # Fuselage parameters (per type)
     fuse_diameter = 0.09 * wingspan
-    nose_length = 2.0 * fuse_diameter
-    tailcone_length = 3.5 * fuse_diameter
-    cylindrical_length = fuse_length - nose_length - tailcone_length
-    if fuse_type == 'conventional':
+    if fuse_type == 'vtol':
+        vtol_pod_length = 0.55 * fuse_length
+        vtol_nose_length = 0.25 * vtol_pod_length
+        vtol_tailcone_length = 0.15 * vtol_pod_length
+        vtol_pod_max_width = 1.6 * fuse_diameter
+        vtol_pod_max_height = 1.3 * fuse_diameter
+        vtol_boom_diameter = 0.18 * fuse_diameter
+        vtol_boom_start = 0.80 * vtol_pod_length
+        vtol_boom_length = (tail_x_pos - vtol_boom_start) + 0.12 * fuse_length
+        nose_length = vtol_nose_length
+        tailcone_length = vtol_tailcone_length
+        cylindrical_length = vtol_pod_length - nose_length - tailcone_length
+        fuse_max_width = vtol_pod_max_width
+        fuse_max_height = vtol_pod_max_height
+    else:
+        nose_length = 2.0 * fuse_diameter
+        tailcone_length = 3.5 * fuse_diameter
+        cylindrical_length = fuse_length - nose_length - tailcone_length
         fuse_max_width = fuse_diameter
         fuse_max_height = fuse_diameter
 
@@ -143,7 +172,75 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'manual_mode': manual_mode,
     }
 
+    if fuse_type == 'vtol':
+        result.update({
+            'vtol_pod_length': round(vtol_pod_length, 3),
+            'vtol_pod_max_width': round(vtol_pod_max_width, 3),
+            'vtol_pod_max_height': round(vtol_pod_max_height, 3),
+            'vtol_nose_length': round(vtol_nose_length, 3),
+            'vtol_boom_diameter': round(vtol_boom_diameter, 3),
+            'vtol_boom_start': round(vtol_boom_start, 3),
+            'vtol_boom_length': round(vtol_boom_length, 3),
+        })
+
+    result['control_surfaces'] = calculate_control_surfaces(
+        wingspan, wing_area, root_chord, taper_ratio, htail_area, vtail_area,
+        wing_shape,
+    )
     return result
+
+
+def calculate_control_surfaces(wingspan, wing_area, root_chord, taper_ratio,
+                                htail_area, vtail_area, wing_shape):
+    half_span = wingspan / 2
+
+    # Aileron: outer portion, ~25% chord
+    ail_eta_start = 0.55
+    ail_eta_end = 0.90
+    ail_chord_ratio = 0.25
+    ail_c_root = root_chord * (1 - ail_eta_start * (1 - taper_ratio)) * ail_chord_ratio
+    ail_c_tip = root_chord * (1 - ail_eta_end * (1 - taper_ratio)) * ail_chord_ratio
+    ail_area = (ail_c_root + ail_c_tip) / 2 * (ail_eta_end - ail_eta_start) * half_span * 2
+
+    # Flap: inner portion, ~30% chord
+    flap_eta_start = 0.08
+    flap_eta_end = 0.50
+    flap_chord_ratio = 0.30
+    flap_c_root = root_chord * (1 - flap_eta_start * (1 - taper_ratio)) * flap_chord_ratio
+    flap_c_tip = root_chord * (1 - flap_eta_end * (1 - taper_ratio)) * flap_chord_ratio
+    flap_area = (flap_c_root + flap_c_tip) / 2 * (flap_eta_end - flap_eta_start) * half_span * 2
+
+    return {
+        'aileron': {
+            'eta_start': ail_eta_start,
+            'eta_end': ail_eta_end,
+            'chord_ratio': ail_chord_ratio,
+            'span_start_m': round(ail_eta_start * half_span, 3),
+            'span_end_m': round(ail_eta_end * half_span, 3),
+            'chord_at_root': round(ail_c_root, 3),
+            'chord_at_tip': round(ail_c_tip, 3),
+            'area': round(ail_area, 4),
+        },
+        'flap': {
+            'eta_start': flap_eta_start,
+            'eta_end': flap_eta_end,
+            'chord_ratio': flap_chord_ratio,
+            'span_start_m': round(flap_eta_start * half_span, 3),
+            'span_end_m': round(flap_eta_end * half_span, 3),
+            'chord_at_root': round(flap_c_root, 3),
+            'chord_at_tip': round(flap_c_tip, 3),
+            'area': round(flap_area, 4),
+        },
+        'elevator': {
+            'chord_ratio': 0.30,
+            'area': round(htail_area * 0.30, 4),
+        },
+        'rudder': {
+            'chord_ratio': 0.30,
+            'area': round(vtail_area * 0.30, 4),
+        },
+    }
+
 
 def generate_wing_mesh_data(geom, airfoil_coords, n_sections=35, n_foil_points=76):
     half_span = geom['wingspan'] / 2
@@ -329,7 +426,7 @@ def generate_tail_mesh_data(geom, airfoil_coords, n_sections=20, n_foil_points=3
     for i in range(n_sections + 1):
         eta = i / n_sections
         y_pos = eta * half_span
-        c = chord * (1 - eta * 0.3)
+        c = chord * (1 - eta * (1 - geom['htail_taper']))
         x_offset = arm + y_pos * np.tan(htail_sweep)
 
         xu = foil_x[upper_idx] * c + x_offset
@@ -361,7 +458,7 @@ def generate_tail_mesh_data(geom, airfoil_coords, n_sections=20, n_foil_points=3
     for i in range(n_sections + 1):
         eta = i / n_sections
         z_pos = eta * vspan
-        c = vchord * (1 - eta * 0.2)
+        c = vchord * (1 - eta * (1 - geom['vtail_taper']))
         x_offset = varm + z_pos * np.tan(vtail_sweep)
 
         xu = foil_x[upper_idx] * c + x_offset

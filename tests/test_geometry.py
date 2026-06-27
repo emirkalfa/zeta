@@ -4,6 +4,7 @@ import pytest
 
 from backend.geometry import (
     calculate_geometry,
+    calculate_control_surfaces,
     generate_wing_mesh_data,
     generate_fuselage_mesh_data,
     generate_conventional_fuselage_mesh_data,
@@ -185,6 +186,48 @@ class TestStraightTrailingEdge:
     def test_ste_wing_shape_passthrough(self):
         g = calculate_geometry(1.5, 2.5, "2412", wing_shape="ste_tapered")
         assert g["wing_shape"] == "ste_tapered"
+
+
+class TestControlSurfaces:
+    def test_cs_keys_in_geometry(self, default_geom):
+        assert 'control_surfaces' in default_geom
+        cs = default_geom['control_surfaces']
+        for k in ('aileron', 'flap', 'elevator', 'rudder'):
+            assert k in cs
+
+    def test_aileron_eta_order(self):
+        cs = calculate_control_surfaces(1.5, 0.321, 0.286, 0.5, 0.063, 0.027, 'tapered')
+        assert cs['aileron']['eta_start'] < cs['aileron']['eta_end']
+
+    def test_flap_eta_order(self):
+        cs = calculate_control_surfaces(1.5, 0.321, 0.286, 0.5, 0.063, 0.027, 'tapered')
+        assert cs['flap']['eta_start'] < cs['flap']['eta_end']
+
+    def test_aileron_flap_no_overlap(self):
+        cs = calculate_control_surfaces(1.5, 0.321, 0.286, 0.5, 0.063, 0.027, 'tapered')
+        assert cs['aileron']['eta_start'] >= cs['flap']['eta_end']
+
+    def test_cs_areas_positive(self):
+        cs = calculate_control_surfaces(1.5, 0.321, 0.286, 0.5, 0.063, 0.027, 'tapered')
+        assert cs['aileron']['area'] > 0
+        assert cs['flap']['area'] > 0
+        assert cs['elevator']['area'] > 0
+        assert cs['rudder']['area'] > 0
+
+    def test_cs_all_wing_shapes(self):
+        for shape in ('tapered', 'rectangular', 'ste_tapered'):
+            g = calculate_geometry(1.5, 2.5, '2412', wing_shape=shape)
+            cs = g['control_surfaces']
+            assert cs['aileron']['area'] > 0
+            assert cs['flap']['area'] > 0
+
+    def test_cs_area_reasonable(self):
+        g = calculate_geometry(1.5, 2.5, '2412')
+        cs = g['control_surfaces']
+        wing_area = g['wing_area']
+        total_cs_area = cs['aileron']['area'] + cs['flap']['area']
+        assert total_cs_area < wing_area
+        assert total_cs_area > wing_area * 0.05
 
 
 class TestConfigPassthrough:

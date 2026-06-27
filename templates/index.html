@@ -78,12 +78,18 @@
             <label class="radio-label"><input type="radio" name="tail_type" value="vtail"> V-tail</label>
           </div>
         </div>
+        <div class="form-group">
+          <label>Gövde Tipi</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="fuse_type" value="conventional" checked> Konvansiyonel</label>
+            <label class="radio-label"><input type="radio" name="fuse_type" value="vtol"> 🚁 VTOL (Pod+Boom)</label>
+          </div>
+        </div>
         <div class="form-group full-width">
           <label for="cgSlider">CG Pozisyonu <span id="cgValue">25</span>% MAC</label>
           <input type="range" id="cgSlider" min="10" max="50" value="25" step="1">
           <div class="range-labels"><span>%10 (ön)</span><span>%25 (nötr)</span><span>%50 (arka)</span></div>
         </div>
-        <input type="hidden" name="fuse_type" value="conventional">
       </div>
 
       <hr style="margin:12px 0; border-color:var(--border)" id="re-separator">
