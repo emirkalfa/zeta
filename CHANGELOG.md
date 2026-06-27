@@ -4,6 +4,16 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-06-28
+
+### Added
+- Straight Trailing Edge (STE) tapered wing model: paralel olmayan LEAD ve TRA ile kanat geometrisi (#c357933).
+- Modern MALE pod-boom gövde: superellipse kesit ve ventral pod desteği (#b67ddf7).
+
+### Changed
+- Pod-boom VTOL gövde kaldırıldı, sadece konvansiyonel gövde tutuluyor (#2b5948c).
+- `*.egg-info` git izlemeden çıkarıldı (#5aab91e).
+
 ## [1.2.2] - 2026-06-22
 
 ### Added
@@ -67,7 +77,8 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - MIT lisansı.
 - Karanlık mod, favicon, profil README.
 
-[Unreleased]: https://github.com/emirkalfa/zeta/compare/v1.2.2...HEAD
+[Unreleased]: https://github.com/emirkalfa/zeta/compare/v1.2.3...HEAD
+[1.2.3]: https://github.com/emirkalfa/zeta/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/emirkalfa/zeta/compare/v1.0.2...v1.2.2
 [1.0.2]: https://github.com/emirkalfa/zeta/compare/v1.0.0...v1.0.2
 [1.0.0]: https://github.com/emirkalfa/zeta/compare/v0.2.0...v1.0.0
