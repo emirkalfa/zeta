@@ -1,4 +1,5 @@
 """Tests for backend/geometry.py - auto and manual aircraft geometry."""
+import numpy as np
 import pytest
 
 from backend.geometry import (
@@ -126,6 +127,64 @@ class TestManualMode:
         g = calculate_geometry(1.5, 2.5, "2412", manual_mode=True,
                                man_root_chord=0.2, man_tip_chord=0.1)
         assert g["manual_mode"] is True
+
+
+class TestStraightTrailingEdge:
+    def test_ste_taper_ratio(self):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_shape="ste_tapered")
+        assert g["taper_ratio"] == pytest.approx(0.5)
+
+    def test_ste_straight_te_flag(self):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_shape="ste_tapered")
+        assert g["straight_te"] is True
+        g2 = calculate_geometry(1.5, 2.5, "2412", wing_shape="tapered")
+        assert g2["straight_te"] is False
+
+    def test_ste_sweep_angle_positive(self):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_shape="ste_tapered")
+        assert g["sweep_angle"] > 0
+
+    def test_ste_mesh_straight_te(self):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_shape="ste_tapered")
+        coords = [{"x": x, "y_upper": y, "y_lower": -y}
+                  for x, y in naca_4_digit_coordinates("2412")]
+        m = generate_wing_mesh_data(g, coords, n_sections=10)
+        te_x_positions = []
+        for sec in m["right"]:
+            upper = sec["upper"]
+            te_x = upper[:, 0].max()
+            te_x_positions.append(te_x)
+        std_te = np.std(te_x_positions)
+        assert std_te < 1e-5, f"TE x std={std_te} should be near zero for straight TE"
+
+    def test_ste_mesh_te_scatter_smaller_than_tapered(self):
+        g_ste = calculate_geometry(1.5, 2.5, "2412", wing_shape="ste_tapered")
+        g_tap = calculate_geometry(1.5, 2.5, "2412", wing_shape="tapered")
+        coords = [{"x": x, "y_upper": y, "y_lower": -y}
+                  for x, y in naca_4_digit_coordinates("2412")]
+        m_ste = generate_wing_mesh_data(g_ste, coords, n_sections=10)
+        m_tap = generate_wing_mesh_data(g_tap, coords, n_sections=10)
+        def te_std(m):
+            te_x = [sec["upper"][:, 0].max() for sec in m["right"]]
+            return np.std(te_x)
+        assert te_std(m_ste) < te_std(m_tap) / 10
+
+    def test_ste_wing_area_matches_formula(self):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_shape="ste_tapered")
+        b = g["wingspan"]
+        ar = g["aspect_ratio"]
+        assert g["wing_area"] == pytest.approx(b ** 2 / ar, rel=1e-2)
+
+    @pytest.mark.parametrize("wingspan", [0.5, 1.5, 3.0, 10.0])
+    def test_ste_scales_with_wingspan(self, wingspan):
+        g = calculate_geometry(wingspan, 2.5, "2412", wing_shape="ste_tapered")
+        assert g["root_chord"] > 0
+        assert g["tip_chord"] > 0
+        assert g["wing_area"] > 0
+
+    def test_ste_wing_shape_passthrough(self):
+        g = calculate_geometry(1.5, 2.5, "2412", wing_shape="ste_tapered")
+        assert g["wing_shape"] == "ste_tapered"
 
 
 class TestConfigPassthrough:

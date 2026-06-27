@@ -20,17 +20,23 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         aspect_ratio = wingspan**2 / wing_area if wing_area > 0 else 7.0
     else:
         ar = 7.0
-        sweep_angle = 5.0
         dihedral_angle = 3.0
         if wing_shape == 'rectangular':
             taper_ratio = 1.0
             sweep_angle = 0.0
+        elif wing_shape == 'ste_tapered':
+            taper_ratio = 0.5
+            sweep_angle = 5.0
         else:
             taper_ratio = 0.5
+            sweep_angle = 5.0
         wing_area = wingspan**2 / ar
         root_chord = 2 * wing_area / (wingspan * (1 + taper_ratio))
         tip_chord = root_chord * taper_ratio
         aspect_ratio = ar
+        if wing_shape == 'ste_tapered':
+            half_span = wingspan / 2
+            sweep_angle = float(np.degrees(np.arctan(0.75 * root_chord * (1 - taper_ratio) / max(half_span, 0.01))))
 
     mac = (2 / 3) * root_chord * (1 + taper_ratio + taper_ratio**2) / (1 + taper_ratio)
     mac_y = (wingspan / 6) * (1 + 2 * taper_ratio) / (1 + taper_ratio)
@@ -131,6 +137,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'cg_position': round(cg_position, 3),
         'span_efficiency': span_efficiency,
         'taper_ratio_input': taper_ratio,
+        'straight_te': wing_shape == 'ste_tapered',
         'wing_x_pos': round(wing_x_pos, 3),
         'tail_x_pos': round(tail_x_pos, 3),
         'manual_mode': manual_mode,
@@ -162,7 +169,10 @@ def generate_wing_mesh_data(geom, airfoil_coords, n_sections=35, n_foil_points=7
         y_pos = eta * half_span
 
         chord = root_chord * (1 - eta * (1 - taper))
-        x_offset = y_pos * np.tan(sweep)
+        if geom.get('straight_te', False):
+            x_offset = root_chord - chord
+        else:
+            x_offset = y_pos * np.tan(sweep)
         y_offset = y_pos * np.sin(dihedral)
 
         x_upper = foil_x[upper_idx] * chord + x_offset

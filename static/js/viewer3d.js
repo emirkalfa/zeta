@@ -116,7 +116,7 @@ function buildWing(geom, coords, wingX) {
       const eta = i / nSec;
       const yPos = eta * halfSpan;
       const chord = rootChord * (1 - eta * (1 - taper));
-      const xOff = yPos * Math.tan(sweep) + wingX;
+      const xOff = geom.straight_te ? (rootChord - chord + wingX) : (yPos * Math.tan(sweep) + wingX);
       const yOff = yPos * Math.sin(dihedral);
       const pts = [];
       for (const idx of uIdx) {
@@ -776,7 +776,7 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
     const eta = i / nSec;
     const yPos = yStart + (yEnd - yStart) * eta;
     const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
-    const xOff = yPos * Math.tan(sweep) + wingX;
+    const xOff = geom.straight_te ? (rootChord - chord + wingX) : (yPos * Math.tan(sweep) + wingX);
     const yOff = yPos * Math.sin(dihedral);
     const pts = [];
     for (const idx of uIdx) {
@@ -872,8 +872,9 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
     const pinRadius = Math.max(chord * 0.015, 0.0015);
     const pinDepth = Math.max(chord * 0.035, 0.0035);
     const pinPositions = [0.30, 0.65];
+    const xOffHoles = geom.straight_te ? (rootChord - chord) : (yPos * Math.tan(sweep));
     for (const pct of pinPositions) {
-      const xPos = pct * chord + yPos * Math.tan(sweep) + wingX;
+      const xPos = xOffHoles + pct * chord + wingX;
       const zPos = sign * (yPos + yPos * Math.sin(dihedral));
       const pinCenter = new THREE.Vector3(xPos, wingPos, zPos);
       addDimple(verts, idxs, pinCenter, spanDir, pinRadius, pinDepth, 8);
@@ -887,8 +888,9 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
     const pinRadius = Math.max(chord * 0.015, 0.0015);
     const pinHeight = Math.max(chord * 0.035, 0.0035);
     const pinPositions = [0.30, 0.65];
+    const xOffPins = geom.straight_te ? (rootChord - chord) : (yPos * Math.tan(sweep));
     for (const pct of pinPositions) {
-      const xPos = pct * chord + yPos * Math.tan(sweep) + wingX;
+      const xPos = xOffPins + pct * chord + wingX;
       const zPos = sign * (yPos + yPos * Math.sin(dihedral));
       const pinCenter = new THREE.Vector3(xPos, wingPos, zPos);
       addCylinder(verts, idxs, pinCenter, spanDir, pinRadius, pinHeight, 8);
