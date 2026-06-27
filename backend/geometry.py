@@ -9,7 +9,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                        man_htail_tip=None, man_htail_sweep=None,
                        man_vtail_span=None, man_vtail_root=None,
                        man_vtail_tip=None,
-                       fuse_type='conventional'):
+                       ):
     if manual_mode:
         root_chord = float(man_root_chord or 0.2)
         tip_chord = float(man_tip_chord or 0.1)
@@ -85,13 +85,13 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         sin2 = np.sin(vgamma) ** 2
         vtail_span = 0.40 * wingspan
         vtail_taper = 0.6
-        vtail_area = max(htail_area / cos2, vtail_area / sin2)
+        vtail_area = 0.20 * wing_area
         vtail_root_chord = 2 * vtail_area / (vtail_span * (1 + vtail_taper))
         vtail_tip_chord = vtail_root_chord * vtail_taper
-        htail_span = 0
-        htail_area = 0
-        htail_root_chord = 0
-        htail_tip_chord = 0
+        htail_span = vtail_span * np.cos(vgamma)
+        htail_area = vtail_area * cos2
+        htail_root_chord = 2 * htail_area / (max(htail_span, 0.001) * (1 + vtail_taper))
+        htail_tip_chord = htail_root_chord * vtail_taper
 
     cg_position = 0.25 * mac
     span_efficiency = 0.85
@@ -102,28 +102,13 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'high': fuse_max_height * 0.65,
     }
 
-    # Fuselage parameters (per type)
+    # Fuselage parameters
     fuse_diameter = 0.09 * wingspan
-    if fuse_type == 'vtol':
-        vtol_pod_length = 0.55 * fuse_length
-        vtol_nose_length = 0.25 * vtol_pod_length
-        vtol_tailcone_length = 0.15 * vtol_pod_length
-        vtol_pod_max_width = 1.6 * fuse_diameter
-        vtol_pod_max_height = 1.3 * fuse_diameter
-        vtol_boom_diameter = 0.18 * fuse_diameter
-        vtol_boom_start = 0.80 * vtol_pod_length
-        vtol_boom_length = (tail_x_pos - vtol_boom_start) + 0.12 * fuse_length
-        nose_length = vtol_nose_length
-        tailcone_length = vtol_tailcone_length
-        cylindrical_length = vtol_pod_length - nose_length - tailcone_length
-        fuse_max_width = vtol_pod_max_width
-        fuse_max_height = vtol_pod_max_height
-    else:
-        nose_length = 2.0 * fuse_diameter
-        tailcone_length = 3.5 * fuse_diameter
-        cylindrical_length = fuse_length - nose_length - tailcone_length
-        fuse_max_width = fuse_diameter
-        fuse_max_height = fuse_diameter
+    nose_length = 2.0 * fuse_diameter
+    tailcone_length = 3.5 * fuse_diameter
+    cylindrical_length = fuse_length - nose_length - tailcone_length
+    fuse_max_width = fuse_diameter
+    fuse_max_height = fuse_diameter
 
     result = {
         'wingspan': round(wingspan, 3),
@@ -132,7 +117,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'wing_position': wing_position,
         'tail_type': tail_type,
         'wing_shape': wing_shape,
-        'fuse_type': fuse_type,
         'root_chord': round(root_chord, 3),
         'tip_chord': round(tip_chord, 3),
         'taper_ratio': round(taper_ratio, 3),
@@ -171,17 +155,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'tail_x_pos': round(tail_x_pos, 3),
         'manual_mode': manual_mode,
     }
-
-    if fuse_type == 'vtol':
-        result.update({
-            'vtol_pod_length': round(vtol_pod_length, 3),
-            'vtol_pod_max_width': round(vtol_pod_max_width, 3),
-            'vtol_pod_max_height': round(vtol_pod_max_height, 3),
-            'vtol_nose_length': round(vtol_nose_length, 3),
-            'vtol_boom_diameter': round(vtol_boom_diameter, 3),
-            'vtol_boom_start': round(vtol_boom_start, 3),
-            'vtol_boom_length': round(vtol_boom_length, 3),
-        })
 
     result['control_surfaces'] = calculate_control_surfaces(
         wingspan, wing_area, root_chord, taper_ratio, htail_area, vtail_area,
@@ -301,60 +274,6 @@ def generate_wing_mesh_data(geom, airfoil_coords, n_sections=35, n_foil_points=7
         'left': sections_left,
         'n_sections': n_sections,
         'n_points': n_half,
-    }
-
-def generate_fuselage_mesh_data(geom, n_circumferential=24):
-    length = geom['fuselage_length']
-    max_w = geom['fuselage_max_width'] / 2
-    max_h = geom['fuselage_max_height'] / 2
-    theta = np.linspace(0, 2 * np.pi, n_circumferential + 1)[:-1]
-
-    def el_pts(x_pos, w, h):
-        ct = np.cos(theta); st = np.sin(theta)
-        return np.column_stack([np.full_like(theta, x_pos), h * st, w * ct])
-
-    sections = []
-    pod_ratio = 0.35
-    nose_ratio = 0.18
-    n_pod = 25
-    boom_w = max(max_w * 0.045, 0.008)
-    boom_h = max(max_h * 0.035, 0.006)
-
-    for i in range(n_pod + 1):
-        eta = i / n_pod
-        x_pos = eta * pod_ratio * length
-        if eta < nose_ratio / pod_ratio:
-            u = eta * pod_ratio / nose_ratio
-            t = u * u * (3 - 2 * u)
-            ws = t
-            hs = t * 0.70
-        elif eta > 0.80:
-            u = (eta - 0.80) / 0.20
-            ss = u * u * (3 - 2 * u)
-            ws = 1 - 0.45 * ss
-            hs = 1 - 0.55 * ss
-        else:
-            ws = 1; hs = 1
-        w = max_w * max(ws, boom_w / max_w * 0.8)
-        h = max_h * max(hs, boom_h / max_h * 0.8)
-        sections.append(el_pts(x_pos, w, h))
-
-    n_boom = 20
-    for i in range(n_boom + 1):
-        eta = i / n_boom
-        x_pos = (pod_ratio + eta * (1 - pod_ratio)) * length
-        r_scale = 1
-        if eta > 0.88:
-            r_scale = 1 - (eta - 0.88) / 0.12 * 0.3
-        bw = boom_w * r_scale
-        bh = boom_h * r_scale
-        ct = np.cos(theta); st = np.sin(theta)
-        sections.append(np.column_stack([np.full_like(theta, x_pos), bh * st, bw * ct]))
-
-    return {
-        'sections': sections,
-        'n_spanwise': n_pod + n_boom + 2,
-        'n_circumferential': n_circumferential,
     }
 
 def generate_conventional_fuselage_mesh_data(geom, n_circumferential=28):

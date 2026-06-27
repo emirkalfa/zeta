@@ -6,7 +6,6 @@ from backend.geometry import (
     calculate_geometry,
     calculate_control_surfaces,
     generate_wing_mesh_data,
-    generate_fuselage_mesh_data,
     generate_conventional_fuselage_mesh_data,
     generate_tail_mesh_data,
 )
@@ -266,11 +265,6 @@ class TestMeshGeneration:
         r0 = m["right"][3]["upper"]
         l0 = m["left"][3]["upper"]
         assert (r0[:, 2] == -l0[:, 2]).all()
-
-    def test_pod_boom_fuselage_has_sections(self, default_geom):
-        m = generate_fuselage_mesh_data(default_geom)
-        assert len(m["sections"]) == m["n_spanwise"]
-        assert m["n_circumferential"] == 24
 
     def test_conventional_fuselage_has_sections(self, default_geom):
         m = generate_conventional_fuselage_mesh_data(default_geom)

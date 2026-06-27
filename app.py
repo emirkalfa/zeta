@@ -97,7 +97,7 @@ def api_calculate():
                               man_vtail_span=data.get('man_vtail_span'),
                               man_vtail_root=data.get('man_vtail_root'),
                               man_vtail_tip=data.get('man_vtail_tip'),
-                              fuse_type=data.get('fuse_type', 'conventional'))
+                               )
     cg_pct = data.get('cg_percent')
     if cg_pct is not None:
         geom['cg_position'] = round(float(cg_pct) / 100.0 * geom['mac'], 3)

@@ -88,8 +88,6 @@ function checkSavedProject() {
         if (wp) wp.checked = true;
         const tt = document.querySelector(`input[name="tail_type"][value="${data.tail_type || 'conventional'}"]`);
         if (tt) tt.checked = true;
-        const ft = document.querySelector(`input[name="fuse_type"][value="${data.fuse_type || 'conventional'}"]`);
-        if (ft) ft.checked = true;
         if (data.reynolds) $('reynolds').value = data.reynolds;
         if (data.cg_percent) { $('cgSlider').value = data.cg_percent; updateCGDisplay(); }
         if (data.max_alpha) $('maxAlpha').value = data.max_alpha;
@@ -108,7 +106,7 @@ function saveProject() {
     wing_shape: document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered',
     wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
-    fuse_type: document.querySelector('input[name="fuse_type"]:checked')?.value || 'conventional',
+
     reynolds: parseInt($('reynolds').value) || 200000,
     cg_percent: parseInt($('cgSlider').value) || 25,
     max_alpha: parseInt($('maxAlpha').value) || 20,
@@ -204,9 +202,8 @@ async function calculateAll() {
 
     // Calculate geometry
     const manual_mode = $('manual-inputs').style.display !== 'none';
-    const fuse_type = document.querySelector('input[name="fuse_type"]:checked')?.value || 'conventional';
     const body = {
-      wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, manual_mode, fuse_type
+      wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, manual_mode
     };
     if (manual_mode) {
       body.man_root_chord = parseFloat($('man_root_chord').value) || undefined;
