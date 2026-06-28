@@ -259,7 +259,6 @@ async function calculateAll() {
     $('results-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   } catch (err) {
-    console.error(err);
     alert('Hesaplama sırasında bir hata oluştu: ' + err.message);
     hideLoading(btn);
   }
