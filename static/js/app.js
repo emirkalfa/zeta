@@ -20,6 +20,12 @@ async function fetchAPI(url, body = null) {
 
 function $(id) { return document.getElementById(id); }
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 function show(id) { $(id).style.display = ''; }
 function hide(id) { $(id).style.display = 'none'; }
 
@@ -45,7 +51,7 @@ async function init() {
 async function loadAirfoils() {
   const data = await fetchAPI('/api/airfoils');
   const opts = data.map(a =>
-    `<option value="${a.code}">${a.name} (t=${(a.max_thickness*100).toFixed(0)}%)</option>`
+    `<option value="${escapeHtml(a.code)}">${escapeHtml(a.name)} (t=${(a.max_thickness*100).toFixed(0)}%)</option>`
   ).join('');
   $('airfoil').innerHTML = opts;
   $('htailAirfoil').innerHTML = opts;
@@ -310,8 +316,8 @@ function displayResults(geom) {
 
   $('results-grid').innerHTML = items.map(item =>
     `<div class="result-item">
-      <div class="value">${item.value}</div>
-      <div class="label">${item.label}</div>
+      <div class="value">${escapeHtml(String(item.value))}</div>
+      <div class="label">${escapeHtml(item.label)}</div>
     </div>`
   ).join('');
 }
@@ -333,15 +339,15 @@ function displayFlightTest(stab) {
   $('flight-results').innerHTML =
     items.map(item =>
       `<div class="flight-item ${item.cls}">
-        <div class="value">${item.value}</div>
-        <div class="label">${item.label}</div>
+        <div class="value">${escapeHtml(String(item.value))}</div>
+        <div class="label">${escapeHtml(item.label)}</div>
       </div>`
     ).join('') +
     `<div class="flight-assessment">
       <h3>Değerlendirme</h3>
-      <ul>${assessments.map(a => `<li>${a}</li>`).join('')}</ul>
+      <ul>${assessments.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>
     </div>
-    <div class="flight-verdict ${stab.overall_passed ? 'pass' : 'fail'}">${verdict}</div>`;
+    <div class="flight-verdict ${stab.overall_passed ? 'pass' : 'fail'}">${escapeHtml(verdict)}</div>`;
 }
 
 window.addEventListener('DOMContentLoaded', init);
