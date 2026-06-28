@@ -51,7 +51,7 @@ async function loadAirfoils() {
   $('htailAirfoil').innerHTML = opts;
   $('htailAirfoil').value = '0012';
   $('vtailAirfoil').innerHTML = opts;
-  $('vtailAirfoil').value = '0010';
+  $('vtailAirfoil').value = '0012';
 }
 
 function setupDarkMode() {
