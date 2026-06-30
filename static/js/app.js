@@ -112,7 +112,7 @@ function checkSavedProject() {
             if (data.man_fuse_sections) {
               state.fuseSections = data.man_fuse_sections;
               for (let i = 0; i < 5; i++) {
-                $('sec_' + i + '_pos').value = state.fuseSections[i].t;
+                if (i > 0) $('sec_' + i + '_pos').value = state.fuseSections[i].t;
                 $('sec_' + i + '_w').value = state.fuseSections[i].w;
                 $('sec_' + i + '_h').value = state.fuseSections[i].h;
               }
@@ -216,8 +216,9 @@ function setupEventListeners() {
 
   // Read all manual fuse section values from DOM
   function readFuseSections() {
+    state.fuseSections[0].t = 0;
     for (let i = 0; i < 5; i++) {
-      state.fuseSections[i].t = parseFloat($('sec_' + i + '_pos').value);
+      if (i > 0) state.fuseSections[i].t = parseFloat($('sec_' + i + '_pos').value);
       state.fuseSections[i].w = parseFloat($('sec_' + i + '_w').value);
       state.fuseSections[i].h = parseFloat($('sec_' + i + '_h').value);
     }
@@ -226,7 +227,7 @@ function setupEventListeners() {
   // Update all section value displays from DOM
   function updateSectionDisplays() {
     for (let i = 0; i < 5; i++) {
-      $('sec_' + i + '_pos_val').textContent = parseFloat($('sec_' + i + '_pos').value).toFixed(3);
+      if (i > 0) $('sec_' + i + '_pos_val').textContent = parseFloat($('sec_' + i + '_pos').value).toFixed(2);
       $('sec_' + i + '_w_val').textContent = parseFloat($('sec_' + i + '_w').value).toFixed(3);
       $('sec_' + i + '_h_val').textContent = parseFloat($('sec_' + i + '_h').value).toFixed(3);
     }
@@ -255,9 +256,9 @@ function setupEventListeners() {
 
   $('manFuseWidth').addEventListener('input', updateFuseFromSliders);
 
-  // Section sliders
+  // Section sliders (skip K1 position — sabit 0)
   for (let i = 0; i < 5; i++) {
-    $('sec_' + i + '_pos').addEventListener('input', updateFuseFromSliders);
+    if (i > 0) $('sec_' + i + '_pos').addEventListener('input', updateFuseFromSliders);
     $('sec_' + i + '_w').addEventListener('input', updateFuseFromSliders);
     $('sec_' + i + '_h').addEventListener('input', updateFuseFromSliders);
   }
