@@ -419,16 +419,20 @@ function buildManualFuselage(geom) {
   const nSecs = 48;
   const nCirc = 32;
 
-  // Kullanıcı tanımlı kesitler (CadQuery'deki .ellipse() çağrılarına karşılık gelir)
-  const keyframes = (geom.fuse_sections && geom.fuse_sections.length >= 2)
+  // Mutlak metre cinsinden kesit pozisyonlarını normalize et
+  const raw = (geom.fuse_sections && geom.fuse_sections.length >= 2)
     ? geom.fuse_sections.map(s => ({ t: s.t, w: s.w, h: s.h }))
     : [
-        { t: 0.000, w: 0.143, h: 0.111 },
-        { t: 0.125, w: 0.571, h: 0.667 },
-        { t: 0.375, w: 1.000, h: 1.000 },
-        { t: 0.750, w: 0.429, h: 0.444 },
-        { t: 1.000, w: 0.057, h: 0.044 },
+        { t: 0.00, w: 0.143, h: 0.111 },
+        { t: 0.15, w: 0.571, h: 0.667 },
+        { t: 0.45, w: 1.000, h: 1.000 },
+        { t: 0.90, w: 0.429, h: 0.444 },
+        { t: 1.20, w: 0.057, h: 0.044 },
       ];
+
+  const totalLen = Math.max(raw[raw.length - 1].t, 0.01);
+  const keyframes = raw.map(s => ({ t: s.t / totalLen, w: s.w, h: s.h }));
+  keyframes.sort((a, b) => a.t - b.t);
 
   function interpolate(t) {
     for (let i = 0; i < keyframes.length - 1; i++) {
@@ -449,7 +453,7 @@ function buildManualFuselage(geom) {
   const sections = [];
   for (let i = 0; i <= nSecs; i++) {
     const t = i / nSecs;
-    const x = t * length;
+    const x = t * totalLen;
     const prof = interpolate(t);
     const w = maxW * prof.w;
     const h = maxH * prof.h;

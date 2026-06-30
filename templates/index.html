@@ -191,43 +191,40 @@
       <div id="manual-fuse-controls" style="display:none; padding:6px 16px; background:var(--card-bg); border-bottom:1px solid var(--border); font-size:0.8rem">
         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap">
           <label style="display:flex; align-items:center; gap:4px">
-            Uzunluk: <span id="fuseLengthVal" style="font-weight:600; min-width:2.5em">1.20</span>m
-            <input type="range" id="manFuseLength" min="0.5" max="3.0" step="0.05" value="1.20" style="width:80px">
-          </label>
-          <label style="display:flex; align-items:center; gap:4px">
             Genişlik: <span id="fuseWidthVal" style="font-weight:600; min-width:2.5em">0.140</span>m
             <input type="range" id="manFuseWidth" min="0.05" max="0.40" step="0.005" value="0.14" style="width:80px">
           </label>
+          <span style="font-size:0.75rem;color:var(--muted)">K5 = toplam uzunluk</span>
         </div>
         <hr style="margin:4px 0; border-color:var(--border)">
         <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px">
           <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
             <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K1: Burun</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_0_pos_val">0.000</span> <input type="range" id="sec_0_pos" min="0" max="1" step="0.005" value="0" style="width:50px"></label>
+            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_0_pos_val">0.00</span>m <input type="range" id="sec_0_pos" min="0" max="0" step="0.01" value="0" style="width:50px" disabled></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <span id="sec_0_w_val">0.143</span> <input type="range" id="sec_0_w" min="0" max="1.5" step="0.005" value="0.143" style="width:50px"></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <span id="sec_0_h_val">0.111</span> <input type="range" id="sec_0_h" min="0" max="1.5" step="0.005" value="0.111" style="width:50px"></label>
           </div>
           <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
             <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K2: Ön</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_1_pos_val">0.125</span> <input type="range" id="sec_1_pos" min="0" max="1" step="0.005" value="0.125" style="width:50px"></label>
+            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_1_pos_val">0.15</span>m <input type="range" id="sec_1_pos" min="0" max="3" step="0.01" value="0.15" style="width:50px"></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <span id="sec_1_w_val">0.571</span> <input type="range" id="sec_1_w" min="0" max="1.5" step="0.005" value="0.571" style="width:50px"></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <span id="sec_1_h_val">0.667</span> <input type="range" id="sec_1_h" min="0" max="1.5" step="0.005" value="0.667" style="width:50px"></label>
           </div>
           <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
             <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K3: Orta</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_2_pos_val">0.375</span> <input type="range" id="sec_2_pos" min="0" max="1" step="0.005" value="0.375" style="width:50px"></label>
+            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_2_pos_val">0.45</span>m <input type="range" id="sec_2_pos" min="0" max="3" step="0.01" value="0.45" style="width:50px"></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <span id="sec_2_w_val">1.000</span> <input type="range" id="sec_2_w" min="0" max="1.5" step="0.005" value="1" style="width:50px"></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <span id="sec_2_h_val">1.000</span> <input type="range" id="sec_2_h" min="0" max="1.5" step="0.005" value="1" style="width:50px"></label>
           </div>
           <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
             <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K4: Arka</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_3_pos_val">0.750</span> <input type="range" id="sec_3_pos" min="0" max="1" step="0.005" value="0.75" style="width:50px"></label>
+            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_3_pos_val">0.90</span>m <input type="range" id="sec_3_pos" min="0" max="3" step="0.01" value="0.90" style="width:50px"></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <span id="sec_3_w_val">0.429</span> <input type="range" id="sec_3_w" min="0" max="1.5" step="0.005" value="0.429" style="width:50px"></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <span id="sec_3_h_val">0.444</span> <input type="range" id="sec_3_h" min="0" max="1.5" step="0.005" value="0.444" style="width:50px"></label>
           </div>
           <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
             <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K5: Kuyruk</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_4_pos_val">1.000</span> <input type="range" id="sec_4_pos" min="0" max="1" step="0.005" value="1" style="width:50px"></label>
+            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <span id="sec_4_pos_val">1.20</span>m <input type="range" id="sec_4_pos" min="0.5" max="3" step="0.01" value="1.20" style="width:50px"></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <span id="sec_4_w_val">0.057</span> <input type="range" id="sec_4_w" min="0" max="1.5" step="0.005" value="0.057" style="width:50px"></label>
             <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <span id="sec_4_h_val">0.044</span> <input type="range" id="sec_4_h" min="0" max="1.5" step="0.005" value="0.044" style="width:50px"></label>
           </div>

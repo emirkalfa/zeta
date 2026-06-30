@@ -10,11 +10,11 @@ const state = {
   wallThickness: 1.2,
   fuseType: 'conventional',
   fuseSections: [
-    { t: 0.000, w: 0.143, h: 0.111 },
-    { t: 0.125, w: 0.571, h: 0.667 },
-    { t: 0.375, w: 1.000, h: 1.000 },
-    { t: 0.750, w: 0.429, h: 0.444 },
-    { t: 1.000, w: 0.057, h: 0.044 },
+    { t: 0.00, w: 0.143, h: 0.111 },
+    { t: 0.15, w: 0.571, h: 0.667 },
+    { t: 0.45, w: 1.000, h: 1.000 },
+    { t: 0.90, w: 0.429, h: 0.444 },
+    { t: 1.20, w: 0.057, h: 0.044 },
   ],
 };
 
@@ -107,9 +107,7 @@ function checkSavedProject() {
             btn.textContent = 'Man.';
             btn.classList.remove('active');
             $('manual-fuse-controls').style.display = '';
-            if (data.man_fuse_length) $('manFuseLength').value = data.man_fuse_length;
             if (data.man_fuse_width) $('manFuseWidth').value = data.man_fuse_width;
-            $('fuseLengthVal').textContent = parseFloat($('manFuseLength').value).toFixed(2);
             $('fuseWidthVal').textContent = parseFloat($('manFuseWidth').value).toFixed(3);
             if (data.man_fuse_sections) {
               state.fuseSections = data.man_fuse_sections;
@@ -142,7 +140,6 @@ function saveProject() {
     wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
     fuse_type: state.fuseType,
-    man_fuse_length: parseFloat($('manFuseLength').value) || 1.2,
     man_fuse_width: parseFloat($('manFuseWidth').value) || 0.14,
     man_fuse_sections: state.fuseSections.map(s => ({ ...s })),
 
@@ -237,13 +234,12 @@ function setupEventListeners() {
 
   // Update geometry from all slider values and rebuild
   function updateFuseFromSliders() {
-    const len = parseFloat($('manFuseLength').value);
     const wid = parseFloat($('manFuseWidth').value);
-    $('fuseLengthVal').textContent = len.toFixed(2);
     $('fuseWidthVal').textContent = wid.toFixed(3);
     readFuseSections();
     updateSectionDisplays();
     if (state.geometry) {
+      const len = state.fuseSections[4].t;
       state.geometry.fuselage_length = len;
       state.geometry.fuselage_max_width = wid;
       state.geometry.fuselage_max_height = wid * (0.05 / 0.09);
@@ -257,7 +253,6 @@ function setupEventListeners() {
     }
   }
 
-  $('manFuseLength').addEventListener('input', updateFuseFromSliders);
   $('manFuseWidth').addEventListener('input', updateFuseFromSliders);
 
   // Section sliders
@@ -315,9 +310,9 @@ async function calculateAll() {
       fuse_type,
     };
     if (fuse_type === 'manual') {
-      body.man_fuse_length = parseFloat($('manFuseLength').value) || undefined;
-      body.man_fuse_width = parseFloat($('manFuseWidth').value) || undefined;
       readFuseSections();
+      body.man_fuse_length = state.fuseSections[4].t;
+      body.man_fuse_width = parseFloat($('manFuseWidth').value) || undefined;
       body.man_fuse_sections = state.fuseSections.map(s => ({ ...s }));
     }
     if (manual_mode) {
