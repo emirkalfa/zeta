@@ -227,7 +227,7 @@ function setupEventListeners() {
   // Update all section value displays from DOM
   function updateSectionDisplays() {
     for (let i = 0; i < 6; i++) {
-      $('sec_' + i + '_pos_val').textContent = parseFloat($('sec_' + i + '_pos').value).toFixed(2);
+      $('sec_' + i + '_pos_val').textContent = parseFloat($('sec_' + i + '_pos').value).toFixed(3);
       $('sec_' + i + '_w_val').textContent = parseFloat($('sec_' + i + '_w').value).toFixed(3);
       $('sec_' + i + '_h_val').textContent = parseFloat($('sec_' + i + '_h').value).toFixed(3);
     }
