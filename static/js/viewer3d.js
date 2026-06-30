@@ -202,7 +202,21 @@ function buildWing(geom, coords, wingX) {
 
 // --- FUSELAGE ---
 function buildFuselage(geom) {
-  buildConventionalFuselage(geom);
+  if (geom.fuse_type === 'manual') {
+    buildManualFuselage(geom);
+  } else {
+    buildConventionalFuselage(geom);
+  }
+}
+
+function rebuildFuselage(geom) {
+  while (fuseGroup.children.length > 0) {
+    const child = fuseGroup.children[0];
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) child.material.dispose();
+    fuseGroup.remove(child);
+  }
+  buildFuselage(geom);
 }
 
 function tubeMesh(sections, color, edgeColor, opacity, capEnds) {
@@ -395,6 +409,61 @@ function buildConventionalFuselage(geom) {
     true
   );
 
+}
+
+function buildManualFuselage(geom) {
+  const length = geom.fuselage_length || 1.2;
+  const maxW = (geom.fuselage_max_width || 0.14) / 2;
+  const maxH = (geom.fuselage_max_height || 0.14) / 2;
+
+  const nSecs = 48;
+  const nCirc = 32;
+
+  // Kullanıcı tanımlı kesitler (CadQuery'deki .ellipse() çağrılarına karşılık gelir)
+  const keyframes = (geom.fuse_sections && geom.fuse_sections.length >= 2)
+    ? geom.fuse_sections.map(s => ({ t: s.t, w: s.w, h: s.h }))
+    : [
+        { t: 0.000, w: 0.143, h: 0.111 },
+        { t: 0.125, w: 0.571, h: 0.667 },
+        { t: 0.375, w: 1.000, h: 1.000 },
+        { t: 0.750, w: 0.429, h: 0.444 },
+        { t: 1.000, w: 0.057, h: 0.044 },
+      ];
+
+  function interpolate(t) {
+    for (let i = 0; i < keyframes.length - 1; i++) {
+      const a = keyframes[i];
+      const b = keyframes[i + 1];
+      if (t >= a.t && t <= b.t) {
+        const localT = (t - a.t) / (b.t - a.t);
+        const smoothT = localT * localT * (3 - 2 * localT);
+        return {
+          w: a.w + (b.w - a.w) * smoothT,
+          h: a.h + (b.h - a.h) * smoothT,
+        };
+      }
+    }
+    return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
+  }
+
+  const sections = [];
+  for (let i = 0; i <= nSecs; i++) {
+    const t = i / nSecs;
+    const x = t * length;
+    const prof = interpolate(t);
+    const w = maxW * prof.w;
+    const h = maxH * prof.h;
+    const sec = [];
+    for (let j = 0; j < nCirc; j++) {
+      const theta = (j / nCirc) * Math.PI * 2;
+      const y = h * Math.sin(theta);
+      const z = w * Math.cos(theta);
+      sec.push(new THREE.Vector3(x, y, z));
+    }
+    sections.push(sec);
+  }
+
+  tubeMesh(sections, 0x94a3b8, 0x475569, 1.0, true);
 }
 
 // Toggle fuselage visibility

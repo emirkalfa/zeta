@@ -8,6 +8,14 @@ const state = {
   airfoilCode: '2412',
   darkMode: localStorage.getItem('zeta-dark') === 'true',
   wallThickness: 1.2,
+  fuseType: 'conventional',
+  fuseSections: [
+    { t: 0.000, w: 0.143, h: 0.111 },
+    { t: 0.125, w: 0.571, h: 0.667 },
+    { t: 0.375, w: 1.000, h: 1.000 },
+    { t: 0.750, w: 0.429, h: 0.444 },
+    { t: 1.000, w: 0.057, h: 0.044 },
+  ],
 };
 
 async function fetchAPI(url, body = null) {
@@ -92,6 +100,33 @@ function checkSavedProject() {
         if (data.cg_percent) { $('cgSlider').value = data.cg_percent; updateCGDisplay(); }
         if (data.max_alpha) $('maxAlpha').value = data.max_alpha;
 
+        if (data.fuse_type) {
+          state.fuseType = data.fuse_type;
+          const btn = $('toggleFuseModel');
+          if (state.fuseType === 'manual') {
+            btn.textContent = 'Man.';
+            btn.classList.remove('active');
+            $('manual-fuse-controls').style.display = '';
+            if (data.man_fuse_length) $('manFuseLength').value = data.man_fuse_length;
+            if (data.man_fuse_width) $('manFuseWidth').value = data.man_fuse_width;
+            $('fuseLengthVal').textContent = parseFloat($('manFuseLength').value).toFixed(2);
+            $('fuseWidthVal').textContent = parseFloat($('manFuseWidth').value).toFixed(3);
+            if (data.man_fuse_sections) {
+              state.fuseSections = data.man_fuse_sections;
+              for (let i = 0; i < 5; i++) {
+                $('sec_' + i + '_pos').value = state.fuseSections[i].t;
+                $('sec_' + i + '_w').value = state.fuseSections[i].w;
+                $('sec_' + i + '_h').value = state.fuseSections[i].h;
+              }
+              updateSectionDisplays();
+            }
+          } else {
+            btn.textContent = 'Konv.';
+            btn.classList.add('active');
+            $('manual-fuse-controls').style.display = 'none';
+          }
+        }
+
       }
     }
   } catch(e) {}
@@ -106,6 +141,10 @@ function saveProject() {
     wing_shape: document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered',
     wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
+    fuse_type: state.fuseType,
+    man_fuse_length: parseFloat($('manFuseLength').value) || 1.2,
+    man_fuse_width: parseFloat($('manFuseWidth').value) || 0.14,
+    man_fuse_sections: state.fuseSections.map(s => ({ ...s })),
 
     reynolds: parseInt($('reynolds').value) || 200000,
     cg_percent: parseInt($('cgSlider').value) || 25,
@@ -159,6 +198,74 @@ function setupEventListeners() {
   }
   $('autoMode').addEventListener('click', () => setMode('auto'));
   $('manualMode').addEventListener('click', () => setMode('manual'));
+
+  // Body model toggle (Konv./Man.)
+  $('toggleFuseModel').addEventListener('click', () => {
+    const btn = $('toggleFuseModel');
+    const isManual = state.fuseType === 'manual';
+    state.fuseType = isManual ? 'conventional' : 'manual';
+    btn.textContent = state.fuseType === 'manual' ? 'Man.' : 'Konv.';
+    btn.classList.toggle('active', state.fuseType === 'conventional');
+    $('manual-fuse-controls').style.display = state.fuseType === 'manual' ? '' : 'none';
+    if (state.geometry) {
+      state.geometry.fuse_type = state.fuseType;
+      if (state.fuseType === 'manual') {
+        readFuseSections();
+        state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+      }
+      rebuildFuselage(state.geometry);
+    }
+  });
+
+  // Read all manual fuse section values from DOM
+  function readFuseSections() {
+    for (let i = 0; i < 5; i++) {
+      state.fuseSections[i].t = parseFloat($('sec_' + i + '_pos').value);
+      state.fuseSections[i].w = parseFloat($('sec_' + i + '_w').value);
+      state.fuseSections[i].h = parseFloat($('sec_' + i + '_h').value);
+    }
+  }
+
+  // Update all section value displays from DOM
+  function updateSectionDisplays() {
+    for (let i = 0; i < 5; i++) {
+      $('sec_' + i + '_pos_val').textContent = parseFloat($('sec_' + i + '_pos').value).toFixed(3);
+      $('sec_' + i + '_w_val').textContent = parseFloat($('sec_' + i + '_w').value).toFixed(3);
+      $('sec_' + i + '_h_val').textContent = parseFloat($('sec_' + i + '_h').value).toFixed(3);
+    }
+  }
+
+  // Update geometry from all slider values and rebuild
+  function updateFuseFromSliders() {
+    const len = parseFloat($('manFuseLength').value);
+    const wid = parseFloat($('manFuseWidth').value);
+    $('fuseLengthVal').textContent = len.toFixed(2);
+    $('fuseWidthVal').textContent = wid.toFixed(3);
+    readFuseSections();
+    updateSectionDisplays();
+    if (state.geometry) {
+      state.geometry.fuselage_length = len;
+      state.geometry.fuselage_max_width = wid;
+      state.geometry.fuselage_max_height = wid * (0.05 / 0.09);
+      state.geometry.fuse_diameter = wid;
+      state.geometry.nose_length = 2.0 * wid;
+      state.geometry.tailcone_length = 3.5 * wid;
+      state.geometry.cylindrical_length = len - 2.0 * wid - 3.5 * wid;
+      state.geometry.fuse_type = 'manual';
+      state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+      rebuildFuselage(state.geometry);
+    }
+  }
+
+  $('manFuseLength').addEventListener('input', updateFuseFromSliders);
+  $('manFuseWidth').addEventListener('input', updateFuseFromSliders);
+
+  // Section sliders
+  for (let i = 0; i < 5; i++) {
+    $('sec_' + i + '_pos').addEventListener('input', updateFuseFromSliders);
+    $('sec_' + i + '_w').addEventListener('input', updateFuseFromSliders);
+    $('sec_' + i + '_h').addEventListener('input', updateFuseFromSliders);
+  }
 }
 
 async function calculateAll() {
@@ -173,6 +280,7 @@ async function calculateAll() {
   const wing_position = document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid';
   const wing_shape = document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered';
   const tail_type = document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional';
+  const fuse_type = state.fuseType;
   const cg_percent = parseInt($('cgSlider').value) || 25;
   const max_alpha = parseInt($('maxAlpha').value) || 20;
 
@@ -203,8 +311,15 @@ async function calculateAll() {
     // Calculate geometry
     const manual_mode = $('manual-inputs').style.display !== 'none';
     const body = {
-      wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, manual_mode
+      wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, manual_mode,
+      fuse_type,
     };
+    if (fuse_type === 'manual') {
+      body.man_fuse_length = parseFloat($('manFuseLength').value) || undefined;
+      body.man_fuse_width = parseFloat($('manFuseWidth').value) || undefined;
+      readFuseSections();
+      body.man_fuse_sections = state.fuseSections.map(s => ({ ...s }));
+    }
     if (manual_mode) {
       body.man_root_chord = parseFloat($('man_root_chord').value) || undefined;
       body.man_tip_chord = parseFloat($('man_tip_chord').value) || undefined;
@@ -222,6 +337,10 @@ async function calculateAll() {
     const reynolds_number = parseInt($('reynolds').value) || 200000;
     body.cg_percent = cg_percent;
     state.geometry = await fetchAPI('/api/calculate', body);
+    if (state.geometry.fuse_type === 'manual') {
+      readFuseSections();
+      state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+    }
 
     // Run analysis (uses wing airfoil)
     state.polars = await fetchAPI('/api/analyze', {

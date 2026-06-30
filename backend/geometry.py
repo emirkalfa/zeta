@@ -9,6 +9,8 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                        man_htail_tip=None, man_htail_sweep=None,
                        man_vtail_span=None, man_vtail_root=None,
                        man_vtail_tip=None,
+                       fuse_type='conventional',
+                       man_fuse_length=None, man_fuse_width=None,
                        ):
     if manual_mode:
         root_chord = float(man_root_chord or 0.2)
@@ -47,6 +49,14 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     fuse_max_height = 0.05 * wingspan
     wing_x_pos = 0.30 * fuse_length
     tail_x_pos = 0.82 * fuse_length
+
+    if fuse_type == 'manual' and man_fuse_length is not None:
+        fuse_length = float(man_fuse_length)
+        fuse_max_width = float(man_fuse_width or 0.09 * wingspan)
+        fuse_max_height = fuse_max_width * (0.05 / 0.09)
+        wing_x_pos = 0.30 * fuse_length
+        tail_x_pos = 0.82 * fuse_length
+
     htail_arm = tail_x_pos - wing_x_pos
 
     if manual_mode:
@@ -103,7 +113,10 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     }
 
     # Fuselage parameters
-    fuse_diameter = 0.09 * wingspan
+    if fuse_type == 'manual' and man_fuse_width is not None:
+        fuse_diameter = float(man_fuse_width)
+    else:
+        fuse_diameter = 0.09 * wingspan
     nose_length = 2.0 * fuse_diameter
     tailcone_length = 3.5 * fuse_diameter
     cylindrical_length = fuse_length - nose_length - tailcone_length
@@ -154,6 +167,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'wing_x_pos': round(wing_x_pos, 3),
         'tail_x_pos': round(tail_x_pos, 3),
         'manual_mode': manual_mode,
+        'fuse_type': fuse_type,
     }
 
     result['control_surfaces'] = calculate_control_surfaces(

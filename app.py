@@ -97,6 +97,9 @@ def api_calculate():
                               man_vtail_span=data.get('man_vtail_span'),
                               man_vtail_root=data.get('man_vtail_root'),
                               man_vtail_tip=data.get('man_vtail_tip'),
+                              fuse_type=data.get('fuse_type', 'conventional'),
+                              man_fuse_length=data.get('man_fuse_length'),
+                              man_fuse_width=data.get('man_fuse_width'),
                                )
     cg_pct = data.get('cg_percent')
     if cg_pct is not None:
