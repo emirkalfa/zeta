@@ -14,6 +14,7 @@ const state = {
     { t: 0.15, w: 0.571, h: 0.667 },
     { t: 0.45, w: 1.000, h: 1.000 },
     { t: 0.90, w: 0.429, h: 0.444 },
+    { t: 1.10, w: 0.100, h: 0.100 },
     { t: 1.20, w: 0.057, h: 0.044 },
   ],
 };
@@ -111,8 +112,8 @@ function checkSavedProject() {
             $('fuseWidthVal').textContent = parseFloat($('manFuseWidth').value).toFixed(3);
             if (data.man_fuse_sections) {
               state.fuseSections = data.man_fuse_sections;
-              for (let i = 0; i < 5; i++) {
-                if (i > 0) $('sec_' + i + '_pos').value = state.fuseSections[i].t;
+              for (let i = 0; i < 6; i++) {
+                $('sec_' + i + '_pos').value = state.fuseSections[i].t;
                 $('sec_' + i + '_w').value = state.fuseSections[i].w;
                 $('sec_' + i + '_h').value = state.fuseSections[i].h;
               }
@@ -216,9 +217,8 @@ function setupEventListeners() {
 
   // Read all manual fuse section values from DOM
   function readFuseSections() {
-    state.fuseSections[0].t = 0;
-    for (let i = 0; i < 5; i++) {
-      if (i > 0) state.fuseSections[i].t = parseFloat($('sec_' + i + '_pos').value);
+    for (let i = 0; i < 6; i++) {
+      state.fuseSections[i].t = parseFloat($('sec_' + i + '_pos').value);
       state.fuseSections[i].w = parseFloat($('sec_' + i + '_w').value);
       state.fuseSections[i].h = parseFloat($('sec_' + i + '_h').value);
     }
@@ -226,8 +226,8 @@ function setupEventListeners() {
 
   // Update all section value displays from DOM
   function updateSectionDisplays() {
-    for (let i = 0; i < 5; i++) {
-      if (i > 0) $('sec_' + i + '_pos_val').textContent = parseFloat($('sec_' + i + '_pos').value).toFixed(2);
+    for (let i = 0; i < 6; i++) {
+      $('sec_' + i + '_pos_val').textContent = parseFloat($('sec_' + i + '_pos').value).toFixed(2);
       $('sec_' + i + '_w_val').textContent = parseFloat($('sec_' + i + '_w').value).toFixed(3);
       $('sec_' + i + '_h_val').textContent = parseFloat($('sec_' + i + '_h').value).toFixed(3);
     }
@@ -240,7 +240,7 @@ function setupEventListeners() {
     readFuseSections();
     updateSectionDisplays();
     if (state.geometry) {
-      const len = state.fuseSections[4].t;
+      const len = state.fuseSections[5].t;
       state.geometry.fuselage_length = len;
       state.geometry.fuselage_max_width = wid;
       state.geometry.fuselage_max_height = wid * (0.05 / 0.09);
@@ -256,9 +256,9 @@ function setupEventListeners() {
 
   $('manFuseWidth').addEventListener('input', updateFuseFromSliders);
 
-  // Section sliders (skip K1 position — sabit 0)
-  for (let i = 0; i < 5; i++) {
-    if (i > 0) $('sec_' + i + '_pos').addEventListener('input', updateFuseFromSliders);
+  // Section sliders (K1–K6, tümü aktif)
+  for (let i = 0; i < 6; i++) {
+    $('sec_' + i + '_pos').addEventListener('input', updateFuseFromSliders);
     $('sec_' + i + '_w').addEventListener('input', updateFuseFromSliders);
     $('sec_' + i + '_h').addEventListener('input', updateFuseFromSliders);
   }
@@ -312,7 +312,7 @@ async function calculateAll() {
     };
     if (fuse_type === 'manual') {
       readFuseSections();
-      body.man_fuse_length = state.fuseSections[4].t;
+      body.man_fuse_length = state.fuseSections[5].t;
       body.man_fuse_width = parseFloat($('manFuseWidth').value) || undefined;
       body.man_fuse_sections = state.fuseSections.map(s => ({ ...s }));
     }

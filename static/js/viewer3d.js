@@ -427,6 +427,7 @@ function buildManualFuselage(geom) {
         { t: 0.15, w: 0.571, h: 0.667 },
         { t: 0.45, w: 1.000, h: 1.000 },
         { t: 0.90, w: 0.429, h: 0.444 },
+        { t: 1.10, w: 0.100, h: 0.100 },
         { t: 1.20, w: 0.057, h: 0.044 },
       ];
 
@@ -435,6 +436,8 @@ function buildManualFuselage(geom) {
   keyframes.sort((a, b) => a.t - b.t);
 
   function interpolate(t) {
+    if (t <= keyframes[0].t) return { w: keyframes[0].w, h: keyframes[0].h };
+    if (t >= keyframes[keyframes.length - 1].t) return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
     for (let i = 0; i < keyframes.length - 1; i++) {
       const a = keyframes[i];
       const b = keyframes[i + 1];
