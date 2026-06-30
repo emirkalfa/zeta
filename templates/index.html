@@ -13,19 +13,31 @@
 </head>
 <body>
 <div id="app">
-  <header>
-    <div class="header-left">
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
       <h1>ZETA</h1>
-      <span class="subtitle">Uçak Tasarım Aracı</span>
-    </div>
-    <div class="header-right">
       <button id="darkToggle" class="icon-btn" title="Karanlık Mod">🌙</button>
     </div>
-  </header>
+    <ul id="sidebar-nav">
+      <li><button class="sidebar-link active" data-tab="input"><span class="s-icon">⚙️</span> Parametreler</button></li>
+      <li><button class="sidebar-link disabled" data-tab="results"><span class="s-icon">📐</span> Ölçüler</button></li>
+      <li><button class="sidebar-link disabled" data-tab="viewer"><span class="s-icon">🪟</span> 3D Model</button></li>
+      <li><button class="sidebar-link disabled" data-tab="fuse"><span class="s-icon">🛢️</span> Gövde</button></li>
+      <li><button class="sidebar-link disabled" data-tab="charts"><span class="s-icon">📊</span> Analiz</button></li>
+      <li><button class="sidebar-link disabled" data-tab="flight"><span class="s-icon">✈️</span> Uçabilirlik</button></li>
+      <li><button class="sidebar-link disabled" data-tab="stl"><span class="s-icon">🖨️</span> STL İndirme</button></li>
+    </ul>
+    <div class="sidebar-footer">
+      <button id="saveBtn" class="icon-btn" title="Projeyi Kaydet">💾</button>
+      <button id="loadBtn" class="icon-btn" title="Projeyi Yükle">📂</button>
+    </div>
+  </aside>
 
-  <main class="container">
-    <!-- Input Section -->
-    <section class="card" id="input-card">
+  <!-- Main Content -->
+  <main id="content">
+    <!-- Tab: Input -->
+    <section class="card tab-pane active" data-tab="input">
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap">
         <h2 style="margin:0">Uçak Parametreleri</h2>
         <div class="mode-selector">
@@ -168,14 +180,14 @@
       <button id="calculateBtn" class="primary-btn" style="margin-top:16px">HESAPLA</button>
     </section>
 
-    <!-- Results Section -->
-    <section class="card" id="results-card" style="display:none">
+    <!-- Tab: Results -->
+    <section class="card tab-pane" data-tab="results">
       <h2>Geometrik Ölçüler</h2>
       <div id="results-grid" class="results-grid"></div>
     </section>
 
-    <!-- 3D Viewer Section -->
-    <section class="card" id="viewer-card" style="display:none">
+    <!-- Tab: 3D Viewer -->
+    <section class="card tab-pane" data-tab="viewer">
       <div class="viewer-header">
         <h2>3D Model</h2>
         <div class="viewer-controls">
@@ -185,148 +197,168 @@
           <button id="viewAutoRotate" class="small-btn active">⟳</button>
           <button id="viewReset" class="small-btn">↺</button>
           <button id="toggleFuse" class="small-btn">Gövde</button>
-          <button id="toggleFuseModel" class="small-btn active">Konv.</button>
-        </div>
-      </div>
-      <div id="manual-fuse-controls" style="display:none; padding:6px 16px; background:var(--card-bg); border-bottom:1px solid var(--border); font-size:0.8rem">
-        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap">
-          <label style="display:flex; align-items:center; gap:4px">
-            Genişlik: <input type="number" id="manFuseWidthInp" step="0.001" min="0.05" max="0.40" value="0.140" style="width:50px;padding:0 2px;font-size:0.75rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:3px">m
-            <input type="range" id="manFuseWidth" min="0.05" max="0.40" step="0.001" value="0.14" style="width:80px">
-          </label>
-          <span style="font-size:0.75rem;color:var(--muted)">En sağdaki K = toplam uzunluk</span>
-        </div>
-        <hr style="margin:4px 0; border-color:var(--border)">
-        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:4px">
-          <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
-            <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K1: Burun</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <input type="number" id="sec_0_pos_inp" step="0.001" min="0" max="3" value="0.000" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px">m <input type="range" id="sec_0_pos" min="0" max="3" step="0.001" value="0" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <input type="number" id="sec_0_w_inp" step="0.001" min="0" max="1.5" value="0.143" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_0_w" min="0" max="1.5" step="0.001" value="0.143" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <input type="number" id="sec_0_h_inp" step="0.001" min="0" max="1.5" value="0.111" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_0_h" min="0" max="1.5" step="0.001" value="0.111" style="width:50px"></label>
-          </div>
-          <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
-            <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K2: Ön</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <input type="number" id="sec_1_pos_inp" step="0.001" min="0" max="3" value="0.150" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px">m <input type="range" id="sec_1_pos" min="0" max="3" step="0.001" value="0.15" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <input type="number" id="sec_1_w_inp" step="0.001" min="0" max="1.5" value="0.571" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_1_w" min="0" max="1.5" step="0.001" value="0.571" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <input type="number" id="sec_1_h_inp" step="0.001" min="0" max="1.5" value="0.667" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_1_h" min="0" max="1.5" step="0.001" value="0.667" style="width:50px"></label>
-          </div>
-          <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
-            <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K3: Orta</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <input type="number" id="sec_2_pos_inp" step="0.001" min="0" max="3" value="0.450" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px">m <input type="range" id="sec_2_pos" min="0" max="3" step="0.001" value="0.45" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <input type="number" id="sec_2_w_inp" step="0.001" min="0" max="1.5" value="1.000" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_2_w" min="0" max="1.5" step="0.001" value="1" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <input type="number" id="sec_2_h_inp" step="0.001" min="0" max="1.5" value="1.000" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_2_h" min="0" max="1.5" step="0.001" value="1" style="width:50px"></label>
-          </div>
-          <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
-            <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K4: Arka</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <input type="number" id="sec_3_pos_inp" step="0.001" min="0" max="3" value="0.900" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px">m <input type="range" id="sec_3_pos" min="0" max="3" step="0.001" value="0.90" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <input type="number" id="sec_3_w_inp" step="0.001" min="0" max="1.5" value="0.429" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_3_w" min="0" max="1.5" step="0.001" value="0.429" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <input type="number" id="sec_3_h_inp" step="0.001" min="0" max="1.5" value="0.444" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_3_h" min="0" max="1.5" step="0.001" value="0.444" style="width:50px"></label>
-          </div>
-          <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
-            <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K5: Arka Kuyruk</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <input type="number" id="sec_4_pos_inp" step="0.001" min="0" max="3" value="1.100" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px">m <input type="range" id="sec_4_pos" min="0" max="3" step="0.001" value="1.10" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <input type="number" id="sec_4_w_inp" step="0.001" min="0" max="1.5" value="0.100" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_4_w" min="0" max="1.5" step="0.001" value="0.100" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <input type="number" id="sec_4_h_inp" step="0.001" min="0" max="1.5" value="0.100" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_4_h" min="0" max="1.5" step="0.001" value="0.100" style="width:50px"></label>
-          </div>
-          <div style="background:var(--input-bg);border-radius:4px;padding:4px 6px">
-            <div style="font-weight:600;font-size:0.75rem;margin-bottom:2px">K6: Kuyruk Ucu</div>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">P: <input type="number" id="sec_5_pos_inp" step="0.001" min="0.5" max="3" value="1.200" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px">m <input type="range" id="sec_5_pos" min="0.5" max="3" step="0.001" value="1.20" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">W: <input type="number" id="sec_5_w_inp" step="0.001" min="0" max="1.5" value="0.057" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_5_w" min="0" max="1.5" step="0.001" value="0.057" style="width:50px"></label>
-            <label style="display:flex;align-items:center;gap:2px;font-size:0.7rem">H: <input type="number" id="sec_5_h_inp" step="0.001" min="0" max="1.5" value="0.044" style="width:38px;padding:0 1px;font-size:0.65rem;text-align:center;background:var(--input-bg);border:1px solid var(--border);border-radius:2px"> <input type="range" id="sec_5_h" min="0" max="1.5" step="0.001" value="0.044" style="width:50px"></label>
-          </div>
         </div>
       </div>
       <div id="three-container"></div>
     </section>
 
-    <!-- Charts Section -->
-    <section class="card" id="charts-card" style="display:none">
+    <!-- Tab: Fuselage -->
+    <section class="card tab-pane" data-tab="fuse">
+      <h2>Gövde Tasarımı</h2>
+      <div class="fuse-layout">
+        <div id="fuse-three-container"></div>
+        <div id="fuse-manual-controls">
+          <p style="color:var(--text-secondary); margin-bottom:12px; font-size:0.8rem">K6'nın P değeri toplam gövde uzunluğunu belirler.</p>
+          <div class="fuse-grid">
+            <div class="fuse-section-card" data-idx="0">
+              <div class="fuse-section-header">K1: Burun</div>
+              <div class="fuse-row"><span class="fuse-label">P</span><input type="range" id="sec_0_pos" min="0" max="3" step="0.001" value="0"><input type="number" id="sec_0_pos_inp" step="0.001" min="0" max="3" value="0.000"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">W</span><input type="range" id="sec_0_w" min="0" max="1.5" step="0.001" value="0.143"><input type="number" id="sec_0_w_inp" step="0.001" min="0" max="1.5" value="0.143"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">H</span><input type="range" id="sec_0_h" min="0" max="1.5" step="0.001" value="0.111"><input type="number" id="sec_0_h_inp" step="0.001" min="0" max="1.5" value="0.111"><span class="fuse-unit">m</span></div>
+            </div>
+            <div class="fuse-section-card" data-idx="1">
+              <div class="fuse-section-header">K2: Ön</div>
+              <div class="fuse-row"><span class="fuse-label">P</span><input type="range" id="sec_1_pos" min="0" max="3" step="0.001" value="0.15"><input type="number" id="sec_1_pos_inp" step="0.001" min="0" max="3" value="0.150"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">W</span><input type="range" id="sec_1_w" min="0" max="1.5" step="0.001" value="0.571"><input type="number" id="sec_1_w_inp" step="0.001" min="0" max="1.5" value="0.571"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">H</span><input type="range" id="sec_1_h" min="0" max="1.5" step="0.001" value="0.667"><input type="number" id="sec_1_h_inp" step="0.001" min="0" max="1.5" value="0.667"><span class="fuse-unit">m</span></div>
+            </div>
+            <div class="fuse-section-card" data-idx="2">
+              <div class="fuse-section-header">K3: Orta</div>
+              <div class="fuse-row"><span class="fuse-label">P</span><input type="range" id="sec_2_pos" min="0" max="3" step="0.001" value="0.45"><input type="number" id="sec_2_pos_inp" step="0.001" min="0" max="3" value="0.450"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">W</span><input type="range" id="sec_2_w" min="0" max="1.5" step="0.001" value="1"><input type="number" id="sec_2_w_inp" step="0.001" min="0" max="1.5" value="1.000"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">H</span><input type="range" id="sec_2_h" min="0" max="1.5" step="0.001" value="1"><input type="number" id="sec_2_h_inp" step="0.001" min="0" max="1.5" value="1.000"><span class="fuse-unit">m</span></div>
+            </div>
+            <div class="fuse-section-card" data-idx="3">
+              <div class="fuse-section-header">K4: Arka</div>
+              <div class="fuse-row"><span class="fuse-label">P</span><input type="range" id="sec_3_pos" min="0" max="3" step="0.001" value="0.9"><input type="number" id="sec_3_pos_inp" step="0.001" min="0" max="3" value="0.900"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">W</span><input type="range" id="sec_3_w" min="0" max="1.5" step="0.001" value="0.429"><input type="number" id="sec_3_w_inp" step="0.001" min="0" max="1.5" value="0.429"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">H</span><input type="range" id="sec_3_h" min="0" max="1.5" step="0.001" value="0.444"><input type="number" id="sec_3_h_inp" step="0.001" min="0" max="1.5" value="0.444"><span class="fuse-unit">m</span></div>
+            </div>
+            <div class="fuse-section-card" data-idx="4">
+              <div class="fuse-section-header">K5: Arka Kuyruk</div>
+              <div class="fuse-row"><span class="fuse-label">P</span><input type="range" id="sec_4_pos" min="0" max="3" step="0.001" value="1.1"><input type="number" id="sec_4_pos_inp" step="0.001" min="0" max="3" value="1.100"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">W</span><input type="range" id="sec_4_w" min="0" max="1.5" step="0.001" value="0.1"><input type="number" id="sec_4_w_inp" step="0.001" min="0" max="1.5" value="0.100"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">H</span><input type="range" id="sec_4_h" min="0" max="1.5" step="0.001" value="0.1"><input type="number" id="sec_4_h_inp" step="0.001" min="0" max="1.5" value="0.100"><span class="fuse-unit">m</span></div>
+            </div>
+            <div class="fuse-section-card" data-idx="5">
+              <div class="fuse-section-header">K6: Kuyruk Ucu</div>
+              <div class="fuse-row"><span class="fuse-label">P</span><input type="range" id="sec_5_pos" min="0.5" max="3" step="0.001" value="1.2"><input type="number" id="sec_5_pos_inp" step="0.001" min="0.5" max="3" value="1.200"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">W</span><input type="range" id="sec_5_w" min="0" max="1.5" step="0.001" value="0.057"><input type="number" id="sec_5_w_inp" step="0.001" min="0" max="1.5" value="0.057"><span class="fuse-unit">m</span></div>
+              <div class="fuse-row"><span class="fuse-label">H</span><input type="range" id="sec_5_h" min="0" max="1.5" step="0.001" value="0.044"><input type="number" id="sec_5_h_inp" step="0.001" min="0" max="1.5" value="0.044"><span class="fuse-unit">m</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab: Charts -->
+    <section class="card tab-pane" data-tab="charts">
       <h2>Aerodinamik Analiz</h2>
       <div class="charts-grid">
         <div class="chart-box">
           <h3>Cl vs α (Kaldırma Katsayısı)</h3>
-          <canvas id="chartClAlpha"></canvas>
+          <div class="chart-canvas-wrap"><canvas id="chartClAlpha"></canvas></div>
           <div class="chart-table" id="tableClAlpha"></div>
         </div>
         <div class="chart-box">
           <h3>Cd vs Cl (Sürükleme Poları)</h3>
-          <canvas id="chartCdCl"></canvas>
+          <div class="chart-canvas-wrap"><canvas id="chartCdCl"></canvas></div>
           <div class="chart-table" id="tableCdCl"></div>
         </div>
         <div class="chart-box">
           <h3>Cm vs α (Moment Katsayısı)</h3>
-          <canvas id="chartCmAlpha"></canvas>
+          <div class="chart-canvas-wrap"><canvas id="chartCmAlpha"></canvas></div>
           <div class="chart-table" id="tableCmAlpha"></div>
         </div>
         <div class="chart-box">
           <h3>Cl/Cd vs α (Verim)</h3>
-          <canvas id="chartEff"></canvas>
+          <div class="chart-canvas-wrap"><canvas id="chartEff"></canvas></div>
           <div class="chart-table" id="tableEff"></div>
         </div>
         <div class="chart-box full-width">
           <h3>Kanat Boyunca Lift Dağılımı</h3>
-          <canvas id="chartLiftDist"></canvas>
+          <div class="chart-canvas-wrap"><canvas id="chartLiftDist"></canvas></div>
           <div class="chart-table" id="tableLiftDist"></div>
         </div>
       </div>
     </section>
 
-    <!-- Flight Test Section -->
-    <section class="card" id="flight-card" style="display:none">
+    <!-- Tab: Flight Test -->
+    <section class="card tab-pane" data-tab="flight">
       <h2>Uçabilirlik Testi</h2>
       <div id="flight-results" class="flight-grid"></div>
     </section>
 
-    <!-- STL Export Section -->
-    <section class="card" id="stl-card" style="display:none">
+    <!-- Tab: STL -->
+    <section class="card tab-pane" data-tab="stl">
       <h2>STL İndirme</h2>
-      <p class="stl-info">3D modeli 3D yazıcıda basmak için ayrı ayrı STL dosyalarını indirin.</p>
+      <p class="stl-info-code" style="margin-bottom:16px">3D modeli 3D yazıcıda basmak için aşağıdaki formatlarda indirin.</p>
 
-      <!-- Tek Parça STL -->
-      <h3 style="margin-top:0">Tek Parça</h3>
-      <div class="stl-buttons">
-        <button id="stlWing" class="stl-btn wing-btn">🪽 Kanat STL</button>
-        <button id="stlTail" class="stl-btn tail-btn">🔄 Kuyruk STL</button>
+      <!-- Tek Parça -->
+      <div class="stl-section-title">🪽 Tek Parça STL</div>
+      <div class="stl-cards-grid">
+        <div class="stl-card">
+          <div class="stl-card-icon">🪽</div>
+          <h4>Kanat STL</h4>
+          <p>Tek parça halinde kanat modeli. Küçük uçaklar için idealdir.</p>
+          <button id="stlWing" class="stl-btn wing-btn">⬇ Kanat STL</button>
+        </div>
+        <div class="stl-card">
+          <div class="stl-card-icon">🔄</div>
+          <h4>Kuyruk STL</h4>
+          <p>Yatay ve dikey kuyruk tek parça. Hızlı baskı için uygundur.</p>
+          <button id="stlTail" class="stl-btn tail-btn">⬇ Kuyruk STL</button>
+        </div>
       </div>
 
       <!-- Dilimleme -->
-      <hr style="margin:20px 0; border-color:var(--border)">
-      <h3>🔪 Dilimleme (Parçalı STL)</h3>
-      <p class="stl-info">Büyük parçaları yazıcıya sığdırmak için eşit parçalara böl. Parçaları yapıştırarak veya bantlayarak birleştirin.</p>
-      <div class="slicing-grid">
-        <div class="form-group">
-          <label for="sliceCount">Kanat — Her Yarıdaki Parça Sayısı</label>
-          <input type="number" id="sliceCount" min="1" max="20" value="3" step="1">
+      <div class="stl-section-title">🔪 Dilimleme (Parçalı STL)</div>
+      <p class="stl-info-code">Büyük parçaları yazıcıya sığdırmak için eşit parçalara bölün. Parçaları yapıştırarak birleştirin.</p>
+      <div class="stl-cards-grid">
+        <div class="stl-card">
+          <div class="stl-card-icon">🔪</div>
+          <h4>Kanat Dilimli</h4>
+          <p>Her yarıdaki parça sayısını ayarlayın.</p>
+          <div class="form-group">
+            <label for="sliceCount">Parça Sayısı</label>
+            <input type="number" id="sliceCount" min="1" max="20" value="3" step="1">
+          </div>
+          <button id="stlWingSliced" class="stl-btn wing-btn sliced-btn">🔪 Kanat Dilimli STL</button>
         </div>
-        <div class="form-group">
-          <label for="tailSliceCount">Kuyruk — Parça Sayısı</label>
-          <input type="number" id="tailSliceCount" min="1" max="20" value="2" step="1">
+        <div class="stl-card">
+          <div class="stl-card-icon">🔪</div>
+          <h4>Kuyruk Dilimli</h4>
+          <p>Kuyruk için parça sayısını ayarlayın.</p>
+          <div class="form-group">
+            <label for="tailSliceCount">Parça Sayısı</label>
+            <input type="number" id="tailSliceCount" min="1" max="20" value="2" step="1">
+          </div>
+          <button id="stlTailSliced" class="stl-btn tail-btn sliced-btn">🔪 Kuyruk Dilimli STL</button>
         </div>
       </div>
-      <div class="stl-buttons">
-        <button id="stlWingSliced" class="stl-btn wing-btn sliced-btn">🔪 Kanat Dilimli STL</button>
-        <button id="stlTailSliced" class="stl-btn tail-btn sliced-btn">🔪 Kuyruk Dilimli STL</button>
-      </div>
-      <p class="stl-info" style="margin-top:10px; font-size:0.8rem; color:var(--primary)">
-        💡 Dosya adları: <code>zeta_kanat_sag_1of3.stl</code> (1=kök, son=uç)
-      </p>
+      <p class="stl-info-code">💡 Dosya adları: <code>zeta_kanat_sag_1of3.stl</code> (1=kök, son=uç)</p>
 
       <!-- Duvar Kalınlığı -->
-      <hr style="margin:20px 0; border-color:var(--border)">
-      <h3>🔧 Duvar Kalınlığı (STL)</h3>
-      <p class="stl-info">Dış yüzey bozulmaz, içe doğru et kalınlığı eklenir. 0 = yüzey (içi boş).</p>
-      <div class="slicing-grid">
-        <div class="form-group">
-          <label for="wallThickness">Duvar Kalınlığı (mm)</label>
-          <input type="number" id="wallThickness" min="0" max="5" step="0.1" value="1.2">
+      <div class="stl-section-title">🔧 Duvar Kalınlığı</div>
+      <p class="stl-info-code">Dış yüzey bozulmaz, içe doğru et kalınlığı eklenir. 0 = yüzey (içi boş).</p>
+      <div class="stl-cards-grid">
+        <div class="stl-card">
+          <div class="stl-card-icon">🔧</div>
+          <h4>Et Kalınlığı Ayarı</h4>
+          <p>Tüm STL çıktılarına uygulanır.</p>
+          <div class="form-group">
+            <label for="wallThickness">Duvar Kalınlığı (mm)</label>
+            <input type="number" id="wallThickness" min="0" max="5" step="0.1" value="1.2">
+          </div>
         </div>
       </div>
     </section>
-  </main>
 
-  <footer>
-    <p>ZETA v1.0 — Üniversite Projeleri İçin Uçak Tasarım Aracı</p>
-  </footer>
+    <!-- Footer -->
+    <footer>
+      <p>ZETA v1.2.3 — Üniversite Projeleri İçin Uçak Tasarım Aracı &mdash; <a href="https://emirkalfa.com" target="_blank">Muhammet Emir Kalfa</a> tarafından üretilmiştir &mdash; <a href="https://github.com/memirkalfa/zeta" target="_blank">GitHub</a></p>
+    </footer>
+  </main>
 </div>
 
 <script src="/static/js/app.js"></script>

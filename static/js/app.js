@@ -29,9 +29,6 @@ async function fetchAPI(url, body = null) {
 
 function $(id) { return document.getElementById(id); }
 
-function show(id) { $(id).style.display = ''; }
-function hide(id) { $(id).style.display = 'none'; }
-
 function showLoading(btn) {
   btn.disabled = true;
   btn.innerHTML = '<span class="loading"></span> Hesaplanıyor...';
@@ -42,6 +39,68 @@ function hideLoading(btn, text) {
   btn.innerHTML = text || 'HESAPLA';
 }
 
+/* ─── Sidebar / Tab System ─── */
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-pane').forEach(pane => {
+    pane.classList.remove('active');
+  });
+  document.querySelectorAll('.sidebar-link').forEach(link => {
+    link.classList.remove('active');
+  });
+  const pane = document.querySelector(`.tab-pane[data-tab="${tabId}"]`);
+  const link = document.querySelector(`.sidebar-link[data-tab="${tabId}"]`);
+  if (pane) pane.classList.add('active');
+  if (link) link.classList.add('active');
+}
+
+function enableTab(tabId) {
+  const link = document.querySelector(`.sidebar-link[data-tab="${tabId}"]`);
+  if (link) link.classList.remove('disabled');
+}
+
+function setupSidebar() {
+  document.querySelectorAll('.sidebar-link').forEach(link => {
+    link.addEventListener('click', () => {
+      const tab = link.dataset.tab;
+      if (link.classList.contains('disabled')) return;
+      switchTab(tab);
+    });
+  });
+}
+
+/* ─── Fuselage Helpers ─── */
+function readFuseSections() {
+  for (let i = 0; i < 6; i++) {
+    state.fuseSections[i].t = parseFloat($('sec_' + i + '_pos').value);
+    state.fuseSections[i].w = parseFloat($('sec_' + i + '_w').value);
+    state.fuseSections[i].h = parseFloat($('sec_' + i + '_h').value);
+  }
+}
+
+function updateSectionDisplays() {
+  for (let i = 0; i < 6; i++) {
+    $('sec_' + i + '_pos_inp').value = parseFloat($('sec_' + i + '_pos').value).toFixed(3);
+    $('sec_' + i + '_w_inp').value = parseFloat($('sec_' + i + '_w').value).toFixed(3);
+    $('sec_' + i + '_h_inp').value = parseFloat($('sec_' + i + '_h').value).toFixed(3);
+  }
+}
+
+function updateFuseFromSliders() {
+  readFuseSections();
+  updateSectionDisplays();
+  if (state.geometry) {
+    const len = state.fuseSections[5].t;
+    const maxW = Math.max(...state.fuseSections.map(s => s.w));
+    state.geometry.fuselage_length = len;
+    state.geometry.fuselage_max_width = maxW;
+    state.geometry.fuselage_max_height = maxW;
+    state.geometry.fuse_type = 'manual';
+    state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+    updateFuseViewer(state.geometry);
+  }
+}
+
+/* ─── Init ─── */
 async function init() {
   await loadAirfoils();
   setupDarkMode();
@@ -49,12 +108,13 @@ async function init() {
   setupEventListeners();
   applyDarkMode();
   checkSavedProject();
+  setupSidebar();
 }
 
 async function loadAirfoils() {
   const data = await fetchAPI('/api/airfoils');
   const opts = data.map(a =>
-    `<option value="${a.code}">${a.name} (t=${(a.max_thickness*100).toFixed(0)}%)</option>`
+    `<option value="${a.code}">${a.name} (t=${(a.max_thickness * 100).toFixed(0)}%)</option>`
   ).join('');
   $('airfoil').innerHTML = opts;
   $('htailAirfoil').innerHTML = opts;
@@ -101,34 +161,19 @@ function checkSavedProject() {
         if (data.cg_percent) { $('cgSlider').value = data.cg_percent; updateCGDisplay(); }
         if (data.max_alpha) $('maxAlpha').value = data.max_alpha;
 
-        if (data.fuse_type) {
-          state.fuseType = data.fuse_type;
-          const btn = $('toggleFuseModel');
-          if (state.fuseType === 'manual') {
-            btn.textContent = 'Man.';
-            btn.classList.remove('active');
-            $('manual-fuse-controls').style.display = '';
-            if (data.man_fuse_width) $('manFuseWidth').value = data.man_fuse_width;
-            $('fuseWidthVal').textContent = parseFloat($('manFuseWidth').value).toFixed(3);
-            if (data.man_fuse_sections) {
-              state.fuseSections = data.man_fuse_sections;
-              for (let i = 0; i < 6; i++) {
-                $('sec_' + i + '_pos').value = state.fuseSections[i].t;
-                $('sec_' + i + '_w').value = state.fuseSections[i].w;
-                $('sec_' + i + '_h').value = state.fuseSections[i].h;
-              }
-              updateSectionDisplays();
-            }
-          } else {
-            btn.textContent = 'Konv.';
-            btn.classList.add('active');
-            $('manual-fuse-controls').style.display = 'none';
+        if (data.fuse_type && data.man_fuse_sections) {
+          state.fuseType = 'manual';
+          state.fuseSections = data.man_fuse_sections;
+          for (let i = 0; i < 6; i++) {
+            $('sec_' + i + '_pos').value = state.fuseSections[i].t;
+            $('sec_' + i + '_w').value = state.fuseSections[i].w;
+            $('sec_' + i + '_h').value = state.fuseSections[i].h;
           }
+          updateSectionDisplays();
         }
-
       }
     }
-  } catch(e) {}
+  } catch (e) { }
 }
 
 function saveProject() {
@@ -141,9 +186,7 @@ function saveProject() {
     wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
     tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
     fuse_type: state.fuseType,
-    man_fuse_width: parseFloat($('manFuseWidth').value) || 0.14,
     man_fuse_sections: state.fuseSections.map(s => ({ ...s })),
-
     reynolds: parseInt($('reynolds').value) || 200000,
     cg_percent: parseInt($('cgSlider').value) || 25,
     max_alpha: parseInt($('maxAlpha').value) || 20,
@@ -161,7 +204,7 @@ function loadProject() {
       const lb = $('loadBtn');
       if (lb) { lb.textContent = '✅'; setTimeout(() => { lb.textContent = '📂'; }, 1500); }
     }
-  } catch(e) { alert('Kayıtlı proje bulunamadı.'); }
+  } catch (e) { alert('Kayıtlı proje bulunamadı.'); }
 }
 
 function updateCGDisplay() {
@@ -185,10 +228,8 @@ function setupEventListeners() {
   $('stlWingSliced').addEventListener('click', exportSlicedWing);
   $('stlTailSliced').addEventListener('click', exportSlicedTail);
 
-  // Toggle fuselage visibility
   $('toggleFuse').addEventListener('click', toggleFuselage);
 
-  // Mode selector
   function setMode(mode) {
     $('autoMode').classList.toggle('active', mode === 'auto');
     $('manualMode').classList.toggle('active', mode === 'manual');
@@ -197,75 +238,14 @@ function setupEventListeners() {
   $('autoMode').addEventListener('click', () => setMode('auto'));
   $('manualMode').addEventListener('click', () => setMode('manual'));
 
-  // Body model toggle (Konv./Man.)
-  $('toggleFuseModel').addEventListener('click', () => {
-    const btn = $('toggleFuseModel');
-    const isManual = state.fuseType === 'manual';
-    state.fuseType = isManual ? 'conventional' : 'manual';
-    btn.textContent = state.fuseType === 'manual' ? 'Man.' : 'Konv.';
-    btn.classList.toggle('active', state.fuseType === 'conventional');
-    $('manual-fuse-controls').style.display = state.fuseType === 'manual' ? '' : 'none';
-    if (state.geometry) {
-      state.geometry.fuse_type = state.fuseType;
-      if (state.fuseType === 'manual') {
-        readFuseSections();
-        state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
-      }
-      rebuildFuselage(state.geometry);
-    }
-  });
+  state.fuseType = 'manual';
 
-  // Read all manual fuse section values from DOM
-  function readFuseSections() {
-    for (let i = 0; i < 6; i++) {
-      state.fuseSections[i].t = parseFloat($('sec_' + i + '_pos').value);
-      state.fuseSections[i].w = parseFloat($('sec_' + i + '_w').value);
-      state.fuseSections[i].h = parseFloat($('sec_' + i + '_h').value);
-    }
-  }
-
-  // Update all section value displays from DOM
-  function updateSectionDisplays() {
-    for (let i = 0; i < 6; i++) {
-      $('sec_' + i + '_pos_inp').value = parseFloat($('sec_' + i + '_pos').value).toFixed(3);
-      $('sec_' + i + '_w_inp').value = parseFloat($('sec_' + i + '_w').value).toFixed(3);
-      $('sec_' + i + '_h_inp').value = parseFloat($('sec_' + i + '_h').value).toFixed(3);
-    }
-  }
-
-
-
-  // Update geometry from all slider values and rebuild
-  function updateFuseFromSliders() {
-    const wid = parseFloat($('manFuseWidth').value);
-    $('manFuseWidthInp').value = wid.toFixed(3);
-    readFuseSections();
-    updateSectionDisplays();
-    if (state.geometry) {
-      const len = state.fuseSections[5].t;
-      state.geometry.fuselage_length = len;
-      state.geometry.fuselage_max_width = wid;
-      state.geometry.fuselage_max_height = wid * (0.05 / 0.09);
-      state.geometry.fuse_diameter = wid;
-      state.geometry.nose_length = 2.0 * wid;
-      state.geometry.tailcone_length = 3.5 * wid;
-      state.geometry.cylindrical_length = len - 2.0 * wid - 3.5 * wid;
-      state.geometry.fuse_type = 'manual';
-      state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
-      rebuildFuselage(state.geometry);
-    }
-  }
-
-  $('manFuseWidth').addEventListener('input', updateFuseFromSliders);
-
-  // Section sliders (K1–K6, tümü aktif)
   for (let i = 0; i < 6; i++) {
     $('sec_' + i + '_pos').addEventListener('input', updateFuseFromSliders);
     $('sec_' + i + '_w').addEventListener('input', updateFuseFromSliders);
     $('sec_' + i + '_h').addEventListener('input', updateFuseFromSliders);
   }
 
-  // Number input → slider sync (K1–K6)
   function makeSync(sliderId, inputId) {
     return () => {
       const val = parseFloat($(inputId).value);
@@ -282,7 +262,6 @@ function setupEventListeners() {
     $('sec_' + i + '_w_inp').addEventListener('input', makeSync('sec_' + i + '_w', 'sec_' + i + '_w_inp'));
     $('sec_' + i + '_h_inp').addEventListener('input', makeSync('sec_' + i + '_h', 'sec_' + i + '_h_inp'));
   }
-  $('manFuseWidthInp').addEventListener('input', makeSync('manFuseWidth', 'manFuseWidthInp'));
 }
 
 async function calculateAll() {
@@ -297,7 +276,7 @@ async function calculateAll() {
   const wing_position = document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid';
   const wing_shape = document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered';
   const tail_type = document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional';
-  const fuse_type = state.fuseType;
+  const fuse_type = 'conventional';
   const cg_percent = parseInt($('cgSlider').value) || 25;
   const max_alpha = parseInt($('maxAlpha').value) || 20;
 
@@ -310,33 +289,23 @@ async function calculateAll() {
   try {
     state.airfoilCode = airfoil_code;
 
-    // Get wing airfoil coordinates
     const airfoilId = await getAirfoilId(airfoil_code);
     const airfoilData = await fetchAPI(`/api/airfoil/${airfoilId}`);
     state.airfoilCoords = airfoilData.coordinates;
 
-    // Get horizontal tail airfoil coordinates
     const htailId = await getAirfoilId(htail_airfoil);
     const htailData = await fetchAPI(`/api/airfoil/${htailId}`);
     state.tailCoords = htailData.coordinates;
 
-    // Get vertical tail airfoil coordinates
     const vtailId = await getAirfoilId(vtail_airfoil);
     const vtailData = await fetchAPI(`/api/airfoil/${vtailId}`);
     state.vtailCoords = vtailData.coordinates;
 
-    // Calculate geometry
     const manual_mode = $('manual-inputs').style.display !== 'none';
     const body = {
       wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, manual_mode,
       fuse_type,
     };
-    if (fuse_type === 'manual') {
-      readFuseSections();
-      body.man_fuse_length = state.fuseSections[5].t;
-      body.man_fuse_width = parseFloat($('manFuseWidth').value) || undefined;
-      body.man_fuse_sections = state.fuseSections.map(s => ({ ...s }));
-    }
     if (manual_mode) {
       body.man_root_chord = parseFloat($('man_root_chord').value) || undefined;
       body.man_tip_chord = parseFloat($('man_tip_chord').value) || undefined;
@@ -354,39 +323,43 @@ async function calculateAll() {
     const reynolds_number = parseInt($('reynolds').value) || 200000;
     body.cg_percent = cg_percent;
     state.geometry = await fetchAPI('/api/calculate', body);
-    if (state.geometry.fuse_type === 'manual') {
-      readFuseSections();
-      state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
-    }
-
-    // Run analysis (uses wing airfoil)
     state.polars = await fetchAPI('/api/analyze', {
       geometry: state.geometry, airfoil_code, reynolds_number, max_alpha
     });
 
-    // Run stability test (uses htail airfoil)
     state.stability = await fetchAPI('/api/stability', {
       geometry: state.geometry, airfoil_code, tail_airfoil_code: htail_airfoil, reynolds_number
     });
 
-    // Save to localStorage
     saveProject();
 
-    // Display everything
     displayResults(state.geometry);
     displayFlightTest(state.stability);
     displayCharts(state.polars);
-    show('results-card');
-    show('viewer-card');
-    show('charts-card');
-    show('flight-card');
-    show('stl-card');
 
+    // Enable sidebar tabs
+    enableTab('results');
+    enableTab('viewer');
+    enableTab('fuse');
+    enableTab('charts');
+    enableTab('flight');
+    enableTab('stl');
+
+    switchTab('viewer');
     initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, tail_type);
+    // Set up manual fuse geometry for Gövde viewer (main viewer stays conventional)
+    readFuseSections();
+    state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+    state.geometry.fuse_type = 'manual';
+    const flen = state.fuseSections[5].t;
+    const fmaxW = Math.max(...state.fuseSections.map(s => s.w));
+    state.geometry.fuselage_length = flen;
+    state.geometry.fuselage_max_width = fmaxW;
+    state.geometry.fuselage_max_height = fmaxW;
+    initFuseViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, tail_type);
     hideLoading(btn);
 
-    // Scroll to results
-    $('results-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    switchTab('results');
 
   } catch (err) {
     console.error(err);
@@ -454,13 +427,13 @@ function displayResults(geom) {
 
 function displayFlightTest(stab) {
   const items = [
-    { label: 'Stall Hızı', value: stab.stall_speed + ' m/s', cls: stab.stall_speed < 12 ? 'pass' : 'warn' },
-    { label: 'Seyir Hızı', value: stab.cruise_speed + ' m/s', cls: 'pass' },
-    { label: 'Tırmanma Oranı', value: stab.climb_rate + ' m/s', cls: stab.climb_rate > 2 ? 'pass' : 'warn' },
-    { label: 'Static Margin', value: '%' + stab.static_margin, cls: stab.static_margin >= 5 ? 'pass' : 'fail' },
-    { label: 'CL Maks', value: stab.cl_max, cls: 'pass' },
-    { label: 'Seyir CD (total)', value: stab.cd_cruise, cls: 'pass' },
-    { label: 'Reynolds (Re)', value: (stab.Reynolds || '').toLocaleString(), cls: 'pass' },
+    { label: 'Stall Hızı', value: stab.stall_speed + ' m/s', cls: stab.stall_speed < 12 ? 'pass' : 'warn', icon: '🐢', pct: Math.min(100, (stab.stall_speed / 20) * 100) },
+    { label: 'Seyir Hızı', value: stab.cruise_speed + ' m/s', cls: 'pass', icon: '✈️', pct: Math.min(100, (stab.cruise_speed / 30) * 100) },
+    { label: 'Tırmanma Oranı', value: stab.climb_rate + ' m/s', cls: stab.climb_rate > 2 ? 'pass' : 'warn', icon: '⬆️', pct: Math.min(100, (stab.climb_rate / 6) * 100) },
+    { label: 'Static Margin', value: '%' + stab.static_margin, cls: stab.static_margin >= 5 ? 'pass' : 'fail', icon: '⚖️', pct: Math.min(100, (stab.static_margin / 15) * 100) },
+    { label: 'CL Maks', value: stab.cl_max, cls: 'pass', icon: '📈', pct: Math.min(100, (stab.cl_max / 2.5) * 100) },
+    { label: 'Seyir CD (total)', value: stab.cd_cruise, cls: 'pass', icon: '📉', pct: Math.min(100, (1 - stab.cd_cruise / 0.1) * 100) },
+    { label: 'Reynolds (Re)', value: (stab.Reynolds || '').toLocaleString(), cls: 'pass', icon: '🔬', pct: Math.min(100, ((stab.Reynolds || 0) / 500000) * 100) },
   ];
 
   const assessments = stab.assessments || [];
@@ -469,8 +442,14 @@ function displayFlightTest(stab) {
   $('flight-results').innerHTML =
     items.map(item =>
       `<div class="flight-item ${item.cls}">
-        <div class="value">${item.value}</div>
-        <div class="label">${item.label}</div>
+        <div class="flight-item-header">
+          <span class="flight-icon">${item.icon}</span>
+          <span class="flight-value">${item.value}</span>
+        </div>
+        <div class="flight-label">${item.label}</div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width: ${item.pct}%"></div>
+        </div>
       </div>`
     ).join('') +
     `<div class="flight-assessment">
