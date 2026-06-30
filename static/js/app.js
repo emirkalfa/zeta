@@ -227,16 +227,18 @@ function setupEventListeners() {
   // Update all section value displays from DOM
   function updateSectionDisplays() {
     for (let i = 0; i < 6; i++) {
-      $('sec_' + i + '_pos_val').textContent = parseFloat($('sec_' + i + '_pos').value).toFixed(3);
-      $('sec_' + i + '_w_val').textContent = parseFloat($('sec_' + i + '_w').value).toFixed(3);
-      $('sec_' + i + '_h_val').textContent = parseFloat($('sec_' + i + '_h').value).toFixed(3);
+      $('sec_' + i + '_pos_inp').value = parseFloat($('sec_' + i + '_pos').value).toFixed(3);
+      $('sec_' + i + '_w_inp').value = parseFloat($('sec_' + i + '_w').value).toFixed(3);
+      $('sec_' + i + '_h_inp').value = parseFloat($('sec_' + i + '_h').value).toFixed(3);
     }
   }
+
+
 
   // Update geometry from all slider values and rebuild
   function updateFuseFromSliders() {
     const wid = parseFloat($('manFuseWidth').value);
-    $('fuseWidthVal').textContent = wid.toFixed(3);
+    $('manFuseWidthInp').value = wid.toFixed(3);
     readFuseSections();
     updateSectionDisplays();
     if (state.geometry) {
@@ -262,6 +264,25 @@ function setupEventListeners() {
     $('sec_' + i + '_w').addEventListener('input', updateFuseFromSliders);
     $('sec_' + i + '_h').addEventListener('input', updateFuseFromSliders);
   }
+
+  // Number input → slider sync (K1–K6)
+  function makeSync(sliderId, inputId) {
+    return () => {
+      const val = parseFloat($(inputId).value);
+      const slider = $(sliderId);
+      if (!isNaN(val)) {
+        const clamped = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), val));
+        slider.value = clamped;
+        updateFuseFromSliders();
+      }
+    };
+  }
+  for (let i = 0; i < 6; i++) {
+    $('sec_' + i + '_pos_inp').addEventListener('input', makeSync('sec_' + i + '_pos', 'sec_' + i + '_pos_inp'));
+    $('sec_' + i + '_w_inp').addEventListener('input', makeSync('sec_' + i + '_w', 'sec_' + i + '_w_inp'));
+    $('sec_' + i + '_h_inp').addEventListener('input', makeSync('sec_' + i + '_h', 'sec_' + i + '_h_inp'));
+  }
+  $('manFuseWidthInp').addEventListener('input', makeSync('manFuseWidth', 'manFuseWidthInp'));
 }
 
 async function calculateAll() {
