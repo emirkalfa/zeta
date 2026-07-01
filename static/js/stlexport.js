@@ -1,9 +1,37 @@
 const STL_SCALE = 1000;
 
 function getWingRootZ(geom) {
-  const hw = geom.fuselage_max_width / 2;
-  const hh = geom.fuselage_max_height / 2;
   const wo = Math.abs(geom.wing_position_offset || 0);
+  let hw, hh;
+
+  if (geom.fuse_type === 'manual' && geom.fuse_sections && geom.fuse_sections.length >= 2) {
+    const wingX = geom.wing_x_pos || (geom.fuselage_length || 1.2) * 0.35;
+    const secs = geom.fuse_sections;
+    const totalLen = Math.max(secs[secs.length - 1].t, 0.01);
+    const t = Math.max(0, Math.min(1, wingX / totalLen));
+
+    let i = 0;
+    for (i = 0; i < secs.length - 1; i++) {
+      if (t >= secs[i].t / totalLen && t <= secs[i + 1].t / totalLen) break;
+    }
+    i = Math.min(i, secs.length - 2);
+
+    const a = secs[i], b = secs[i + 1];
+    const aT = a.t / totalLen, bT = b.t / totalLen;
+    const localT = bT !== aT ? (t - aT) / (bT - aT) : 0;
+    const s = Math.max(0, Math.min(1, localT));
+    const sm = s * s * (3 - 2 * s);
+
+    const actW = a.w + (b.w - a.w) * sm;
+    const actH = a.h + (b.h - a.h) * sm;
+    hw = actW / 2;
+    hh = actH / 2;
+  } else {
+    hw = (geom.fuselage_max_width || 0.14) / 2;
+    hh = (geom.fuselage_max_height || 0.14) / 2;
+  }
+
+  if (hh <= 0 || hw <= 0) return 0;
   if (wo >= hh) return hw * 0.15;
   return hw * Math.sqrt(1 - (wo / hh) * (wo / hh));
 }
@@ -269,10 +297,6 @@ function buildFuselageSections(geom, type, airfoilCoords) {
   }
 
   // Manual (özgün) fuselage
-  const length = geom.fuselage_length || 1.2;
-  const maxW = (geom.fuselage_max_width || 0.14) / 2;
-  const maxH = (geom.fuselage_max_height || 0.14) / 2;
-
   const raw = (geom.fuse_sections && geom.fuse_sections.length >= 2)
     ? geom.fuse_sections.map(s => ({ t: s.t, w: s.w, h: s.h }))
     : [
@@ -308,7 +332,7 @@ function buildFuselageSections(geom, type, airfoilCoords) {
   for (let i = 0; i <= nSecs; i++) {
     const t = i / nSecs, x = t * totalLen;
     const prof = interpolate(t);
-    const w = maxW * prof.w, h = maxH * prof.h;
+    const w = prof.w / 2, h = prof.h / 2;
     const sec = [];
     for (let j = 0; j < nCirc; j++) {
       const theta = (j / nCirc) * Math.PI * 2;
