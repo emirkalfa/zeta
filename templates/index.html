@@ -94,6 +94,7 @@
           <label>Gövde Tipi</label>
           <div class="radio-group">
             <label class="radio-label"><input type="radio" name="fuse_type" value="conventional" checked> Konvansiyonel</label>
+            <label class="radio-label"><input type="radio" name="fuse_type" value="manual"> Özgün (Manuel)</label>
           </div>
         </div>
         <div class="form-group full-width">
@@ -309,6 +310,18 @@
           <p>Yatay ve dikey kuyruk tek parça. Hızlı baskı için uygundur.</p>
           <button id="stlTail" class="stl-btn tail-btn">⬇ Kuyruk STL</button>
         </div>
+        <div class="stl-card">
+          <div class="stl-card-icon">🛢️</div>
+          <h4>Konvansiyonel Gövde STL</h4>
+          <p>Hesaplanan boyutlara göre oluşturulmuş konvansiyonel gövde.</p>
+          <button id="stlFuseConv" class="stl-btn fuse-btn">⬇ Konv. Gövde STL</button>
+        </div>
+        <div class="stl-card">
+          <div class="stl-card-icon">🛢️</div>
+          <h4>Özgün Gövde STL</h4>
+          <p>K1–K6 kesitlerine göre oluşturulmuş özgün gövde tasarımı.</p>
+          <button id="stlFuseManual" class="stl-btn fuse-btn">⬇ Özgün Gövde STL</button>
+        </div>
       </div>
 
       <!-- Dilimleme -->
@@ -334,6 +347,26 @@
             <input type="number" id="tailSliceCount" min="1" max="20" value="2" step="1">
           </div>
           <button id="stlTailSliced" class="stl-btn tail-btn sliced-btn">🔪 Kuyruk Dilimli STL</button>
+        </div>
+        <div class="stl-card">
+          <div class="stl-card-icon">🔪</div>
+          <h4>Konvansiyonel Gövde Dilimli</h4>
+          <p>Konvansiyonel gövdeyi eşit parçalara bölün.</p>
+          <div class="form-group">
+            <label for="fuseConvSliceCount">Parça Sayısı</label>
+            <input type="number" id="fuseConvSliceCount" min="1" max="20" value="3" step="1">
+          </div>
+          <button id="stlFuseConvSliced" class="stl-btn fuse-btn sliced-btn">🔪 Konv. Gövde Dilimli STL</button>
+        </div>
+        <div class="stl-card">
+          <div class="stl-card-icon">🔪</div>
+          <h4>Özgün Gövde Dilimli</h4>
+          <p>Özgün gövdeyi eşit parçalara bölün.</p>
+          <div class="form-group">
+            <label for="fuseManualSliceCount">Parça Sayısı</label>
+            <input type="number" id="fuseManualSliceCount" min="1" max="20" value="3" step="1">
+          </div>
+          <button id="stlFuseManualSliced" class="stl-btn fuse-btn sliced-btn">🔪 Özgün Gövde Dilimli STL</button>
         </div>
       </div>
       <p class="stl-info-code">💡 Dosya adları: <code>zeta_kanat_sag_1of3.stl</code> (1=kök, son=uç)</p>

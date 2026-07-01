@@ -913,6 +913,15 @@ header {
   color: white;
 }
 
+.stl-card .stl-btn.fuse-btn {
+  border-color: #64748b;
+  color: #64748b;
+}
+.stl-card .stl-btn.fuse-btn:hover {
+  background: #64748b;
+  color: white;
+}
+
 .stl-card .stl-btn.sliced-btn {
   border-style: dashed;
 }

@@ -54,7 +54,7 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tail
   const tailX = geom.tail_x_pos || geom.fuselage_length * 0.82;
 
   buildWing(geom, wingCoords, wingX);
-  buildFuselage(geom);
+  buildFuselage(geom, wingCoords);
   buildTail(geom, tailCoords, vtailCoords, tailType, tailX);
 
   scene.add(wingGroup);
@@ -201,22 +201,22 @@ function buildWing(geom, coords, wingX) {
 }
 
 // --- FUSELAGE ---
-function buildFuselage(geom) {
+function buildFuselage(geom, wingCoords) {
   if (geom.fuse_type === 'manual') {
-    buildManualFuselage(geom);
+    buildManualFuselage(geom, wingCoords);
   } else {
-    buildConventionalFuselage(geom);
+    buildConventionalFuselage(geom, wingCoords);
   }
 }
 
-function rebuildFuselage(geom) {
+function rebuildFuselage(geom, wingCoords) {
   while (fuseGroup.children.length > 0) {
     const child = fuseGroup.children[0];
     if (child.geometry) child.geometry.dispose();
     if (child.material) child.material.dispose();
     fuseGroup.remove(child);
   }
-  buildFuselage(geom);
+  buildFuselage(geom, wingCoords);
 }
 
 function tubeMesh(sections, color, edgeColor, opacity, capEnds) {
@@ -260,7 +260,7 @@ function tubeMesh(sections, color, edgeColor, opacity, capEnds) {
   return mesh;
 }
 
-function buildConventionalFuselage(geom) {
+function buildConventionalFuselage(geom, wingCoords) {
 
   const L = geom.fuselage_length;
   const maxW = geom.fuselage_max_width / 2;
@@ -398,7 +398,13 @@ function buildConventionalFuselage(geom) {
   }
 
   // ================================
-  // 5. RENDER
+  // 5. WING ROOT CUTOUT
+  // ================================
+
+  applyWingRootCutout(sections, nCirc, geom, wingCoords);
+
+  // ================================
+  // 6. RENDER
   // ================================
 
   tubeMesh(
@@ -411,7 +417,7 @@ function buildConventionalFuselage(geom) {
 
 }
 
-function buildManualFuselage(geom) {
+function buildManualFuselage(geom, wingCoords) {
   const length = geom.fuselage_length || 1.2;
   const maxW = (geom.fuselage_max_width || 0.14) / 2;
   const maxH = (geom.fuselage_max_height || 0.14) / 2;
@@ -470,7 +476,92 @@ function buildManualFuselage(geom) {
     sections.push(sec);
   }
 
+  applyWingRootCutout(sections, nCirc, geom, wingCoords);
+
   tubeMesh(sections, 0x94a3b8, 0x475569, 1.0, true);
+}
+
+function applyWingRootCutout(sections, nCirc, geom, airfoilCoords) {
+  if (!airfoilCoords || !airfoilCoords.length || !geom || !geom.wing_x_pos) return;
+
+  const wingX = geom.wing_x_pos;
+  const rootChord = geom.root_chord;
+  const wingOffset = geom.wing_position_offset || 0;
+  const halfWidth = geom.fuselage_max_width / 2;
+  const halfHeight = geom.fuselage_max_height / 2;
+  const blendDist = halfWidth * 0.6;
+  const xBuffer = rootChord * 0.15;
+  const xStart = wingX - xBuffer;
+  const xEnd = wingX + rootChord + xBuffer;
+  const xMidS = wingX;
+  const xMidE = wingX + rootChord;
+
+  const nHalf = Math.floor(airfoilCoords.length / 2);
+  const upperPts = airfoilCoords.slice(0, nHalf).map(c => ({x: c.x, y: c.y_upper})).sort((a,b)=>a.x-b.x);
+  const lowerPts = airfoilCoords.slice(nHalf).map(c => ({x: c.x, y: c.y_lower})).sort((a,b)=>a.x-b.x);
+
+  function interp(arr, lx) {
+    if (!arr.length) return 0;
+    if (lx <= arr[0].x) return arr[0].y;
+    if (lx >= arr[arr.length-1].x) return arr[arr.length-1].y;
+    for (let i = 0; i < arr.length-1; i++) {
+      if (lx >= arr[i].x && lx <= arr[i+1].x) {
+        const t = (lx - arr[i].x) / (arr[i+1].x - arr[i].x);
+        return arr[i].y + (arr[i+1].y - arr[i].y) * t;
+      }
+    }
+    return arr[arr.length-1].y;
+  }
+
+  function sstep(e0, e1, x) {
+    const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+    return t * t * (3 - 2 * t);
+  }
+
+  for (let i = 0; i < sections.length; i++) {
+    const sec = sections[i];
+    if (!sec || !sec.length) continue;
+    const x = sec[0].x;
+
+    let bx;
+    if (x <= xStart || x >= xEnd) bx = 0;
+    else if (x <= xMidS) bx = sstep(xStart, xMidS, x);
+    else if (x >= xMidE) bx = 1 - sstep(xMidE, xEnd, x);
+    else bx = 1;
+    if (bx < 1e-6) continue;
+
+    const lx = (x - wingX) / rootChord;
+    if (lx < -0.05 || lx > 1.05) continue;
+
+    const clx = Math.max(0, Math.min(1, lx));
+    const wUpper = interp(upperPts, clx) * rootChord + wingOffset;
+    const wLower = interp(lowerPts, clx) * rootChord + wingOffset;
+    const wingThick = Math.abs(wUpper - wLower);
+
+    for (let j = 0; j < nCirc; j++) {
+      const p = sec[j];
+      const z = p.z;
+      const y0 = p.y;
+
+      const tz = Math.abs(z) / blendDist;
+      const bz = tz >= 1 ? 0 : 1 - sstep(0, 1, tz);
+      if (bx * bz < 1e-6) continue;
+
+      const dyUpper = Math.abs(y0 - wUpper);
+      const dyLower = Math.abs(y0 - wLower);
+      const minDy = Math.min(dyUpper, dyLower);
+
+      const sigma = Math.max(wingThick * 0.6, halfHeight * 0.15);
+      const by = Math.exp(-(minDy / sigma) * (minDy / sigma));
+
+      const inf = bx * bz * by;
+      if (inf < 1e-6) continue;
+
+      const protrusion = Math.max(wingThick * 0.35, halfWidth * 0.04);
+      const sign = z >= 0 ? 1 : -1;
+      p.z = z + sign * protrusion * inf;
+    }
+  }
 }
 
 // Toggle fuselage visibility
@@ -1456,7 +1547,7 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   fuseViewerTailCoords = tailCoords || null;
   fuseViewerVtailCoords = vtailCoords || null;
   fuseViewerTailType = tailType || 'conventional';
-  buildFuseViewerFuselage(geom);
+  buildFuseViewerFuselage(geom, wingCoords);
 
   fuseViewerRunning = true;
   animateFuseViewer();
@@ -1473,7 +1564,7 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   fuseViewerRenderer._onResize = onFuseResize;
 }
 
-function buildFuseViewerFuselage(geom) {
+function buildFuseViewerFuselage(geom, wingCoords) {
   while (fuseViewerGroup.children.length > 0) {
     const child = fuseViewerGroup.children[0];
     if (child.geometry) child.geometry.dispose();
@@ -1530,6 +1621,8 @@ function buildFuseViewerFuselage(geom) {
     }
     sections.push(sec);
   }
+
+  applyWingRootCutout(sections, nCirc, geom, wingCoords);
 
   if (sections.length < 2) return;
   const nPts = sections[0].length;
@@ -1924,9 +2017,9 @@ function buildFuseViewerTail(geom, coords, vtailCoords, tailType, tailX) {
   }
 }
 
-function updateFuseViewer(geom) {
+function updateFuseViewer(geom, wingCoords) {
   if (!fuseViewerRunning || !fuseViewerGroup) return;
-  buildFuseViewerFuselage(geom);
+  buildFuseViewerFuselage(geom, wingCoords);
   if (geom) {
     const len = geom.fuselage_length || 1.2;
     fuseViewerControls.target.set(len * 0.5, 0, 0);

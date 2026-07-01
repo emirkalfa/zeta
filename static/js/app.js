@@ -96,7 +96,7 @@ function updateFuseFromSliders() {
     state.geometry.fuselage_max_height = maxW;
     state.geometry.fuse_type = 'manual';
     state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
-    updateFuseViewer(state.geometry);
+    updateFuseViewer(state.geometry, state.airfoilCoords);
   }
 }
 
@@ -225,6 +225,10 @@ function setupEventListeners() {
   $('viewReset').addEventListener('click', () => viewerReset());
   $('stlWing').addEventListener('click', () => exportSTL('wing'));
   $('stlTail').addEventListener('click', () => exportSTL('tail'));
+  $('stlFuseConv').addEventListener('click', () => exportFuselageSTL('conventional'));
+  $('stlFuseManual').addEventListener('click', () => exportFuselageSTL('manual'));
+  $('stlFuseConvSliced').addEventListener('click', () => exportSlicedFuselage('conventional'));
+  $('stlFuseManualSliced').addEventListener('click', () => exportSlicedFuselage('manual'));
   $('stlWingSliced').addEventListener('click', exportSlicedWing);
   $('stlTailSliced').addEventListener('click', exportSlicedTail);
 
@@ -276,7 +280,7 @@ async function calculateAll() {
   const wing_position = document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid';
   const wing_shape = document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered';
   const tail_type = document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional';
-  const fuse_type = 'conventional';
+  const fuse_type = document.querySelector('input[name="fuse_type"]:checked')?.value || 'conventional';
   const cg_percent = parseInt($('cgSlider').value) || 25;
   const max_alpha = parseInt($('maxAlpha').value) || 20;
 
@@ -345,17 +349,28 @@ async function calculateAll() {
     enableTab('flight');
     enableTab('stl');
 
+    readFuseSections();
+    if (fuse_type === 'manual') {
+      state.geometry.fuse_type = 'manual';
+      state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+      const flen = state.fuseSections[5].t;
+      const fmaxW = Math.max(...state.fuseSections.map(s => s.w));
+      state.geometry.fuselage_length = flen;
+      state.geometry.fuselage_max_width = fmaxW;
+      state.geometry.fuselage_max_height = fmaxW;
+    } else {
+      state.geometry.fuse_type = 'conventional';
+    }
     switchTab('viewer');
     initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, tail_type);
-    // Set up manual fuse geometry for Gövde viewer (main viewer stays conventional)
-    readFuseSections();
+    // Set up manual fuse geometry for Gövde viewer tab (always uses keyframe preview)
     state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
     state.geometry.fuse_type = 'manual';
-    const flen = state.fuseSections[5].t;
-    const fmaxW = Math.max(...state.fuseSections.map(s => s.w));
-    state.geometry.fuselage_length = flen;
-    state.geometry.fuselage_max_width = fmaxW;
-    state.geometry.fuselage_max_height = fmaxW;
+    const fuseLen = state.fuseSections[5].t;
+    const fuseMaxW = Math.max(...state.fuseSections.map(s => s.w));
+    state.geometry.fuselage_length = fuseLen;
+    state.geometry.fuselage_max_width = fuseMaxW;
+    state.geometry.fuselage_max_height = fuseMaxW;
     initFuseViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, tail_type);
     hideLoading(btn);
 

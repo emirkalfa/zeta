@@ -201,6 +201,201 @@ function exportSTL(part) {
   }
 }
 
+function buildFuselageSections(geom, type, airfoilCoords) {
+  if (type === 'conventional') {
+    const L = geom.fuselage_length || 1.2;
+    const maxW = (geom.fuselage_max_width || 0.14) / 2;
+    const maxH = (geom.fuselage_max_height || 0.14) / 2;
+    const nSecs = 64;
+    const nCirc = 40;
+
+    function smoothstep(a, b, x) {
+      const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    }
+    function widthProfile(x) {
+      const t = x / L;
+      const bR = 1.0, tR = 0.35;
+      if (t < 0.30) { const u = t / 0.30; return bR * Math.sqrt(u); }
+      else if (t < 0.75) return bR;
+      else { const u = (t - 0.75) / 0.25; return bR - (bR - tR) * Math.sin(u * Math.PI / 2); }
+    }
+    function heightProfile(x) {
+      const t = x / L;
+      const bR = 1.0, tR = 0.30;
+      if (t < 0.32) { const u = t / 0.32; return bR * Math.sqrt(u); }
+      else if (t < 0.72) return bR;
+      else { const u = (t - 0.72) / 0.28; return bR - (bR - tR) * Math.sin(u * Math.PI / 2); }
+    }
+    function upperShape(x) { const t = x / L; return 0.82 - 0.08 * Math.exp(-Math.pow((t - 0.55) / 0.20, 2)); }
+    function lowerShape(x) { const t = x / L; return 1.12 + 0.10 * Math.exp(-Math.pow((t - 0.50) / 0.25, 2)); }
+    function ventralPod(x) {
+      const t = x / L, center = 0.45, width = 0.20, peak = 0.25;
+      return peak * Math.exp(-Math.pow((t - center) / width, 2) * 4);
+    }
+    function superellipse(theta, n) {
+      const ct = Math.cos(theta), st = Math.sin(theta), ex = 2 / n;
+      return { x: Math.sign(ct) * Math.pow(Math.abs(ct), ex), y: Math.sign(st) * Math.pow(Math.abs(st), ex) };
+    }
+
+    const sections = [];
+    for (let i = 0; i <= nSecs; i++) {
+      const t = i / nSecs, x = t * L;
+      const w = maxW * widthProfile(x), h = maxH * heightProfile(x);
+      const up = upperShape(x), low = lowerShape(x), vent = ventralPod(x);
+      const sec = [];
+      for (let j = 0; j < nCirc; j++) {
+        const theta = (j / nCirc) * Math.PI * 2;
+        const sp = superellipse(theta, 2.4 + 0.8 * Math.sin(t * Math.PI));
+        let y = sp.y * h;
+        let z = sp.x * w;
+        if (y > 0) y *= up;
+        else y = y * low - h * vent * (1 - Math.pow(Math.abs(sp.x), 0.6));
+        sec.push({ x, y, z });
+      }
+      sections.push(sec);
+    }
+    if (airfoilCoords) applyWingRootCutout(sections, nCirc, geom, airfoilCoords);
+    return { sections, nCirc };
+  }
+
+  // Manual (özgün) fuselage
+  const length = geom.fuselage_length || 1.2;
+  const maxW = (geom.fuselage_max_width || 0.14) / 2;
+  const maxH = (geom.fuselage_max_height || 0.14) / 2;
+
+  const raw = (geom.fuse_sections && geom.fuse_sections.length >= 2)
+    ? geom.fuse_sections.map(s => ({ t: s.t, w: s.w, h: s.h }))
+    : [
+        { t: 0.00, w: 0.143, h: 0.111 },
+        { t: 0.15, w: 0.571, h: 0.667 },
+        { t: 0.45, w: 1.000, h: 1.000 },
+        { t: 0.90, w: 0.429, h: 0.444 },
+        { t: 1.10, w: 0.100, h: 0.100 },
+        { t: 1.20, w: 0.057, h: 0.044 },
+      ];
+
+  const totalLen = Math.max(raw[raw.length - 1].t, 0.01);
+  const keyframes = raw.map(s => ({ t: s.t / totalLen, w: s.w, h: s.h }));
+  keyframes.sort((a, b) => a.t - b.t);
+
+  function interpolate(t) {
+    if (t <= keyframes[0].t) return { w: keyframes[0].w, h: keyframes[0].h };
+    if (t >= keyframes[keyframes.length - 1].t) return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
+    for (let i = 0; i < keyframes.length - 1; i++) {
+      const a = keyframes[i], b = keyframes[i + 1];
+      if (t >= a.t && t <= b.t) {
+        const localT = (t - a.t) / (b.t - a.t);
+        const smoothT = localT * localT * (3 - 2 * localT);
+        return { w: a.w + (b.w - a.w) * smoothT, h: a.h + (b.h - a.h) * smoothT };
+      }
+    }
+    return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
+  }
+
+  const nSecs = 48;
+  const nCirc = 32;
+  const sections = [];
+  for (let i = 0; i <= nSecs; i++) {
+    const t = i / nSecs, x = t * totalLen;
+    const prof = interpolate(t);
+    const w = maxW * prof.w, h = maxH * prof.h;
+    const sec = [];
+    for (let j = 0; j < nCirc; j++) {
+      const theta = (j / nCirc) * Math.PI * 2;
+      sec.push({ x, y: h * Math.sin(theta), z: w * Math.cos(theta) });
+    }
+    sections.push(sec);
+  }
+  if (airfoilCoords) applyWingRootCutout(sections, nCirc, geom, airfoilCoords);
+  return { sections, nCirc };
+}
+
+function meshFromSections(sections, nCirc) {
+  const verts = [];
+  const idxs = [];
+
+  for (const sec of sections) {
+    for (const p of sec) verts.push(p.x, p.y, p.z);
+  }
+
+  for (let i = 0; i < sections.length - 1; i++) {
+    for (let j = 0; j < nCirc; j++) {
+      const jn = (j + 1) % nCirc;
+      const a = i * nCirc + j;
+      const b = i * nCirc + jn;
+      const c = (i + 1) * nCirc + j;
+      const d = (i + 1) * nCirc + jn;
+      idxs.push(a, c, b);
+      idxs.push(b, c, d);
+    }
+  }
+
+  for (const secIdx of [0, sections.length - 1]) {
+    const start = secIdx * nCirc;
+    const cx = new THREE.Vector3(0, 0, 0);
+    for (let j = 0; j < nCirc; j++) {
+      cx.x += verts[(start + j) * 3];
+      cx.y += verts[(start + j) * 3 + 1];
+      cx.z += verts[(start + j) * 3 + 2];
+    }
+    cx.divideScalar(nCirc);
+    const ci = verts.length / 3;
+    verts.push(cx.x, cx.y, cx.z);
+    for (let j = 0; j < nCirc; j++) {
+      const jn = (j + 1) % nCirc;
+      idxs.push(start + j, start + jn, ci);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idxs);
+  geo.computeVertexNormals();
+
+  return new THREE.Mesh(geo, new THREE.MeshPhongMaterial());
+}
+
+function exportFuselageSTL(type) {
+  if (!checkGeom()) return;
+  const geom = state.geometry;
+
+  if (type !== 'conventional' && type !== 'manual') return;
+
+  const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
+  if (!sections.length) {
+    alert('Gövde modeli oluşturulamadı.');
+    return;
+  }
+
+  const mesh = meshFromSections(sections, nCirc);
+  const fileName = type === 'conventional' ? 'zeta_fuselage_conventional.stl' : 'zeta_fuselage_manual.stl';
+  exportMeshAsSTL(mesh, fileName);
+}
+
+function exportSlicedFuselage(type) {
+  if (!checkGeom()) return;
+  const n = getNumSegments(type === 'conventional' ? 'fuseConvSliceCount' : 'fuseManualSliceCount');
+  if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+
+  const geom = state.geometry;
+  const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
+  if (!sections.length) { alert('Gövde modeli oluşturulamadı.'); return; }
+
+  const totalSecs = sections.length;
+  const segSize = totalSecs / n;
+  const ext = type === 'conventional' ? 'conv' : 'manual';
+
+  for (let seg = 0; seg < n; seg++) {
+    const iStart = Math.round(seg * segSize);
+    const iEnd = Math.round((seg + 1) * segSize);
+    const segSections = sections.slice(iStart, iEnd + 1);
+    if (segSections.length < 2) continue;
+    const mesh = meshFromSections(segSections, nCirc);
+    exportMeshAsSTL(mesh, `zeta_fuselage_${ext}_${seg+1}of${n}.stl`);
+  }
+}
+
 function exportSlicedWing() {
   if (!checkGeom()) return;
   const n = getNumSegments('sliceCount');
