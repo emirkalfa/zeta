@@ -521,8 +521,28 @@ function applyWingRootCutout(sections, nCirc, geom, airfoilCoords) {
   const wingX = geom.wing_x_pos;
   const rootChord = geom.root_chord;
   const wingOffset = geom.wing_position_offset || 0;
-  const halfWidth = geom.fuselage_max_width / 2;
-  const halfHeight = geom.fuselage_max_height / 2;
+
+  let halfWidth, halfHeight;
+  if (geom.fuse_type === 'manual' && geom.fuse_sections && geom.fuse_sections.length >= 2) {
+    const secs = geom.fuse_sections;
+    const totalLen = Math.max(secs[secs.length - 1].t, 0.01);
+    const t = Math.max(0, Math.min(1, wingX / totalLen));
+    let i = 0;
+    for (i = 0; i < secs.length - 1; i++) {
+      if (t >= secs[i].t / totalLen && t <= secs[i + 1].t / totalLen) break;
+    }
+    i = Math.min(i, secs.length - 2);
+    const a = secs[i], b = secs[i + 1];
+    const aT = a.t / totalLen, bT = b.t / totalLen;
+    const localT = bT !== aT ? (t - aT) / (bT - aT) : 0;
+    const s = Math.max(0, Math.min(1, localT));
+    const sm = s * s * (3 - 2 * s);
+    halfWidth = (a.w + (b.w - a.w) * sm) / 2;
+    halfHeight = (a.h + (b.h - a.h) * sm) / 2;
+  } else {
+    halfWidth = geom.fuselage_max_width / 2;
+    halfHeight = geom.fuselage_max_height / 2;
+  }
   const blendDist = halfWidth * 0.6;
   const xBuffer = rootChord * 0.15;
   const xStart = wingX - xBuffer;
