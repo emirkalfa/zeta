@@ -1,5 +1,13 @@
 const STL_SCALE = 1000;
 
+function getWingRootZ(geom) {
+  const hw = geom.fuselage_max_width / 2;
+  const hh = geom.fuselage_max_height / 2;
+  const wo = Math.abs(geom.wing_position_offset || 0);
+  if (wo >= hh) return hw * 0.15;
+  return hw * Math.sqrt(1 - (wo / hh) * (wo / hh));
+}
+
 function getNumSegments(id) {
   return parseInt(document.getElementById(id).value) || 1;
 }
@@ -143,8 +151,9 @@ function exportSTL(part) {
       case 'wing': {
         const coords = state.airfoilCoords;
         const halfSpan = geom.wingspan / 2;
-        meshes.push(buildWingSegment(geom, coords, 0, halfSpan, 1, false, false, wallM, true));
-        meshes.push(buildWingSegment(geom, coords, 0, halfSpan, -1, false, false, wallM, true));
+        const wingRootZ = getWingRootZ(geom);
+        meshes.push(buildWingSegment(geom, coords, wingRootZ, halfSpan, 1, false, false, wallM, true, true));
+        meshes.push(buildWingSegment(geom, coords, wingRootZ, halfSpan, -1, false, false, wallM, true, true));
         break;
       }
       case 'tail': {
@@ -404,7 +413,9 @@ function exportSlicedWing() {
   const geom = state.geometry;
   const coords = state.airfoilCoords;
   const halfSpan = geom.wingspan / 2;
-  const segLen = halfSpan / n;
+  const wingRootZ = getWingRootZ(geom);
+  const wingSpan = halfSpan - wingRootZ;
+  const segLen = wingSpan / n;
   const wallM = (state.wallThickness || 0) / 1000;
 
   for (let side = 0; side < 2; side++) {
@@ -412,11 +423,12 @@ function exportSlicedWing() {
     const sideName = side === 0 ? 'right' : 'left';
 
     for (let seg = 0; seg < n; seg++) {
-      const yStart = seg * segLen;
-      const yEnd = (seg + 1) * segLen;
+      const yStart = wingRootZ + seg * segLen;
+      const yEnd = wingRootZ + (seg + 1) * segLen;
       const capTip = seg === n - 1;
+      const capRoot = seg === 0;
 
-      const mesh = buildWingSegment(geom, coords, yStart, yEnd, sign, false, false, wallM, capTip);
+      const mesh = buildWingSegment(geom, coords, yStart, yEnd, sign, false, false, wallM, capTip, capRoot);
       exportMeshAsSTL(mesh, `z_wing_${sideName}_${seg+1}of${n}.stl`);
     }
   }

@@ -97,8 +97,17 @@ function makeTextSprite(text, color) {
 }
 
 // --- WING ---
+function getWingRootZ(geom) {
+  const hw = geom.fuselage_max_width / 2;
+  const hh = geom.fuselage_max_height / 2;
+  const wo = Math.abs(geom.wing_position_offset || 0);
+  if (wo >= hh) return hw * 0.15;
+  return hw * Math.sqrt(1 - (wo / hh) * (wo / hh));
+}
+
 function buildWing(geom, coords, wingX) {
   const halfSpan = geom.wingspan / 2;
+  const wingRootZ = getWingRootZ(geom);
   const rootChord = geom.root_chord;
   const taper = geom.taper_ratio != null ? geom.taper_ratio : 0.5;
   const sweep = THREE.MathUtils.degToRad(geom.sweep_angle != null ? geom.sweep_angle : 5);
@@ -110,6 +119,7 @@ function buildWing(geom, coords, wingX) {
   const uIdx = Array.from({length: nHalf}, (_, i) => i);
   const lIdx = Array.from({length: nHalf}, (_, i) => coords.length - 1 - i);
   const nPts = coords.length;
+  const spanLen = halfSpan - wingRootZ;
 
   const cs = geom.control_surfaces || {};
   const flapES = cs.flap?.eta_start ?? 0.08;
@@ -121,8 +131,8 @@ function buildWing(geom, coords, wingX) {
     const secs = [];
     for (let i = 0; i <= nSec; i++) {
       const eta = i / nSec;
-      const yPos = eta * halfSpan;
-      const chord = rootChord * (1 - eta * (1 - taper));
+      const yPos = wingRootZ + eta * spanLen;
+      const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
       const xOff = geom.straight_te ? (rootChord - chord + wingX) : (yPos * Math.tan(sweep) + wingX);
       const yOff = yPos * Math.sin(dihedral);
       const pts = [];
@@ -132,7 +142,7 @@ function buildWing(geom, coords, wingX) {
       for (const idx of lIdx) {
         pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_lower * chord + wingPos + yOff, sign * yPos));
       }
-      secs.push({pts, eta});
+      secs.push({pts, eta: yPos / halfSpan});
     }
     return secs;
   };
@@ -1075,7 +1085,7 @@ function addDimple(verts, idxs, baseCenter, axis, radius, depth, nRadial) {
 }
 
 // Build a single wing segment as a closed manifold mesh
-function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, wallM, capTip) {
+function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, wallM, capTip, capRoot) {
   const halfSpan = geom.wingspan / 2;
   const rootChord = geom.root_chord;
   const taper = geom.taper_ratio != null ? geom.taper_ratio : 0.5;
@@ -1151,6 +1161,44 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
       }
       frontCenter.divideScalar(nPts);
       makeCapFan(verts, idxs, tipInfo.innerTipStart, nPts, frontCenter, spanDir);
+    }
+    if (capRoot) {
+      const outwardDir = spanDir.clone().negate();
+      const captDepth = wallMeters;
+      const rootOuterStart = 0;
+      const rootInnerStart = nPts * (nSec + 1);
+
+      const rootOuterCapStart = verts.length / 3;
+      for (let j = 0; j < nPts; j++) {
+        const idx = rootOuterStart + j;
+        verts.push(
+          verts[idx * 3] + outwardDir.x * captDepth,
+          verts[idx * 3 + 1] + outwardDir.y * captDepth,
+          verts[idx * 3 + 2] + outwardDir.z * captDepth
+        );
+      }
+
+      buildAnnulus(verts, idxs, rootOuterStart, rootOuterCapStart, nPts, true);
+
+      const outerRootC = new THREE.Vector3(0, 0, 0);
+      for (let j = 0; j < nPts; j++) {
+        const idx = (rootOuterCapStart + j) * 3;
+        outerRootC.x += verts[idx];
+        outerRootC.y += verts[idx + 1];
+        outerRootC.z += verts[idx + 2];
+      }
+      outerRootC.divideScalar(nPts);
+      makeCapFan(verts, idxs, rootOuterCapStart, nPts, outerRootC, outwardDir);
+
+      const innerRootC = new THREE.Vector3(0, 0, 0);
+      for (let j = 0; j < nPts; j++) {
+        const idx = (rootInnerStart + j) * 3;
+        innerRootC.x += verts[idx];
+        innerRootC.y += verts[idx + 1];
+        innerRootC.z += verts[idx + 2];
+      }
+      innerRootC.divideScalar(nPts);
+      makeCapFan(verts, idxs, rootInnerStart, nPts, innerRootC, spanDir);
     }
   } else {
     for (const sec of secs) {
@@ -1676,6 +1724,7 @@ function buildFuseViewerFuselage(geom, wingCoords) {
 
 function buildFuseViewerWing(geom, coords, wingX) {
   const halfSpan = geom.wingspan / 2;
+  const wingRootZ = getWingRootZ(geom);
   const rootChord = geom.root_chord;
   const taper = geom.taper_ratio != null ? geom.taper_ratio : 0.5;
   const sweep = THREE.MathUtils.degToRad(geom.sweep_angle != null ? geom.sweep_angle : 5);
@@ -1687,13 +1736,14 @@ function buildFuseViewerWing(geom, coords, wingX) {
   const uIdx = Array.from({length: nHalf}, (_, i) => i);
   const lIdx = Array.from({length: nHalf}, (_, i) => coords.length - 1 - i);
   const nPts = coords.length;
+  const spanLen = halfSpan - wingRootZ;
 
   const genSecs = (sign) => {
     const secs = [];
     for (let i = 0; i <= nSec; i++) {
       const eta = i / nSec;
-      const yPos = eta * halfSpan;
-      const chord = rootChord * (1 - eta * (1 - taper));
+      const yPos = wingRootZ + eta * spanLen;
+      const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
       const xOff = geom.straight_te ? (rootChord - chord + wingX) : (yPos * Math.tan(sweep) + wingX);
       const yOff = yPos * Math.sin(dihedral);
       const pts = [];
@@ -1703,7 +1753,7 @@ function buildFuseViewerWing(geom, coords, wingX) {
       for (const idx of lIdx) {
         pts.push(new THREE.Vector3(coords[idx].x * chord + xOff, coords[idx].y_lower * chord + wingPos + yOff, sign * yPos));
       }
-      secs.push({pts, eta});
+      secs.push({pts, eta: yPos / halfSpan});
     }
     return secs;
   };
