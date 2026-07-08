@@ -376,6 +376,21 @@ function meshFromSections(sections, nCirc) {
   return new THREE.Mesh(geo, new THREE.MeshPhongMaterial());
 }
 
+function buildFuselageMesh(sections, nCirc, wallM) {
+  if (wallM > 0) {
+    const innerSections = sections.map(s => offsetFuselageSection(s, wallM, nCirc));
+    const verts = [];
+    const idxs = [];
+    buildThickFuselage(verts, idxs, sections, innerSections, nCirc);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setIndex(idxs);
+    geo.computeVertexNormals();
+    return new THREE.Mesh(geo, new THREE.MeshPhongMaterial());
+  }
+  return meshFromSections(sections, nCirc);
+}
+
 async function exportFuselageSTL(type) {
   if (!checkGeom()) return;
   if (type !== 'conventional' && type !== 'manual') return;
@@ -384,6 +399,7 @@ async function exportFuselageSTL(type) {
   const confirmed = await showDownloadConfirm([fileName]);
   if (!confirmed) return;
 
+  const wallM = (state.wallThickness || 0) / 1000;
   const geom = state.geometry;
   const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
   if (!sections.length) {
@@ -391,7 +407,7 @@ async function exportFuselageSTL(type) {
     return;
   }
 
-  const mesh = meshFromSections(sections, nCirc);
+  const mesh = buildFuselageMesh(sections, nCirc, wallM);
   exportMeshAsSTL(mesh, fileName);
 }
 
@@ -405,6 +421,7 @@ async function exportSlicedFuselage(type) {
   const confirmed = await showDownloadConfirm(filenames);
   if (!confirmed) return;
 
+  const wallM = (state.wallThickness || 0) / 1000;
   const geom = state.geometry;
   const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
   if (!sections.length) { alert('Gövde modeli oluşturulamadı.'); return; }
@@ -417,7 +434,7 @@ async function exportSlicedFuselage(type) {
     const iEnd = Math.round((seg + 1) * segSize);
     const segSections = sections.slice(iStart, iEnd + 1);
     if (segSections.length < 2) continue;
-    const mesh = meshFromSections(segSections, nCirc);
+    const mesh = buildFuselageMesh(segSections, nCirc, wallM);
     exportMeshAsSTL(mesh, `zeta_fuselage_${ext}_${seg+1}of${n}.stl`);
   }
 }

@@ -948,6 +948,26 @@ function buildThickWingSeg(verts, idxs, secs, innerSecs, nPts) {
   return { innerTipStart };
 }
 
+function offsetFuselageSection(section, wallM, nCirc) {
+  const inner = new Array(nCirc);
+  for (let i = 0; i < nCirc; i++) {
+    const p = section[i];
+    const theta = (i / nCirc) * Math.PI * 2;
+    const off = Math.min(wallM, Math.min(Math.abs(p.y), Math.abs(p.z)) * 0.99);
+    inner[i] = { x: p.x, y: p.y - off * Math.sin(theta), z: p.z - off * Math.cos(theta) };
+  }
+  return inner;
+}
+
+function buildThickFuselage(verts, idxs, sections, innerSections, nCirc) {
+  buildTubeSkin(verts, idxs, sections, nCirc, false);
+  const innerStart = buildTubeSkin(verts, idxs, innerSections, nCirc, true);
+  buildAnnulus(verts, idxs, 0, innerStart, nCirc, false);
+  const outerTip = (sections.length - 1) * nCirc;
+  const innerTip = innerStart + (innerSections.length - 1) * nCirc;
+  buildAnnulus(verts, idxs, outerTip, innerTip, nCirc, true);
+}
+
 // ========== SLICED SEGMENT GENERATORS ==========
 
 function makeCapFan(verts, idxs, perimeterStart, nPts, center, outwardDir) {
