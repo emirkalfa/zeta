@@ -53,6 +53,12 @@ async function fetchAPI(url, body = null) {
 
 function $(id) { return document.getElementById(id); }
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 function showLoading(btn) {
   btn.disabled = true;
   btn.innerHTML = '<span class="loading"></span> Hesaplanıyor...';
@@ -141,7 +147,7 @@ async function init() {
 async function loadAirfoils() {
   const data = await fetchAPI('/api/airfoils');
   const opts = data.map(a =>
-    `<option value="${a.code}">${a.name} (t=${(a.max_thickness * 100).toFixed(0)}%)</option>`
+    `<option value="${escapeHtml(a.code)}">${escapeHtml(a.name)} (t=${(a.max_thickness * 100).toFixed(0)}%)</option>`
   ).join('');
   $('airfoil').innerHTML = opts;
   $('htailAirfoil').innerHTML = opts;
@@ -487,9 +493,9 @@ function displayFlightTest(stab) {
       `<div class="flight-item ${item.cls}">
         <div class="flight-item-header">
           <span class="flight-icon">${item.icon}</span>
-          <span class="flight-value">${item.value}</span>
+          <span class="flight-value">${escapeHtml(String(item.value))}</span>
         </div>
-        <div class="flight-label">${item.label}</div>
+        <div class="flight-label">${escapeHtml(item.label)}</div>
         <div class="progress-track">
           <div class="progress-fill" style="width: ${item.pct}%"></div>
         </div>
@@ -499,7 +505,7 @@ function displayFlightTest(stab) {
       <h3>Değerlendirme</h3>
       <ul>${assessments.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>
     </div>
-    <div class="flight-verdict ${stab.overall_passed ? 'pass' : 'fail'}">${escapeHtml(verdict)}</div>`;
+    <div class="flight-verdict ${stab.overall_passed ? 'pass' : 'fail'}">${verdict}</div>`;
 }
 
 window.addEventListener('DOMContentLoaded', init);
