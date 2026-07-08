@@ -968,6 +968,31 @@ function buildThickFuselage(verts, idxs, sections, innerSections, nCirc) {
   buildAnnulus(verts, idxs, outerTip, innerTip, nCirc, true);
 }
 
+function fitFuseViewerToModel() {
+  if (!fuseViewerRunning || !fuseViewerGroup || !fuseViewerRenderer || !fuseViewerCamera || !fuseViewerControls) return;
+  const c = document.getElementById('fuse-three-container');
+  if (!c) return;
+  const w = c.clientWidth || 600;
+  const h = c.clientHeight || 400;
+  fuseViewerCamera.aspect = w / h;
+  fuseViewerCamera.updateProjectionMatrix();
+  fuseViewerRenderer.setSize(w, h);
+
+  const box = new THREE.Box3().setFromObject(fuseViewerGroup);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const dist = maxDim * 1.6;
+
+  fuseViewerCamera.position.set(
+    center.x + dist * 0.5,
+    center.y + dist * 0.25,
+    center.z + dist
+  );
+  fuseViewerControls.target.copy(center);
+  fuseViewerControls.update();
+}
+
 // ========== SLICED SEGMENT GENERATORS ==========
 
 function makeCapFan(verts, idxs, perimeterStart, nPts, center, outwardDir) {
@@ -1533,8 +1558,7 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   fuseViewerScene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#f5f7fa');
 
   fuseViewerCamera = new THREE.PerspectiveCamera(40, w / h, 0.01, 100);
-  fuseViewerCamera.position.set(2, 0.8, 2.5);
-  fuseViewerCamera.lookAt(0.6, 0, 0);
+  fuseViewerCamera.position.set(1.5, 0.6, 1.8);
 
   fuseViewerRenderer = new THREE.WebGLRenderer({ antialias: true });
   fuseViewerRenderer.setSize(w, h);
@@ -1557,7 +1581,6 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   fuseViewerScene.add(dir2);
 
   const gridHelper = new THREE.GridHelper(2, 10, 0x888888, 0x444444);
-  gridHelper.position.set(0.6, -0.3, 0);
   fuseViewerScene.add(gridHelper);
 
   fuseViewerGroup = new THREE.Group();
@@ -1568,6 +1591,7 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   fuseViewerVtailCoords = vtailCoords || null;
   fuseViewerTailType = tailType || 'conventional';
   buildFuseViewerFuselage(geom, wingCoords);
+  fitFuseViewerToModel();
 
   fuseViewerRunning = true;
   animateFuseViewer();
@@ -2040,11 +2064,7 @@ function buildFuseViewerTail(geom, coords, vtailCoords, tailType, tailX) {
 function updateFuseViewer(geom, wingCoords) {
   if (!fuseViewerRunning || !fuseViewerGroup) return;
   buildFuseViewerFuselage(geom, wingCoords);
-  if (geom) {
-    const len = geom.fuselage_length || 1.2;
-    fuseViewerControls.target.set(len * 0.5, 0, 0);
-    fuseViewerControls.update();
-  }
+  fitFuseViewerToModel();
 }
 
 function animateFuseViewer() {

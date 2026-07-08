@@ -88,6 +88,9 @@ function setupSidebar() {
       const tab = link.dataset.tab;
       if (link.classList.contains('disabled')) return;
       switchTab(tab);
+      if (tab === 'fuse' && typeof fitFuseViewerToModel === 'function') {
+        fitFuseViewerToModel();
+      }
     });
   });
 }
