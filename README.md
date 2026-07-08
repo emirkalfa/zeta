@@ -28,7 +28,7 @@ Kanat, govde ve kuyruga ait ~45 geometrik olcuyu hesaplar:
 
 ### Govde Tasarimi
 - **Konvansiyonel govde**: Otomatik hesaplanan superellips kesitli, usti yassilastirilmis (wing saddle), alti ventral pod cikintili model
-- **Manuel (Ozg�n) govde**: 6 adet kesit (K1-K6) ile kullanici tanimli govde. Her kesit icin pozisyon (m), genislik ve yukseklik slider ile veya sayisal girisle ayarlanabilir
+- **Manuel (Ozgün) govde**: 6 adet kesit (K1-K6) ile kullanici tanimli govde. Her kesit icin pozisyon (m), genislik ve yukseklik slider ile veya sayisal girisle ayarlanabilir
 - Kesitler arasi smooth Hermite interpolasyonu
 - Govde 3D goruntuleyicide kanat ve kuyrukla birlikte on izleme
 
