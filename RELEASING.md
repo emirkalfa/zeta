@@ -20,21 +20,9 @@ sabitine yükler ve `/api/version` endpoint'inde döner.
 - `feat/*`, `fix/*` — geliştirme branch'leri. PR yoluyla `main`'e birleşir.
 - `v*` tag'leri — release işaretçileri.
 
-CI (`ci.yml`) `main`/`develop` push'larında + tüm PR'larda test çalıştırır.
-Release workflow (`release.yml`) sadece `v*` tag push'unda tetiklenir.
-
-## PR Label Sözleşmesi (Release Drafter)
-
-PR birleştirilirken şu label'lardan biri eklenmeli (yoksa yanlış kategori):
-
-| Label | Kategori |
-|-------|----------|
-| `breaking`, `major` | Breaking Changes + major bump |
-| `feat`, `feature`, `enhancement` | Yenilikler + minor bump |
-| `fix`, `bug` | Hata Düzeltmeleri + patch bump |
-| `docs` | Dokümantasyon + patch bump |
-| `refactor`, `test`, `chore` | Refactor & Test + patch bump |
-| `skip-changelog` | Değişiklik günlüğüne girmez |
+CI (`ci.yml`) `main` push'larında + tüm PR'larda test çalıştırır.
+Release workflow (`release.yml`) sadece `v*` tag push'unda tetiklenir,
+otomatik olarak GitHub Release oluşturur.
 
 ## Release Yayınlama Adımları
 
@@ -93,15 +81,13 @@ git push origin main
 git push origin v0.3.0
 ```
 
-### 5. CI + Release Workflow
+### 5. Release Workflow
 
-`ci.yml` tag push'unda da çalışır. Tüm testler geçince `release.yml`
-otomatik olarak:
+`v*` tag push'unda `release.yml` otomatik olarak:
 
-1. `VERSION` dosyasının tag ile eşleştiğini doğrular (uyuşmazsa ❌)
-2. Source tarball + sdist + wheel build eder
-3. `CHANGELOG.md` ilgili bölümünü release body olarak kullanır
-4. GitHub Release oluşturur ve artifact'leri ekler
+1. Testleri çalıştırır
+2. sdist + wheel build eder
+3. GitHub Release oluşturur ve artifact'leri ekler
 
 ### 6. Doğrulama
 
@@ -153,7 +139,7 @@ git push origin main --tags
 ```
 
 **Workflow izinleri:** GitHub repo Settings → Actions → Workflow permissions
-→ "Read and write permissions" açık olmalı (Release Drafter + GH Release için).
+→ "Read and write permissions" açık olmalı (GH Release için).
 
 **CHANGELOG excerpt boş:** `CHANGELOG.md`'de `[0.3.0]` başlığı tam olarak
 `## [0.3.0] - YYYY-AA-GG` formatında olmalı.

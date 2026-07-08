@@ -732,6 +732,7 @@ function mergeMeshes(meshes) {
 function downloadBlob(data, filename) {
   const blob = new Blob([data], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
+  if (!url || !url.startsWith('blob:')) return;
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;

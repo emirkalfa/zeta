@@ -89,9 +89,10 @@ function createTable(containerId, headers, data) {
   if (!container) return;
 
   const sample = data.filter((_, i) => i % Math.max(1, Math.floor(data.length / 10)) === 0).slice(0, 10);
+  const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
 
   let html = '<table><thead><tr>';
-  for (const h of headers) html += `<th>${h}</th>`;
+  for (const h of headers) html += `<th>${esc(h)}</th>`;
   html += '</tr></thead><tbody>';
 
   for (const row of sample) {

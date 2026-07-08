@@ -147,7 +147,7 @@ async function loadAirfoils() {
   $('htailAirfoil').innerHTML = opts;
   $('htailAirfoil').value = '0012';
   $('vtailAirfoil').innerHTML = opts;
-  $('vtailAirfoil').value = '0010';
+  $('vtailAirfoil').value = '0012';
 }
 
 function setupDarkMode() {
@@ -406,7 +406,6 @@ async function calculateAll() {
     switchTab('results');
 
   } catch (err) {
-    console.error(err);
     alert('Hesaplama sırasında bir hata oluştu: ' + err.message);
     hideLoading(btn);
   }
@@ -463,8 +462,8 @@ function displayResults(geom) {
 
   $('results-grid').innerHTML = items.map(item =>
     `<div class="result-item">
-      <div class="value">${item.value}</div>
-      <div class="label">${item.label}</div>
+      <div class="value">${escapeHtml(String(item.value))}</div>
+      <div class="label">${escapeHtml(item.label)}</div>
     </div>`
   ).join('');
 }
@@ -498,9 +497,9 @@ function displayFlightTest(stab) {
     ).join('') +
     `<div class="flight-assessment">
       <h3>Değerlendirme</h3>
-      <ul>${assessments.map(a => `<li>${a}</li>`).join('')}</ul>
+      <ul>${assessments.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>
     </div>
-    <div class="flight-verdict ${stab.overall_passed ? 'pass' : 'fail'}">${verdict}</div>`;
+    <div class="flight-verdict ${stab.overall_passed ? 'pass' : 'fail'}">${escapeHtml(verdict)}</div>`;
 }
 
 window.addEventListener('DOMContentLoaded', init);
