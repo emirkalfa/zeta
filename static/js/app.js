@@ -160,7 +160,8 @@ function setupDarkMode() {
 
 function applyDarkMode() {
   document.documentElement.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
-  $('darkToggle').textContent = state.darkMode ? '☀️' : '🌙';
+  const icon = $('darkToggle').querySelector('i');
+  if (icon) icon.className = state.darkMode ? 'ph ph-sun' : 'ph ph-moon';
   if (typeof updateViewerTheme === 'function') updateViewerTheme();
 }
 
