@@ -815,10 +815,6 @@ header {
   font-size: 1.6rem;
   font-weight: 800;
   letter-spacing: -0.5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
 }
 
 .flight-verdict.pass {
