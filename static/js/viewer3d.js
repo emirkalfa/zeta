@@ -3,6 +3,7 @@ let scene, camera, renderer, controls;
 let wingGroup, fuseGroup, tailGroup;
 let autoRotate = false;
 let animFrame;
+let grid;
 
 function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tailType) {
   if (viewer) disposeViewer();
@@ -40,7 +41,7 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tail
   dl2.position.set(-5, 0, -5);
   scene.add(dl2);
 
-  const grid = new THREE.GridHelper(5, 20, 0x888888, 0x444444);
+  grid = new THREE.GridHelper(5, 20, 0x888888, 0x444444);
   grid.position.y = -0.3;
   scene.add(grid);
 
@@ -1545,6 +1546,7 @@ function buildVTailSegment(geom, vCoords, yStart, yEnd, hasPins, hasHoles, wallM
 let fuseViewerScene, fuseViewerCamera, fuseViewerRenderer, fuseViewerControls;
 let fuseViewerGroup, fuseViewerRunning = false, fuseViewerAnimFrame;
 let fuseViewerWingGrid, fuseViewerTailCoords, fuseViewerVtailCoords, fuseViewerTailType;
+let fuseViewerGridHelper;
 
 function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   const container = document.getElementById('fuse-three-container');
@@ -1580,8 +1582,8 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   dir2.position.set(-2, 1, -3);
   fuseViewerScene.add(dir2);
 
-  const gridHelper = new THREE.GridHelper(2, 10, 0x888888, 0x444444);
-  fuseViewerScene.add(gridHelper);
+  fuseViewerGridHelper = new THREE.GridHelper(2, 10, 0x888888, 0x444444);
+  fuseViewerScene.add(fuseViewerGridHelper);
 
   fuseViewerGroup = new THREE.Group();
   fuseViewerScene.add(fuseViewerGroup);
@@ -2105,4 +2107,31 @@ function disposeViewer() {
   scene = null; camera = null; renderer = null; controls = null;
   wingGroup = null; fuseGroup = null; tailGroup = null;
   viewer = null;
+}
+
+function updateViewerTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || (isDark ? '#0f172a' : '#f5f7fa');
+  const gridColor = isDark ? 0x4a5568 : 0x888888;
+  const centerColor = isDark ? 0x2d3748 : 0x444444;
+
+  if (scene) {
+    scene.background = new THREE.Color(bg);
+  }
+  if (fuseViewerScene) {
+    fuseViewerScene.background = new THREE.Color(bg);
+  }
+  if (grid && scene) {
+    scene.remove(grid);
+    grid.dispose && grid.dispose();
+    grid = new THREE.GridHelper(5, 20, gridColor, centerColor);
+    grid.position.y = -0.3;
+    scene.add(grid);
+  }
+  if (fuseViewerGridHelper && fuseViewerScene) {
+    fuseViewerScene.remove(fuseViewerGridHelper);
+    fuseViewerGridHelper.dispose && fuseViewerGridHelper.dispose();
+    fuseViewerGridHelper = new THREE.GridHelper(2, 10, gridColor, centerColor);
+    fuseViewerScene.add(fuseViewerGridHelper);
+  }
 }

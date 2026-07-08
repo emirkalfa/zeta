@@ -161,6 +161,7 @@ function setupDarkMode() {
 function applyDarkMode() {
   document.documentElement.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
   $('darkToggle').textContent = state.darkMode ? '☀️' : '🌙';
+  if (typeof updateViewerTheme === 'function') updateViewerTheme();
 }
 
 function setupSaveLoad() {
