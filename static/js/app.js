@@ -469,17 +469,17 @@ function displayResults(geom) {
 
 function displayFlightTest(stab) {
   const items = [
-    { label: 'Stall Hızı', value: stab.stall_speed + ' m/s', cls: stab.stall_speed < 12 ? 'pass' : 'warn', icon: '🐢', pct: Math.min(100, (stab.stall_speed / 20) * 100) },
-    { label: 'Seyir Hızı', value: stab.cruise_speed + ' m/s', cls: 'pass', icon: '✈️', pct: Math.min(100, (stab.cruise_speed / 30) * 100) },
-    { label: 'Tırmanma Oranı', value: stab.climb_rate + ' m/s', cls: stab.climb_rate > 2 ? 'pass' : 'warn', icon: '⬆️', pct: Math.min(100, (stab.climb_rate / 6) * 100) },
-    { label: 'Static Margin', value: '%' + stab.static_margin, cls: stab.static_margin >= 5 ? 'pass' : 'fail', icon: '⚖️', pct: Math.min(100, (stab.static_margin / 15) * 100) },
-    { label: 'CL Maks', value: stab.cl_max, cls: 'pass', icon: '📈', pct: Math.min(100, (stab.cl_max / 2.5) * 100) },
-    { label: 'Seyir CD (total)', value: stab.cd_cruise, cls: 'pass', icon: '📉', pct: Math.min(100, (1 - stab.cd_cruise / 0.1) * 100) },
-    { label: 'Reynolds (Re)', value: (stab.Reynolds || '').toLocaleString(), cls: 'pass', icon: '🔬', pct: Math.min(100, ((stab.Reynolds || 0) / 500000) * 100) },
+    { label: 'Stall Hızı', value: stab.stall_speed + ' m/s', cls: stab.stall_speed < 12 ? 'pass' : 'warn', icon: '<i class="ph ph-speedometer"></i>', pct: Math.min(100, (stab.stall_speed / 20) * 100) },
+    { label: 'Seyir Hızı', value: stab.cruise_speed + ' m/s', cls: 'pass', icon: '<i class="ph ph-airplane-in-flight"></i>', pct: Math.min(100, (stab.cruise_speed / 30) * 100) },
+    { label: 'Tırmanma Oranı', value: stab.climb_rate + ' m/s', cls: stab.climb_rate > 2 ? 'pass' : 'warn', icon: '<i class="ph ph-arrow-up"></i>', pct: Math.min(100, (stab.climb_rate / 6) * 100) },
+    { label: 'Static Margin', value: '%' + stab.static_margin, cls: stab.static_margin >= 5 ? 'pass' : 'fail', icon: '<i class="ph ph-scales"></i>', pct: Math.min(100, (stab.static_margin / 15) * 100) },
+    { label: 'CL Maks', value: stab.cl_max, cls: 'pass', icon: '<i class="ph ph-chart-bar"></i>', pct: Math.min(100, (stab.cl_max / 2.5) * 100) },
+    { label: 'Seyir CD (total)', value: stab.cd_cruise, cls: 'pass', icon: '<i class="ph ph-trend-down"></i>', pct: Math.min(100, (1 - stab.cd_cruise / 0.1) * 100) },
+    { label: 'Reynolds (Re)', value: (stab.Reynolds || '').toLocaleString(), cls: 'pass', icon: '<i class="ph ph-atom"></i>', pct: Math.min(100, ((stab.Reynolds || 0) / 500000) * 100) },
   ];
 
   const assessments = stab.assessments || [];
-  const verdict = stab.overall_passed ? '✅ UÇABİLİR' : '❌ UÇAMAZ';
+  const verdict = stab.overall_passed ? '<i class="ph ph-check-circle"></i> UÇABİLİR' : '<i class="ph ph-x-circle"></i> UÇAMAZ';
 
   $('flight-results').innerHTML =
     items.map(item =>
