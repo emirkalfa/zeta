@@ -297,87 +297,87 @@
       <p class="stl-info-code" style="margin-bottom:16px">3D modeli 3D yazıcıda basmak için aşağıdaki formatlarda indirin.</p>
 
       <!-- Tek Parça -->
-      <div class="stl-section-title">🪽 Tek Parça STL</div>
+      <div class="stl-section-title"><i class="ph ph-airplane"></i> Tek Parça STL</div>
       <div class="stl-cards-grid">
         <div class="stl-card">
-          <div class="stl-card-icon">🪽</div>
+          <div class="stl-card-icon"><i class="ph ph-airplane"></i></div>
           <h4>Kanat STL</h4>
           <p>Tek parça halinde kanat modeli. Küçük uçaklar için idealdir.</p>
-          <button id="stlWing" class="stl-btn wing-btn">⬇ Kanat STL</button>
+          <button id="stlWing" class="stl-btn wing-btn"><i class="ph ph-arrow-down"></i> Kanat STL</button>
         </div>
         <div class="stl-card">
-          <div class="stl-card-icon">🔄</div>
+          <div class="stl-card-icon"><i class="ph ph-swap"></i></div>
           <h4>Kuyruk STL</h4>
           <p>Yatay ve dikey kuyruk tek parça. Hızlı baskı için uygundur.</p>
-          <button id="stlTail" class="stl-btn tail-btn">⬇ Kuyruk STL</button>
+          <button id="stlTail" class="stl-btn tail-btn"><i class="ph ph-arrow-down"></i> Kuyruk STL</button>
         </div>
         <div class="stl-card">
-          <div class="stl-card-icon">🛢️</div>
+          <div class="stl-card-icon"><i class="ph ph-airplane-tilt"></i></div>
           <h4>Konvansiyonel Gövde STL</h4>
           <p>Hesaplanan boyutlara göre oluşturulmuş konvansiyonel gövde.</p>
-          <button id="stlFuseConv" class="stl-btn fuse-btn">⬇ Konv. Gövde STL</button>
+          <button id="stlFuseConv" class="stl-btn fuse-btn"><i class="ph ph-arrow-down"></i> Konv. Gövde STL</button>
         </div>
         <div class="stl-card">
-          <div class="stl-card-icon">🛢️</div>
+          <div class="stl-card-icon"><i class="ph ph-airplane-tilt"></i></div>
           <h4>Özgün Gövde STL</h4>
           <p>K1–K6 kesitlerine göre oluşturulmuş özgün gövde tasarımı.</p>
-          <button id="stlFuseManual" class="stl-btn fuse-btn">⬇ Özgün Gövde STL</button>
+          <button id="stlFuseManual" class="stl-btn fuse-btn"><i class="ph ph-arrow-down"></i> Özgün Gövde STL</button>
         </div>
       </div>
 
       <!-- Dilimleme -->
-      <div class="stl-section-title">🔪 Dilimleme (Parçalı STL)</div>
+      <div class="stl-section-title"><i class="ph ph-scissors"></i> Dilimleme (Parçalı STL)</div>
       <p class="stl-info-code">Büyük parçaları yazıcıya sığdırmak için eşit parçalara bölün. Parçaları yapıştırarak birleştirin.</p>
       <div class="stl-cards-grid">
         <div class="stl-card">
-          <div class="stl-card-icon">🔪</div>
+          <div class="stl-card-icon"><i class="ph ph-scissors"></i></div>
           <h4>Kanat Dilimli</h4>
           <p>Her yarıdaki parça sayısını ayarlayın.</p>
           <div class="form-group">
             <label for="sliceCount">Parça Sayısı</label>
             <input type="number" id="sliceCount" min="1" max="20" value="3" step="1">
           </div>
-          <button id="stlWingSliced" class="stl-btn wing-btn sliced-btn">🔪 Kanat Dilimli STL</button>
+          <button id="stlWingSliced" class="stl-btn wing-btn sliced-btn"><i class="ph ph-scissors"></i> Kanat Dilimli STL</button>
         </div>
         <div class="stl-card">
-          <div class="stl-card-icon">🔪</div>
+          <div class="stl-card-icon"><i class="ph ph-scissors"></i></div>
           <h4>Kuyruk Dilimli</h4>
           <p>Kuyruk için parça sayısını ayarlayın.</p>
           <div class="form-group">
             <label for="tailSliceCount">Parça Sayısı</label>
             <input type="number" id="tailSliceCount" min="1" max="20" value="2" step="1">
           </div>
-          <button id="stlTailSliced" class="stl-btn tail-btn sliced-btn">🔪 Kuyruk Dilimli STL</button>
+          <button id="stlTailSliced" class="stl-btn tail-btn sliced-btn"><i class="ph ph-scissors"></i> Kuyruk Dilimli STL</button>
         </div>
         <div class="stl-card">
-          <div class="stl-card-icon">🔪</div>
+          <div class="stl-card-icon"><i class="ph ph-scissors"></i></div>
           <h4>Konvansiyonel Gövde Dilimli</h4>
           <p>Konvansiyonel gövdeyi eşit parçalara bölün.</p>
           <div class="form-group">
             <label for="fuseConvSliceCount">Parça Sayısı</label>
             <input type="number" id="fuseConvSliceCount" min="1" max="20" value="3" step="1">
           </div>
-          <button id="stlFuseConvSliced" class="stl-btn fuse-btn sliced-btn">🔪 Konv. Gövde Dilimli STL</button>
+          <button id="stlFuseConvSliced" class="stl-btn fuse-btn sliced-btn"><i class="ph ph-scissors"></i> Konv. Gövde Dilimli STL</button>
         </div>
         <div class="stl-card">
-          <div class="stl-card-icon">🔪</div>
+          <div class="stl-card-icon"><i class="ph ph-scissors"></i></div>
           <h4>Özgün Gövde Dilimli</h4>
           <p>Özgün gövdeyi eşit parçalara bölün.</p>
           <div class="form-group">
             <label for="fuseManualSliceCount">Parça Sayısı</label>
             <input type="number" id="fuseManualSliceCount" min="1" max="20" value="3" step="1">
           </div>
-          <button id="stlFuseManualSliced" class="stl-btn fuse-btn sliced-btn">🔪 Özgün Gövde Dilimli STL</button>
+          <button id="stlFuseManualSliced" class="stl-btn fuse-btn sliced-btn"><i class="ph ph-scissors"></i> Özgün Gövde Dilimli STL</button>
         </div>
       </div>
-      <p class="stl-info-code">💡 Dosya adları: <code>zeta_kanat_sag_1of3.stl</code> (1=kök, son=uç)</p>
+      <p class="stl-info-code"><i class="ph ph-lightbulb"></i> Dosya adları: <code>zeta_kanat_sag_1of3.stl</code> (1=kök, son=uç)</p>
 
       <!-- Duvar Kalınlığı -->
-      <div class="stl-section-title">🔧 Duvar Kalınlığı</div>
+      <div class="stl-section-title"><i class="ph ph-wrench"></i> Duvar Kalınlığı</div>
       <p class="stl-info-code">Dış yüzey bozulmaz, içe doğru et kalınlığı eklenir. 0 = yüzey (içi boş).</p>
       <div class="stl-cards-grid">
         <div class="stl-card">
-          <div class="stl-card-icon">🔧</div>
+          <div class="stl-card-icon"><i class="ph ph-wrench"></i></div>
           <h4>Et Kalınlığı Ayarı</h4>
           <p>Tüm STL çıktılarına uygulanır.</p>
           <div class="form-group">

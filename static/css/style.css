@@ -837,6 +837,9 @@ header {
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .stl-cards-grid {
@@ -866,6 +869,9 @@ header {
 .stl-card-icon {
   font-size: 2rem;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .stl-card h4 {
@@ -890,6 +896,10 @@ header {
   transition: all 0.2s;
   text-align: center;
   color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .stl-card .stl-btn:hover {
@@ -959,6 +969,11 @@ header {
   background: transparent;
   padding: 0;
   font-size: 0.75rem;
+}
+
+.stl-info-code i {
+  vertical-align: middle;
+  margin-right: 4px;
 }
 
 /* ─── Footer ─── */
