@@ -1716,6 +1716,13 @@ function buildFuseViewerFuselage(geom, wingCoords) {
     const tailX = geom.tail_x_pos || totalLen * 0.82;
     buildFuseViewerTail(geom, fuseViewerTailCoords, fuseViewerVtailCoords, fuseViewerTailType, tailX);
   }
+
+  // Center model on grid (XZ center, Y sits on ground)
+  if (fuseViewerGroup.children.length > 0) {
+    const box = new THREE.Box3().setFromObject(fuseViewerGroup);
+    const c = box.getCenter(new THREE.Vector3());
+    fuseViewerGroup.position.set(-c.x, -box.min.y, -c.z);
+  }
 }
 
 function buildFuseViewerWing(geom, coords, wingX) {
