@@ -127,10 +127,13 @@ body {
 }
 
 .sidebar-link .s-icon {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   width: 24px;
   text-align: center;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-link.disabled {

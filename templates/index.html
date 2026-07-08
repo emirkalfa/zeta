@@ -6,6 +6,7 @@
 <title>ZETA - Uçak Tasarım Aracı</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
@@ -20,13 +21,13 @@
       <button id="darkToggle" class="icon-btn" title="Karanlık Mod">🌙</button>
     </div>
     <ul id="sidebar-nav">
-      <li><button class="sidebar-link active" data-tab="input"><span class="s-icon">⚙️</span> Parametreler</button></li>
-      <li><button class="sidebar-link disabled" data-tab="results"><span class="s-icon">📐</span> Ölçüler</button></li>
-      <li><button class="sidebar-link disabled" data-tab="viewer"><span class="s-icon">🪟</span> 3D Model</button></li>
-      <li><button class="sidebar-link disabled" data-tab="fuse"><span class="s-icon">🛢️</span> Gövde</button></li>
-      <li><button class="sidebar-link disabled" data-tab="charts"><span class="s-icon">📊</span> Analiz</button></li>
-      <li><button class="sidebar-link disabled" data-tab="flight"><span class="s-icon">✈️</span> Uçabilirlik</button></li>
-      <li><button class="sidebar-link disabled" data-tab="stl"><span class="s-icon">🖨️</span> STL İndirme</button></li>
+      <li><button class="sidebar-link active" data-tab="input"><span class="s-icon"><i class="ph ph-gear"></i></span> Parametreler</button></li>
+      <li><button class="sidebar-link disabled" data-tab="results"><span class="s-icon"><i class="ph ph-ruler"></i></span> Ölçüler</button></li>
+      <li><button class="sidebar-link disabled" data-tab="viewer"><span class="s-icon"><i class="ph ph-cube"></i></span> 3D Model</button></li>
+      <li><button class="sidebar-link disabled" data-tab="fuse"><span class="s-icon"><i class="ph ph-airplane-tilt"></i></span> Gövde</button></li>
+      <li><button class="sidebar-link disabled" data-tab="charts"><span class="s-icon"><i class="ph ph-chart-bar"></i></span> Analiz</button></li>
+      <li><button class="sidebar-link disabled" data-tab="flight"><span class="s-icon"><i class="ph ph-airplane-in-flight"></i></span> Uçabilirlik</button></li>
+      <li><button class="sidebar-link disabled" data-tab="stl"><span class="s-icon"><i class="ph ph-printer"></i></span> STL İndirme</button></li>
     </ul>
     <div class="sidebar-footer">
       <button id="saveBtn" class="icon-btn" title="Projeyi Kaydet">💾</button>
