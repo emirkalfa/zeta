@@ -4,8 +4,8 @@
   --text: #1a1a2e;
   --text-secondary: #555;
   --border: #e0e4ea;
-  --primary: #444;
-  --primary-hover: #222;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
   --shadow: 0 2px 12px rgba(0,0,0,0.06);
   --radius: 12px;
   --sidebar-width: 220px;
@@ -18,8 +18,8 @@
   --text: #e2e8f0;
   --text-secondary: #94a3b8;
   --border: #334155;
-  --primary: #bbb;
-  --primary-hover: #ddd;
+  --primary: #60a5fa;
+  --primary-hover: #3b82f6;
   --shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
 
@@ -68,7 +68,9 @@ body {
   font-size: 1.3rem;
   font-weight: 800;
   letter-spacing: -0.5px;
-  color: var(--text);
+  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .sidebar-header .icon-btn {
@@ -120,8 +122,8 @@ body {
 }
 
 .sidebar-link.active {
-  background: color-mix(in srgb, var(--text) 10%, var(--bg));
-  color: var(--text);
+  background: color-mix(in srgb, var(--primary) 14%, var(--bg));
+  color: var(--primary);
 }
 
 .sidebar-link .s-icon {
@@ -161,9 +163,9 @@ body {
 }
 
 .sidebar-footer .icon-btn:hover {
-  background: var(--text);
-  color: var(--card-bg);
-  border-color: var(--text);
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
 /* ─── Main Content ─── */
@@ -202,7 +204,9 @@ header {
   font-size: 1.8rem;
   font-weight: 800;
   letter-spacing: -1px;
-  color: var(--text);
+  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .subtitle {
@@ -277,7 +281,7 @@ header {
 .form-group select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0,0,0,0.08);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
 }
 
 .form-group input[type="range"] {
@@ -348,16 +352,16 @@ header {
 }
 
 .radio-label:hover {
-  border-color: var(--text);
+  border-color: var(--primary);
   color: var(--text);
-  background: color-mix(in srgb, var(--text) 8%, var(--bg));
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg));
 }
 
 .radio-label:has(input:checked) {
-  border-color: var(--text);
-  background: color-mix(in srgb, var(--text) 10%, var(--bg));
-  color: var(--text);
-  box-shadow: 0 0 0 1px var(--text);
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, var(--bg));
+  color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .radio-label input[type="radio"] {
@@ -368,7 +372,7 @@ header {
 .primary-btn {
   width: 100%;
   padding: 14px;
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--primary), #6366f1);
   color: white;
   border: none;
   border-radius: var(--radius);
@@ -381,7 +385,7 @@ header {
 
 .primary-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 20px rgba(59,130,246,0.35);
 }
 
 .small-btn {
@@ -398,15 +402,15 @@ header {
 
 .small-btn:hover,
 .small-btn.active {
-  background: var(--text);
-  color: var(--card-bg);
-  border-color: var(--text);
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
 #manual-inputs h3 {
   margin: 16px 0 8px;
   font-size: 0.95rem;
-  color: var(--text);
+  color: var(--primary);
 }
 
 #manual-inputs .form-grid {
@@ -439,8 +443,8 @@ header {
 }
 
 .mode-btn.active {
-  background: var(--text);
-  color: var(--card-bg);
+  background: var(--primary);
+  color: #fff;
 }
 
 .mode-btn:not(.active):hover {
@@ -465,7 +469,7 @@ header {
 .result-item .value {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--text);
+  color: var(--primary);
 }
 
 .result-item .label {
@@ -610,7 +614,7 @@ header {
 .fuse-row input[type="number"]:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0,0,0,0.08);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
 }
 
 .fuse-unit {
@@ -762,17 +766,17 @@ header {
   transition: width 0.8s ease;
 }
 
-.flight-item.pass .flight-icon { background: color-mix(in srgb, var(--text) 12%, var(--bg)); color: var(--text); }
-.flight-item.pass .flight-value { color: var(--text); }
-.flight-item.pass .progress-fill { background: var(--text); }
+.flight-item.pass .flight-icon { background: #22c55e20; color: #22c55e; }
+.flight-item.pass .flight-value { color: #22c55e; }
+.flight-item.pass .progress-fill { background: linear-gradient(90deg, #22c55e, #4ade80); }
 
-.flight-item.fail .flight-icon { background: color-mix(in srgb, var(--text-secondary) 20%, var(--bg)); color: var(--text-secondary); }
-.flight-item.fail .flight-value { color: var(--text-secondary); }
-.flight-item.fail .progress-fill { background: var(--text-secondary); }
+.flight-item.fail .flight-icon { background: #ef444420; color: #ef4444; }
+.flight-item.fail .flight-value { color: #ef4444; }
+.flight-item.fail .progress-fill { background: linear-gradient(90deg, #ef4444, #f87171); }
 
-.flight-item.warn .flight-icon { background: color-mix(in srgb, var(--text) 12%, var(--bg)); color: var(--text); }
-.flight-item.warn .flight-value { color: var(--text); }
-.flight-item.warn .progress-fill { background: var(--text); }
+.flight-item.warn .flight-icon { background: #f59e0b20; color: #f59e0b; }
+.flight-item.warn .flight-value { color: #f59e0b; }
+.flight-item.warn .progress-fill { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
 
 .flight-assessment {
   grid-column: 1 / -1;
@@ -818,15 +822,15 @@ header {
 }
 
 .flight-verdict.pass {
-  background: color-mix(in srgb, var(--text) 10%, var(--bg));
-  color: var(--text);
-  border: 1px solid var(--border);
+  background: linear-gradient(135deg, #22c55e20, #22c55e08);
+  color: #22c55e;
+  border: 1px solid #22c55e40;
 }
 
 .flight-verdict.fail {
-  background: color-mix(in srgb, var(--text-secondary) 12%, var(--bg));
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
+  background: linear-gradient(135deg, #ef444420, #ef444408);
+  color: #ef4444;
+  border: 1px solid #ef444440;
 }
 
 /* ─── STL Cards ─── */
@@ -903,39 +907,36 @@ header {
 }
 
 .stl-card .stl-btn:hover {
-  background: var(--text);
-  color: var(--card-bg);
-  border-color: var(--text);
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
 .stl-card .stl-btn.wing-btn {
-  border-color: var(--text-secondary);
-  color: var(--text);
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 .stl-card .stl-btn.wing-btn:hover {
-  background: var(--text);
-  color: var(--card-bg);
-  border-color: var(--text);
+  background: #3b82f6;
+  color: white;
 }
 
 .stl-card .stl-btn.tail-btn {
-  border-color: var(--text-secondary);
-  color: var(--text);
+  border-color: #f59e0b;
+  color: #f59e0b;
 }
 .stl-card .stl-btn.tail-btn:hover {
-  background: var(--text);
-  color: var(--card-bg);
-  border-color: var(--text);
+  background: #f59e0b;
+  color: white;
 }
 
 .stl-card .stl-btn.fuse-btn {
-  border-color: var(--text-secondary);
-  color: var(--text);
+  border-color: #64748b;
+  color: #64748b;
 }
 .stl-card .stl-btn.fuse-btn:hover {
-  background: var(--text);
-  color: var(--card-bg);
-  border-color: var(--text);
+  background: #64748b;
+  color: white;
 }
 
 .stl-card .stl-btn.sliced-btn {
@@ -988,7 +989,7 @@ footer {
 }
 
 footer a {
-  color: var(--text-secondary);
+  color: var(--primary);
   text-decoration: none;
 }
 
@@ -1002,7 +1003,7 @@ footer a:hover {
   width: 20px;
   height: 20px;
   border: 3px solid var(--border);
-  border-top-color: var(--text-secondary);
+  border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
