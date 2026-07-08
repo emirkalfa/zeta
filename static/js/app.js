@@ -1,3 +1,27 @@
+/* ─── Cookie Helpers (fallback to localStorage) ─── */
+function setCookie(name, value, days) {
+  try {
+    const encoded = encodeURIComponent(value);
+    if (encoded.length > 4096) throw new Error('Cookie size exceeded');
+    document.cookie = `${name}=${encoded}; path=/; max-age=${days * 86400}; SameSite=Lax`;
+    return true;
+  } catch (e) {
+    localStorage.setItem(name, value);
+    return false;
+  }
+}
+
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+  if (match) return decodeURIComponent(match[2]);
+  return localStorage.getItem(name);
+}
+
+function deleteCookie(name) {
+  document.cookie = `${name}=; path=/; max-age=0`;
+  localStorage.removeItem(name);
+}
+
 const state = {
   geometry: null,
   polars: null,
@@ -6,7 +30,7 @@ const state = {
   tailCoords: null,
   vtailCoords: null,
   airfoilCode: '2412',
-  darkMode: localStorage.getItem('zeta-dark') === 'true',
+  darkMode: getCookie('zeta-dark') === 'true',
   wallThickness: 1.2,
   fuseType: 'conventional',
   fuseSections: [
@@ -126,7 +150,7 @@ async function loadAirfoils() {
 function setupDarkMode() {
   $('darkToggle').addEventListener('click', () => {
     state.darkMode = !state.darkMode;
-    localStorage.setItem('zeta-dark', state.darkMode);
+    setCookie('zeta-dark', state.darkMode, 365);
     applyDarkMode();
   });
 }
@@ -143,7 +167,7 @@ function setupSaveLoad() {
 
 function checkSavedProject() {
   try {
-    const saved = localStorage.getItem('zeta-project');
+    const saved = getCookie('zeta-project');
     if (saved) {
       const data = JSON.parse(saved);
       if (data.wingspan) {
@@ -191,14 +215,14 @@ function saveProject() {
     cg_percent: parseInt($('cgSlider').value) || 25,
     max_alpha: parseInt($('maxAlpha').value) || 20,
   };
-  localStorage.setItem('zeta-project', JSON.stringify(data));
+  setCookie('zeta-project', JSON.stringify(data), 365);
   const sb = $('saveBtn');
   if (sb) { sb.textContent = '✅'; setTimeout(() => { sb.textContent = '💾'; }, 1500); }
 }
 
 function loadProject() {
   try {
-    const saved = localStorage.getItem('zeta-project');
+    const saved = getCookie('zeta-project');
     if (saved) {
       checkSavedProject();
       const lb = $('loadBtn');

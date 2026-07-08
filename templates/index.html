@@ -394,6 +394,23 @@
   </main>
 </div>
 
+<!-- Download Confirmation Modal -->
+<div id="downloadModal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>📥 İndirme Onayı</h3>
+    </div>
+    <div class="modal-body">
+      <p>Aşağıdaki dosya(lar) indirilecek:</p>
+      <ul id="downloadFileList"></ul>
+    </div>
+    <div class="modal-footer">
+      <button id="downloadCancelBtn" class="small-btn">İptal</button>
+      <button id="downloadConfirmBtn" class="primary-btn" style="width:auto;padding:10px 24px">İndir</button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/js/app.js"></script>
 <script src="/static/js/viewer3d.js"></script>
 <script src="/static/js/charts.js"></script>

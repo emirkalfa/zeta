@@ -12,6 +12,22 @@ function checkGeom() {
   return true;
 }
 
+function showDownloadConfirm(files) {
+  return new Promise((resolve) => {
+    const list = document.getElementById('downloadFileList');
+    list.innerHTML = files.map(f => `<li>📄 ${f}</li>`).join('');
+    document.getElementById('downloadModal').style.display = 'flex';
+    document.getElementById('downloadConfirmBtn').onclick = () => {
+      document.getElementById('downloadModal').style.display = 'none';
+      resolve(true);
+    };
+    document.getElementById('downloadCancelBtn').onclick = () => {
+      document.getElementById('downloadModal').style.display = 'none';
+      resolve(false);
+    };
+  });
+}
+
 function exportMeshAsSTL(mesh, fileName) {
   mesh.scale.setScalar(STL_SCALE);
   mesh.updateMatrixWorld(true);
@@ -132,8 +148,12 @@ function buildVTailPanel(geom, coords, vAngle, sign, wallM) {
   }));
 }
 
-function exportSTL(part) {
+async function exportSTL(part) {
   if (!checkGeom()) return;
+  const filename = part === 'wing' ? 'z_wing.stl' : `zeta_${part}.stl`;
+  const confirmed = await showDownloadConfirm([filename]);
+  if (!confirmed) return;
+
   const wallM = (state.wallThickness || 0) / 1000;
   const geom = state.geometry;
   let meshes = [];
@@ -356,12 +376,15 @@ function meshFromSections(sections, nCirc) {
   return new THREE.Mesh(geo, new THREE.MeshPhongMaterial());
 }
 
-function exportFuselageSTL(type) {
+async function exportFuselageSTL(type) {
   if (!checkGeom()) return;
-  const geom = state.geometry;
-
   if (type !== 'conventional' && type !== 'manual') return;
 
+  const fileName = type === 'conventional' ? 'zeta_fuselage_conventional.stl' : 'zeta_fuselage_manual.stl';
+  const confirmed = await showDownloadConfirm([fileName]);
+  if (!confirmed) return;
+
+  const geom = state.geometry;
   const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
   if (!sections.length) {
     alert('Gövde modeli oluşturulamadı.');
@@ -369,14 +392,18 @@ function exportFuselageSTL(type) {
   }
 
   const mesh = meshFromSections(sections, nCirc);
-  const fileName = type === 'conventional' ? 'zeta_fuselage_conventional.stl' : 'zeta_fuselage_manual.stl';
   exportMeshAsSTL(mesh, fileName);
 }
 
-function exportSlicedFuselage(type) {
+async function exportSlicedFuselage(type) {
   if (!checkGeom()) return;
   const n = getNumSegments(type === 'conventional' ? 'fuseConvSliceCount' : 'fuseManualSliceCount');
   if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+
+  const ext = type === 'conventional' ? 'conv' : 'manual';
+  const filenames = Array.from({length: n}, (_, i) => `zeta_fuselage_${ext}_${i+1}of${n}.stl`);
+  const confirmed = await showDownloadConfirm(filenames);
+  if (!confirmed) return;
 
   const geom = state.geometry;
   const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
@@ -384,7 +411,6 @@ function exportSlicedFuselage(type) {
 
   const totalSecs = sections.length;
   const segSize = totalSecs / n;
-  const ext = type === 'conventional' ? 'conv' : 'manual';
 
   for (let seg = 0; seg < n; seg++) {
     const iStart = Math.round(seg * segSize);
@@ -396,10 +422,19 @@ function exportSlicedFuselage(type) {
   }
 }
 
-function exportSlicedWing() {
+async function exportSlicedWing() {
   if (!checkGeom()) return;
   const n = getNumSegments('sliceCount');
   if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+
+  const filenames = [];
+  for (const sideName of ['right', 'left']) {
+    for (let seg = 0; seg < n; seg++) {
+      filenames.push(`z_wing_${sideName}_${seg+1}of${n}.stl`);
+    }
+  }
+  const confirmed = await showDownloadConfirm(filenames);
+  if (!confirmed) return;
 
   const geom = state.geometry;
   const coords = state.airfoilCoords;
@@ -422,13 +457,34 @@ function exportSlicedWing() {
   }
 }
 
-function exportSlicedTail() {
+async function exportSlicedTail() {
   if (!checkGeom()) return;
   const n = getNumSegments('tailSliceCount');
   if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
 
   const geom = state.geometry;
   const tailType = geom.tail_type || 'conventional';
+
+  const filenames = [];
+  if (tailType === 'vtail') {
+    for (const sn of ['sag', 'sol']) {
+      for (let s = 0; s < n; s++) {
+        filenames.push(`zeta_vtail_${sn}_${s+1}of${n}.stl`);
+      }
+    }
+  } else {
+    for (const sn of ['sag', 'sol']) {
+      for (let s = 0; s < n; s++) {
+        filenames.push(`zeta_htail_${sn}_${s+1}of${n}.stl`);
+      }
+    }
+    for (let s = 0; s < n; s++) {
+      filenames.push(`zeta_vtail_${s+1}of${n}.stl`);
+    }
+  }
+  const confirmed = await showDownloadConfirm(filenames);
+  if (!confirmed) return;
+
   const wallM = (state.wallThickness || 0) / 1000;
 
   if (tailType === 'vtail') {
