@@ -4,29 +4,29 @@ function displayCharts(polars) {
   destroyCharts();
 
   if (polars.cl_vs_alpha && polars.cl_vs_alpha.length) {
-    createLineChart('chartClAlpha', 'Cl vs α', polars.cl_vs_alpha, 'Hücum Açısı (°)', 'Cl', '#3b82f6');
+    createLineChart('chartClAlpha', 'Cl vs α', polars.cl_vs_alpha, 'Hücum Açısı (°)', 'Cl', '#444');
     createTable('tableClAlpha', ['α (°)', 'Cl'], polars.cl_vs_alpha);
   }
 
   if (polars.cd_vs_cl && polars.cd_vs_cl.length) {
-    createLineChart('chartCdCl', 'Cd vs Cl', polars.cd_vs_cl, 'Cd', 'Cl', '#ef4444');
+    createLineChart('chartCdCl', 'Cd vs Cl', polars.cd_vs_cl, 'Cd', 'Cl', '#666');
     createTable('tableCdCl', ['Cd', 'Cl'], polars.cd_vs_cl);
   }
 
   if (polars.cm_vs_alpha && polars.cm_vs_alpha.length) {
-    createLineChart('chartCmAlpha', 'Cm vs α', polars.cm_vs_alpha, 'Hücum Açısı (°)', 'Cm', '#8b5cf6');
+    createLineChart('chartCmAlpha', 'Cm vs α', polars.cm_vs_alpha, 'Hücum Açısı (°)', 'Cm', '#888');
     createTable('tableCmAlpha', ['α (°)', 'Cm'], polars.cm_vs_alpha);
   }
 
   if (polars.efficiency && polars.efficiency.length) {
-    createLineChart('chartEff', 'Cl/Cd vs α', polars.efficiency, 'Hücum Açısı (°)', 'Cl/Cd', '#22c55e');
+    createLineChart('chartEff', 'Cl/Cd vs α', polars.efficiency, 'Hücum Açısı (°)', 'Cl/Cd', '#333');
     createTable('tableEff', ['α (°)', 'Cl/Cd'], polars.efficiency);
   }
 
   if (polars.lift_distribution && polars.lift_distribution.length) {
     const ld = polars.lift_distribution;
     createLineChart('chartLiftDist', 'Lift Dağılımı', ld.map(d => ({x: d.y, y: d.cl_local})),
-      'Kanat Açıklığı (m)', 'cl_local', '#f59e0b');
+      'Kanat Açıklığı (m)', 'cl_local', '#555');
     createTable('tableLiftDist', ['Y (m)', 'cl_local', 'Chord (m)'],
       ld.map(d => ({x: d.y, y: d.cl_local, z: d.chord})));
   }
@@ -47,7 +47,7 @@ function createLineChart(canvasId, label, data, xLabel, yLabel, color) {
         data: data.map(d => ({x: d.x, y: d.y})),
         showLine: true,
         borderColor: color,
-        backgroundColor: color + '20',
+        backgroundColor: color + '30',
         fill: true,
         pointRadius: 2,
         pointHoverRadius: 5,
