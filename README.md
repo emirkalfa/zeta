@@ -9,120 +9,120 @@
 
 **ZETA**, üniversite seviyesindeki projeler için uçak tasarımı yapmanızı sağlayan bir web uygulamasıdır. Kanat açıklığı, ağırlık ve airfoil profili gibi temel parametreleri girerek bir uçağın tüm geometrik ölçülerini hesaplar, lifting-line teorisi ile aerodinamik analizini yapar, 3 boyutlu modelini oluşturur ve 3D yazıcı için STL dosyaları üretir.
 
-## Ozellikler
+## Özellikler
 
-### Parametre Girisi
-- Kanat acikligi, agirlik, airfoil profili, kanat konumu (alcak/orta/yuksek), kuyruk tipi (konvansiyonel/T-tail/V-tail), kanat-govde bileskesi (icten gecen/yuzeyde biten/ayri)
-- **Otomatik mod**: Tek tukla hesaplama
-- **Manuel mod**: Kok veter, uç veter, ok acisi, dihedral, kuyruk boyutlari, govde boyutlari gibi parametreleri elle girme
-- CG pozisyonu kaydirici (%MAC)
-- Kanat sekli secimi: **Tapered**, **Rectangular**, **STE Tapered** (Straight Trailing Edge)
+### Parametre Girişi
+- Kanat açıklığı, ağırlık, airfoil profili, kanat konumu (alçak/orta/yüksek), kuyruk tipi (konvansiyonel/T-tail/V-tail), kanat-gövde bileşkesi (içten geçen/yüzeyde biten/ayrı)
+- **Otomatik mod**: Tek tıkla hesaplama
+- **Manuel mod**: Kök veter, uç veter, ok açısı, dihedral, kuyruk boyutları, gövde boyutları gibi parametreleri elle girme
+- CG pozisyonu kaydırıcısı (%MAC)
+- Kanat şekli seçimi: **Tapered**, **Rectangular**, **STE Tapered** (Straight Trailing Edge)
 
 ### Geometri Hesaplama
-Kanat, govde ve kuyruga ait ~45 geometrik olcuyu hesaplar:
-- Kanat: aciklik, veter, MAC, aciklik orani, alan, ok acisi, dihedral, hucre acisi, incelme orani, kok/konturluk ucu kiriş, flap ve aileron alanlari
-- Yatay/Dikey kuyruk: aciklik, veter, alan, hacim katsayilari, V-tail acisi
-- Govde: uzunluk, maksimum genislik/yukseklik, yanal alan, fincan orani
-- Agirlik merkezi ve nötr nokta pozisyonu
-- Kanat yuku, kontrol yuzeyi alanlari
+Kanat, gövde ve kuyruğa ait ~45 geometrik ölçüyü hesaplar:
+- Kanat: açıklık, veter, MAC, açıklık oranı, alan, ok açısı, dihedral, hücum açısı, incelme oranı, kök/konturluk ucu kirişi, flap ve aileron alanları
+- Yatay/Dikey kuyruk: açıklık, veter, alan, hacim katsayıları, V-tail açısı
+- Gövde: uzunluk, maksimum genişlik/yükseklik, yanal alan, fincan oranı
+- Ağırlık merkezi ve nötr nokta pozisyonu
+- Kanat yükü, kontrol yüzeyi alanları
 
-### Govde Tasarimi
-- **Konvansiyonel govde**: Otomatik hesaplanan superellips kesitli, usti yassilastirilmis (wing saddle), alti ventral pod cikintili model
-- **Manuel (Ozgün) govde**: 6 adet kesit (K1-K6) ile kullanici tanimli govde. Her kesit icin pozisyon (m), genislik ve yukseklik slider ile veya sayisal girisle ayarlanabilir
-- Kesitler arasi smooth Hermite interpolasyonu
-- Govde 3D goruntuleyicide kanat ve kuyrukla birlikte on izleme
+### Gövde Tasarımı
+- **Konvansiyonel gövde**: Otomatik hesaplanan süperelips kesitli, üstü yassılaştırılmış (wing saddle), altı ventral pod çıkıntılı model
+- **Manuel (Özgün) gövde**: 6 adet kesit (K1-K6) ile kullanıcı tanımlı gövde. Her kesit için pozisyon (m), genişlik ve yükseklik slider ile veya sayısal girişle ayarlanabilir
+- Kesitler arası smooth Hermite interpolasyonu
+- Gövde 3D görüntüleyicide kanat ve kuyrukla birlikte ön izleme
 
-### 3D Model Goruntuleme (Three.js)
-- **Ana goruntuleyici**: Interaktif 3D kanat + govde + kuyruk
-- **Govde goruntuleyici**: Ayri bir sahnede govde kesitleri, kanat ve kuyruk
-- Kanat bolgeleri renklendirilmis: mavi (ana kanat), turuncu (flap), yesil (kanatcik)
-- Kuyruk kontrol yuzeyleri (elevator, rudder) ayri renklerle
-- X/Y/Z eksen butonlari, otomatik dondurme, sifirlama
-- Fuselage toggle (govdeyi goster/gizle)
+### 3D Model Görüntüleme (Three.js)
+- **Ana görüntüleyici**: İnteraktif 3D kanat + gövde + kuyruk
+- **Gövde görüntüleyici**: Ayrı bir sahnede gövde kesitleri, kanat ve kuyruk
+- Kanat bölgeleri renklendirilmiş: mavi (ana kanat), turuncu (flap), yeşil (kanatçık)
+- Kuyruk kontrol yüzeyleri (elevator, rudder) ayrı renklerle
+- X/Y/Z eksen butonları, otomatik döndürme, sıfırlama
+- Fuselage toggle (gövdeyi göster/gizle)
 - Temaya uyumlu arka plan ve grid renkleri
-- Fare: sol tus+surukle=dondurme, sag tus+surukle=kaydirma, scroll=zoom
+- Fare: sol tuş+sürükle=döndürme, sağ tuş+sürükle=kaydırma, scroll=zoom
 
-### Aerodinamik Analiz (Lifting-Line Teorisi)
-- Fourier serisi cozumu ile Cl, Cd, Cm polarlari
-- **Ok acisi (sweep) duzeltmesi**: cl_alpha = cl_alpha_2d * cos(sweep_rad)
-- **Post-stall modeli**: CL_max sonrasi davranis
-- **Reynolds sayisina bagli**: cd_0, cl_max, cm_0 Re ile olceklenir
+### Aerodinamik Analiz (Lifting-line Teorisi)
+- Fourier serisi çözümü ile Cl, Cd, Cm polarları
+- **Ok açısı (sweep) düzeltmesi**: cl_alpha = cl_alpha_2d * cos(sweep_rad)
+- **Post-stall modeli**: CL_max sonrası davranış
+- **Reynolds sayısına bağlı**: cd_0, cl_max, cm_0 Re ile ölçeklenir
 - 5 adet grafik (Chart.js):
   - Cl vs alpha
   - Cd vs Cl
   - Cm vs alpha
   - Cl/Cd verimlilik
-  - Lift dagilimi (kanat acikligi boyunca)
-- Her grafigin altinda sayisal tablo (10 ornek satir)
+  - Lift dağılımı (kanat açıklığı boyunca)
+- Her grafiğin altında sayısal tablo (10 örnek satır)
 
-### Ucabilirlik Testi
-7 kriterli degerlendirme:
-| Kriter | Formul | Sinirlar |
+### Uçabilirlik Testi
+7 kriterli değerlendirme:
+| Kriter | Formül | Sınırlar |
 |--------|--------|----------|
-| Stall hizi | sqrt(2W / (rho * S * cl_max)) | <5: cok dusuk, <10: normal, <15: biraz yuksek, >=15: FAIL |
-| Seyir hizi | sqrt(2W / (rho * S * cl_opt)) | Bilgi amacli |
-| Tirmanma hizi | (P_avail - P_req) / W | >5: mukemmel, >2: iyi, >0: zayif, <=0: FAIL |
-| Statik margin | NP - CG_percent | 5-20%: stabil, >20%: asiri stabil, <5%: FAIL |
-- Progress bar gostergeli 7 kart
-- Degerlendirme listesi
-- Ucabilir/Ucamaz karari
+| Stall hızı | sqrt(2W / (rho * S * cl_max)) | <5: çok düşük, <10: normal, <15: biraz yüksek, >=15: FAIL |
+| Seyir hızı | sqrt(2W / (rho * S * cl_opt)) | Bilgi amaçlı |
+| Tırmanma hızı | (P_avail - P_req) / W | >5: mükemmel, >2: iyi, >0: zayıf, <=0: FAIL |
+| Statik margin | NP - CG_percent | 5-20%: stabil, >20%: aşırı stabil, <5%: FAIL |
+- Progress bar göstergeli 7 kart
+- Değerlendirme listesi
+- Uçabilir/Uçamaz kararı
 
-### STL Disa Aktarma (3D Yazici Icin)
-- **Tek parca**: Kanat, kuyruk, konvansiyonel govde, ozgun govde
-- **Dilimlenmis (sliced)**: Her parcayi N esit parcaya bolerek cikti
-  - Kanat dilimli: sag/sol ayri, her dilimde hizalama pimleri ve delikleri
-  - Kuyruk dilimli: H-tail sag/sol + V-tail
-  - Govde dilimli: konvansiyonel ve ozgun
-- **Et kalinligi**: 0-5mm ayarlanabilir (0 = yuzey)
-- Olceklendirme: 1:1000 (mm hassasiyetinde)
-- Onay modali: Indirme oncesi dosya listesi gosterimi
-- Guvenlik: blob URL validasyonu
+### STL Dışa Aktarma (3D Yazıcı İçin)
+- **Tek parça**: Kanat, kuyruk, konvansiyonel gövde, özgün gövde
+- **Dilimlenmiş (sliced)**: Her parçayı N eşit parçaya bölerek çıktı
+  - Kanat dilimli: sağ/sol ayrı, her dilimde hizalama pimleri ve delikleri
+  - Kuyruk dilimli: H-tail sağ/sol + V-tail
+  - Gövde dilimli: konvansiyonel ve özgün
+- **Et kalınlığı**: 0-5mm ayarlanabilir (0 = yüzey)
+- Ölçeklendirme: 1:1000 (mm hassasiyetinde)
+- Onay modalı: İndirme öncesi dosya listesi gösterimi
+- Güvenlik: blob URL validasyonu
 
-### Airfoil Veritabani
+### Airfoil Veritabanı
 8 adet NACA 4-hane profili:
 - Simetrik: 0012, 0015
 - Kamburlu: 2412, 4412, 2415, 4415, 23012, 6412
-- Her profil icin koordinat verisi ve Re-bagimli ozellikler
+- Her profil için koordinat verisi ve Re-bağımlı özellikler
 
-### Diger Ozellikler
-- **Karanlik/aydinlik mod**: Tema degisimi tum bilesenlere aninda yansir
-- **Proje kaydetme**: Cookie + localStorage ile otomatik kaydetme ve geri yukleme
+### Diğer Özellikler
+- **Karanlık/aydınlık mod**: Tema değişimi tüm bileşenlere anında yansır
+- **Proje kaydetme**: Cookie + localStorage ile otomatik kaydetme ve geri yükleme
 - **Phosphor Icons**: Modern ikon seti
-- **XSS korumasi**: escapeHtml fonksiyonu ile tum dinamik icerik guvenli
-- **Slider + sayisal giris**: Her slider'in yaninda hassas deger girisi
-- **Yuklenme animasyonu**: Hesaplama sirasinda buton yuklenme gostergesi
+- **XSS koruması**: escapeHtml fonksiyonu ile tüm dinamik içerik güvenli
+- **Slider + sayısal giriş**: Her slider'ın yanında hassas değer girişi
+- **Yüklenme animasyonu**: Hesaplama sırasında buton yüklenme göstergesi
 
 ## Sistem Gereksinimleri
 
 - **Python 3.10+**
-- **Modern bir web tarayici** (Chrome, Firefox, Edge, Safari)
-- **Internet baglantisi** (CDN'den kutuphaneler yuklenir)
+- **Modern bir web tarayıcı** (Chrome, Firefox, Edge, Safari)
+- **İnternet bağlantısı** (CDN'den kütüphaneler yüklenir)
 
 ## Kurulum
 
 ```bash
-# Bagimliliklari yukleyin
+# Bağımlılıkları yükleyin
 pip3 install --break-system-packages flask numpy scipy
 
-# Uygulamayi baslatin
+# Uygulamayı başlatın
 python3 app.py
 
-# Tarayicida acin: http://localhost:5000
+# Tarayıcıda açın: http://localhost:5000
 ```
 
-## API Uç Noktalari
+## API Uç Noktaları
 
-| Route | Metod | Aciklama |
+| Route | Metot | Açıklama |
 |-------|-------|----------|
 | `/` | GET | Ana sayfa |
 | `/api/airfoils` | GET | Airfoil listesi |
-| `/api/airfoil/<id>` | GET | Airfoil detayi + koordinatlar |
-| `/api/airfoil_props/<code>` | GET | Airfoil ozellikleri (opsiyonel Re parametresi ile) |
+| `/api/airfoil/<id>` | GET | Airfoil detayı + koordinatlar |
+| `/api/airfoil_props/<code>` | GET | Airfoil özellikleri (opsiyonel Re parametresi ile) |
 | `/api/calculate` | POST | Geometri hesaplama |
 | `/api/analyze` | POST | Aerodinamik analiz |
-| `/api/stability` | POST | Ucabilirlik testi |
-| `/api/version` | GET | Surum bilgisi |
-| `/healthz` | GET | Saglik kontrolu |
+| `/api/stability` | POST | Uçabilirlik testi |
+| `/api/version` | GET | Sürüm bilgisi |
+| `/healthz` | GET | Sağlık kontrolü |
 
 ## Testler
 
@@ -133,21 +133,21 @@ pytest
 
 124 test (pytest):
 - `test_app.py`: Flask endpoint testleri
-- `test_airfoil.py`: Airfoil hesaplama, alpha_L0, cm_0, cl_max/cd_0 referans karsilastirmalari
-- `test_geometry.py`: Geometri hesaplamalari
-- `test_analysis.py`: Lifting-line cozumu, 3D CL_alpha egimi
-- `test_stability.py`: Downwash AR-bagimliligi, htail alan etkisi
+- `test_airfoil.py`: Airfoil hesaplama, alpha_L0, cm_0, cl_max/cd_0 referans karşılaştırmaları
+- `test_geometry.py`: Geometri hesaplamaları
+- `test_analysis.py`: Lifting-line çözümü, 3D CL_alpha eğimi
+- `test_stability.py`: Downwash AR-bağımlılığı, htail alan etkisi
 
 CI/CD: GitHub Actions ile push/PR'da otomatik test.
 
-## Dosya Yapisi
+## Dosya Yapısı
 
 ```
 zeta/
 ├── app.py                    # Ana Flask sunucu
-├── requirements.txt          # Python bagimliliklari
+├── requirements.txt          # Python bağımlılıkları
 ├── README.md
-├── VERSION                   # Surum numarasi (tek kaynak)
+├── VERSION                   # Sürüm numarası (tek kaynak)
 ├── CHANGELOG.md
 ├── RELEASING.md
 ├── pyproject.toml
@@ -158,17 +158,17 @@ zeta/
 ├── backend/
 │   ├── __init__.py
 │   ├── airfoil.py            # NACA airfoil hesaplama
-│   ├── geometry.py           # Geometi hesaplamalari
+│   ├── geometry.py           # Geometri hesaplamaları
 │   ├── analysis.py           # Aerodinamik analiz
-│   └── stability.py          # Ucabilirlik testi
+│   └── stability.py          # Uçabilirlik testi
 ├── static/
-│   ├── css/style.css         # Stil dosyasi (dark/light mode)
+│   ├── css/style.css         # Stil dosyası (dark/light mode)
 │   ├── favicon.svg
 │   └── js/
-│       ├── app.js            # Ana uygulama mantigi
-│       ├── viewer3d.js       # Three.js 3D goruntuleyici (kanat+govde+kuyruk)
+│       ├── app.js            # Ana uygulama mantığı
+│       ├── viewer3d.js       # Three.js 3D görüntüleyici (kanat+gövde+kuyruk)
 │       ├── charts.js         # Chart.js grafikleri
-│       └── stlexport.js      # STL disa aktarma
+│       └── stlexport.js      # STL dışa aktarma
 ├── templates/
 │   └── index.html            # Ana sayfa
 ├── tests/
@@ -185,18 +185,18 @@ zeta/
 
 ## Teknik Detaylar
 
-| Modul | Yontem |
+| Modül | Yöntem |
 |-------|--------|
-| Geometri | Klasik ucak geometrisi formulleri + STE modeli |
-| Aerodinamik | Lifting-line teorisi (Fourier serisi) + sweep duzeltmesi + post-stall |
-| Stabilite | Notr nokta, static margin, downwash (AR-bagimli) |
-| Airfoil | Thin airfoil teorisi, alpha_L0 numerik integral, Re-bagimli |
+| Geometri | Klasik uçak geometrisi formülleri + STE modeli |
+| Aerodinamik | Lifting-line teorisi (Fourier serisi) + sweep düzeltmesi + post-stall |
+| Stabilite | Nötr nokta, static margin, downwash (AR-bağımlı) |
+| Airfoil | Thin airfoil teorisi, alpha_L0 numerik integral, Re-bağımlı |
 | 3D Model | Three.js BufferGeometry + OrbitControls |
 | Grafikler | Chart.js (scatter + line) |
 | STL | Three.js STLBinaryExporter, manifold mesh |
-| Veritabani | SQLite |
+| Veritabanı | SQLite |
 | Frontend | Vanilla JS, CSS custom properties, Phosphor Icons |
 
-## Surum
+## Sürüm
 
-Mevcut surum: **v1.3.3**. Detayli degisiklik gunlugu icin [CHANGELOG.md](CHANGELOG.md)'ye bakin.
+Mevcut sürüm: **v1.3.3**. Detaylı değişiklik günlüğü için [CHANGELOG.md](CHANGELOG.md)'ye bakın.
