@@ -81,12 +81,14 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 .brand-mark {
-  display: block;
   font-family: var(--mono);
   font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: 0.18em;
 }
+
+.brand-mark { display: flex; align-items: center; gap: 10px; }
+.brand-logo { width: 26px; height: 26px; flex-shrink: 0; }
 
 .brand-sub {
   display: block;
@@ -789,6 +791,13 @@ input[type="range"]::-moz-range-thumb {
 .check-table .note { white-space: normal; min-width: 180px; }
 
 .flight-details { max-width: 520px; }
+
+/* ─── Görev ─── */
+#competition-inputs { margin-top: 20px; }
+.preset-row { margin-top: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.preset-row .hint { font-size: 0.75rem; color: var(--text-secondary); }
+#mission-checks:empty { display: none; }
+.mission-details { max-width: 520px; margin-top: 40px; }
 
 /* ─── STL indirme ─── */
 .stl-wall { max-width: 420px; }

@@ -22,12 +22,17 @@ const FUSE_DEFAULT_SHAPE = [
   { t: 0.917, w: 0.100, h: 0.100 },
   { t: 1.000, w: 0.057, h: 0.044 },
 ];
-const RESULT_TABS = ['results', 'viewer', 'fuse', 'charts', 'flight', 'stl'];
+const RESULT_TABS = ['results', 'viewer', 'fuse', 'charts', 'flight', 'mission', 'stl'];
+// Değeri olduğu gibi saklanıp geri yüklenen görev/güç alanları
+const MISSION_FIELDS = ['motorPower', 'batteryWh', 'avionicsPower', 'nLimit', 'targetEndurance', 'targetTurnRate', 'targetStall'];
+// Bataryadan itkiye toplam verim (ESC · motor · pervane) için tipik değer
+const PROP_EFFICIENCY = 0.6;
 
 const state = {
   geometry: null,
   polars: null,
   stability: null,
+  mission: null,
   airfoils: [],
   airfoilCoords: null,
   tailCoords: null,
@@ -257,6 +262,7 @@ function applyTheme() {
   if (typeof updateViewerTheme === 'function') updateViewerTheme();
   // Chart.js renkleri oluşturulurken okuduğu için grafikler yeniden çizilir
   if (state.polars) displayCharts(state.polars);
+  if (state.mission) displayMissionCharts(state.mission);
 }
 
 /* ─── Proje kaydı ─── */
@@ -277,6 +283,11 @@ function restoreProject() {
   if (data.reynolds) $('reynolds').value = data.reynolds;
   if (data.cg_percent) { $('cgSlider').value = data.cg_percent; updateCGDisplay(); }
   if (data.max_alpha) $('maxAlpha').value = data.max_alpha;
+  setRadio('mission_profile', data.mission_profile);
+  for (const id of MISSION_FIELDS) {
+    if (data.mission?.[id] != null) $(id).value = data.mission[id];
+  }
+  updateMissionProfile();
 
   if (Array.isArray(data.fuse_sections_m) && data.fuse_sections_m.length === 6) {
     state.fuseSections = data.fuse_sections_m;
@@ -300,7 +311,20 @@ function saveProject() {
     reynolds: parseInt($('reynolds').value) || 200000,
     cg_percent: parseInt($('cgSlider').value) || 25,
     max_alpha: parseInt($('maxAlpha').value) || 20,
+    mission_profile: radioValue('mission_profile', 'general'),
+    mission: Object.fromEntries(MISSION_FIELDS.map(id => [id, $(id).value])),
   }));
+}
+
+function updateMissionProfile() {
+  $('competition-inputs').hidden = radioValue('mission_profile', 'general') !== 'competition';
+}
+
+// Tipik bir yarışma İHA'sı için başlangıç değerleri (6S 10 Ah ≈ 222 Wh)
+function loadCompetitionPreset() {
+  const values = { wingspan: 2.0, weight: 5.0, motorPower: 1200, batteryWh: 222, avionicsPower: 30, nLimit: 4 };
+  for (const [id, value] of Object.entries(values)) $(id).value = value;
+  setRadio('wing_pos', 'high');
 }
 
 function updateCGDisplay() {
@@ -315,6 +339,11 @@ function setupEventListeners() {
       $('manual-inputs').hidden = radioValue('mode') !== 'manual';
     });
   });
+
+  document.querySelectorAll('input[name="mission_profile"]').forEach(input => {
+    input.addEventListener('change', updateMissionProfile);
+  });
+  $('loadCompetitionPreset').addEventListener('click', loadCompetitionPreset);
 
   $('viewX').addEventListener('click', () => viewerSetView('x'));
   $('viewY').addEventListener('click', () => viewerSetView('y'));
@@ -355,6 +384,13 @@ async function calculateAll() {
   const fuse_type = radioValue('fuse_type', 'conventional');
   const manual_mode = radioValue('mode', 'auto') === 'manual';
   const reynolds_number = parseInt($('reynolds').value) || 200000;
+  const motor_power = parseFloat($('motorPower').value);
+  const battery_wh = parseFloat($('batteryWh').value);
+  if (!(motor_power > 0) || !(battery_wh > 0)) {
+    showFormError('Motor gücü ve batarya enerjisi sıfırdan büyük olmalı.');
+    return;
+  }
+  const competition = radioValue('mission_profile', 'general') === 'competition';
 
   const body = {
     wingspan, weight, airfoil_code, tail_type, fuse_type, manual_mode,
@@ -377,13 +413,25 @@ async function calculateAll() {
     );
 
     state.geometry = await fetchAPI('/api/calculate', body);
-    [state.polars, state.stability] = await Promise.all([
+    [state.polars, state.stability, state.mission] = await Promise.all([
       fetchAPI('/api/analyze', {
         geometry: state.geometry, airfoil_code, reynolds_number,
         max_alpha: parseInt($('maxAlpha').value) || 20,
       }),
       fetchAPI('/api/stability', {
         geometry: state.geometry, airfoil_code, tail_airfoil_code: htail_airfoil, reynolds_number,
+        motor_power, prop_efficiency: PROP_EFFICIENCY,
+      }),
+      fetchAPI('/api/mission', {
+        geometry: state.geometry, airfoil_code, reynolds_number,
+        motor_power, battery_wh, prop_efficiency: PROP_EFFICIENCY,
+        avionics_power: parseFloat($('avionicsPower').value) || 0,
+        n_limit: parseFloat($('nLimit').value) || 4,
+        targets: competition ? {
+          endurance_min: parseFloat($('targetEndurance').value) || undefined,
+          turn_rate_deg: parseFloat($('targetTurnRate').value) || undefined,
+          stall_speed: parseFloat($('targetStall').value) || undefined,
+        } : undefined,
       }),
     ]);
 
@@ -398,6 +446,7 @@ async function calculateAll() {
 
     displayResults(state.geometry);
     displayFlightTest(state.stability);
+    displayMission(state.mission);
     enableResultTabs();
 
     // 3D sahneler boyutlarını kapsayıcıdan aldığı için sekme görünürken kurulur
@@ -410,6 +459,8 @@ async function calculateAll() {
 
     switchTab('charts');
     displayCharts(state.polars);
+    switchTab('mission');
+    displayMissionCharts(state.mission);
 
     switchTab('results');
   } catch (err) {
@@ -545,7 +596,7 @@ function displayFlightTest(stab) {
     ['Seyir CD', stab.cd_cruise, ''],
     ['Seyir sürüklemesi', stab.drag_cruise, 'N'],
     ['Gerekli güç', stab.power_required, 'W'],
-    ['Mevcut güç (150 W/kg varsayımı)', stab.power_available, 'W'],
+    ['Mevcut güç (itki)', stab.power_available, 'W'],
     ['Nötr nokta', (stab.neutral_point * 100).toFixed(1), '% MAC'],
     ['Ağırlık merkezi', (stab.cg_position * 100).toFixed(1), '% MAC'],
     ['Reynolds sayısı', stab.Reynolds.toLocaleString('tr-TR'), ''],
@@ -571,6 +622,78 @@ function displayFlightTest(stab) {
         `<div><dt>${escapeHtml(label)}</dt><dd class="num">${escapeHtml(String(value))}${unit ? ` <span class="unit">${unit}</span>` : ''}</dd></div>`
       ).join('')}</dl>
     </section>`;
+}
+
+const MISSION_TARGETS = {
+  endurance_min: { label: 'Havada kalış', unit: 'dk', sign: '≥' },
+  turn_rate_deg: { label: 'Sürekli dönüş hızı', unit: '°/s', sign: '≥' },
+  stall_speed: { label: 'Stall hızı', unit: 'm/s', sign: '≤' },
+};
+
+function displayMission(m) {
+  const unitHtml = unit => unit ? ` <span class="unit">${unit}</span>` : '';
+  const stat = ([label, value, unit]) =>
+    `<div class="stat">
+      <div class="stat-label">${label}</div>
+      <div class="stat-value num">${escapeHtml(String(value ?? '–'))}${unitHtml(unit)}</div>
+    </div>`;
+  $('mission-summary').innerHTML = [
+    ['Havada kalış (seyirde)', m.endurance_min, 'dk'],
+    ['Azami hız', m.max_speed, 'm/s'],
+    ['Sürekli dönüş', m.turn_rate_deg, '°/s'],
+    ['Dönüş yarıçapı', m.turn_radius, 'm'],
+  ].map(stat).join('');
+
+  let checksHtml = '';
+  if (!m.can_fly) {
+    checksHtml = `<div class="verdict fail"><i class="ph ph-x-circle"></i><div>
+      <strong>Güç yetersiz</strong>
+      <p>Bu motor gücüyle uçak düz uçuşu sürdüremiyor. Motor gücünü artırın ya da ağırlığı azaltın.</p>
+    </div></div>`;
+  } else if (m.checks) {
+    const failed = m.checks.filter(c => c.status === 'fail').length;
+    const rows = m.checks.map(c => {
+      const def = MISSION_TARGETS[c.key];
+      const st = STATUS[c.status];
+      return `<tr>
+        <th scope="row">${def.label}</th>
+        <td class="num">${c.value} <span class="unit">${def.unit}</span></td>
+        <td class="limit">${def.sign} ${c.target} ${def.unit}</td>
+        <td><span class="status ${c.status}"><i class="ph ${st.icon}"></i>${st.label}</span></td>
+      </tr>`;
+    }).join('');
+    checksHtml = `<div class="verdict ${m.targets_met ? 'pass' : 'fail'}">
+      <i class="ph ${m.targets_met ? 'ph-check-circle' : 'ph-x-circle'}"></i>
+      <div>
+        <strong>${m.targets_met ? 'Görev hedefleri karşılanıyor' : 'Görev hedefleri karşılanmıyor'}</strong>
+        <p>${failed ? `${m.checks.length} hedeften ${failed} tanesi tutmuyor.` : 'Hedefler Parametreler adımından düzenlenebilir.'}</p>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="check-table">
+        <thead><tr><th>Hedef</th><th>Değer</th><th>İstenen</th><th>Durum</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }
+  $('mission-checks').innerHTML = checksHtml;
+
+  $('mission-details').innerHTML = [
+    ['Stall hızı', m.stall_speed, 'm/s'],
+    ['Seyir hızı', m.cruise_speed, 'm/s'],
+    ['Seyirde çekilen güç', m.cruise_power, 'W'],
+    ['Menzil (seyirde)', m.range_km, 'km'],
+    ['Azami tırmanma', m.climb_rate, 'm/s'],
+    ['Sürekli dönüşte yük faktörü', m.turn_load_factor, 'g'],
+    ['Köşe hızı', m.corner_speed, 'm/s'],
+    ['Anlık dönüş (köşe hızında)', m.corner_turn_rate_deg, '°/s'],
+    ['Anlık dönüş yarıçapı', m.corner_turn_radius, 'm'],
+    ['Kanat yüklemesi', m.wing_loading, 'kg/m²'],
+    ['Güç yüklemesi', m.power_loading, 'W/kg'],
+    ['Toplam CD0', m.cd0_total, ''],
+  ].map(([label, value, unit]) =>
+    `<div><dt>${label}</dt><dd class="num">${escapeHtml(String(value))}${unitHtml(unit)}</dd></div>`
+  ).join('');
 }
 
 window.addEventListener('DOMContentLoaded', init);

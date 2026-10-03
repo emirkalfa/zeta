@@ -51,26 +51,49 @@ function fmt(v) {
   return String(parseFloat(v.toFixed(digits)));
 }
 
-function displayCharts(polars) {
-  destroyCharts();
+function chartTheme() {
   const css = getComputedStyle(document.documentElement);
-  const theme = {
+  return {
     line: css.getPropertyValue('--primary').trim(),
     text: css.getPropertyValue('--text-secondary').trim(),
     grid: css.getPropertyValue('--border').trim(),
     font: css.getPropertyValue('--mono').trim(),
   };
+}
 
+function displayCharts(polars) {
+  const theme = chartTheme();
   for (const def of CHART_DEFS) {
     const { points, note } = def.build(polars);
     if (!points || !points.length) continue;
     document.getElementById('note' + def.id).textContent = note;
-    createLineChart('chart' + def.id, def, points, theme);
+    createLineChart('chart' + def.id, def, [{ points }], theme);
     createTable('table' + def.id, def, points);
   }
 }
 
-function createLineChart(canvasId, def, points, theme) {
+// Görev sayfası: dönüş hızı ve güç eğrileri
+function displayMissionCharts(mission) {
+  const theme = chartTheme();
+  document.getElementById('noteTurn').textContent =
+    `En iyi sürekli ${fmt(mission.turn_rate_deg)}°/s · ${fmt(mission.turn_speed)} m/s`;
+  createLineChart('chartTurn', { x: 'Hız (m/s)', y: 'Dönüş hızı (°/s)' }, [
+    { label: 'Sürekli', points: mission.turn_curve.map(d => ({ x: d.v, y: d.sustained })) },
+    { label: 'Anlık', points: mission.turn_curve.map(d => ({ x: d.v, y: d.instantaneous })), secondary: true },
+  ], theme);
+
+  const speeds = mission.power_curve.map(d => d.v);
+  document.getElementById('notePower').textContent = `Mevcut ${fmt(mission.power_available)} W`;
+  createLineChart('chartPower', { x: 'Hız (m/s)', y: 'Güç (W)' }, [
+    { label: 'Gerekli', points: mission.power_curve.map(d => ({ x: d.v, y: d.required })) },
+    { label: 'Mevcut', points: [speeds[0], speeds[speeds.length - 1]].map(v => ({ x: v, y: mission.power_available })), secondary: true },
+  ], theme);
+}
+
+// series: [{ points, label?, secondary? }] — ikincil seriler nötr renkte ve kesikli çizilir
+function createLineChart(canvasId, def, series, theme) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+
   const axis = (label) => ({
     title: { display: true, text: label, color: theme.text },
     grid: { color: theme.grid },
@@ -81,16 +104,18 @@ function createLineChart(canvasId, def, points, theme) {
   charts[canvasId] = new Chart(document.getElementById(canvasId), {
     type: 'scatter',
     data: {
-      datasets: [{
+      datasets: series.map(({ points, label, secondary }) => ({
+        label,
         data: points,
         showLine: true,
-        borderColor: theme.line,
-        backgroundColor: theme.line,
+        borderColor: secondary ? theme.text : theme.line,
+        backgroundColor: secondary ? theme.text : theme.line,
+        borderDash: secondary ? [6, 4] : [],
         borderWidth: 2,
         pointRadius: 0,
         pointHoverRadius: 4,
         pointHitRadius: 12,
-      }],
+      })),
     },
     options: {
       responsive: true,
@@ -98,7 +123,11 @@ function createLineChart(canvasId, def, points, theme) {
       animation: false,
       interaction: { mode: 'nearest', intersect: false },
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: series.length > 1,
+          align: 'end',
+          labels: { color: theme.text, boxWidth: 18, boxHeight: 0, font: { size: 11 } },
+        },
         tooltip: {
           displayColors: false,
           callbacks: {
@@ -118,11 +147,4 @@ function createTable(containerId, def, points) {
   ).join('');
   document.getElementById(containerId).innerHTML =
     `<table class="data-table num"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
-}
-
-function destroyCharts() {
-  for (const key in charts) {
-    charts[key].destroy();
-    delete charts[key];
-  }
 }

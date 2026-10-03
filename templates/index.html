@@ -27,7 +27,7 @@
 <div id="app">
   <aside id="sidebar">
     <div class="brand">
-      <span class="brand-mark">ZETA</span>
+      <span class="brand-mark"><svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true"><use href="/static/favicon.svg#mark"/></svg>ZETA</span>
       <span class="brand-sub">Uçak tasarım ve analiz aracı</span>
     </div>
     <ol id="sidebar-nav">
@@ -37,7 +37,8 @@
       <li><button class="sidebar-link" data-tab="fuse" disabled><span class="nav-num">04</span>Gövde</button></li>
       <li><button class="sidebar-link" data-tab="charts" disabled><span class="nav-num">05</span>Analiz</button></li>
       <li><button class="sidebar-link" data-tab="flight" disabled><span class="nav-num">06</span>Uçabilirlik</button></li>
-      <li><button class="sidebar-link" data-tab="stl" disabled><span class="nav-num">07</span>STL indirme</button></li>
+      <li><button class="sidebar-link" data-tab="mission" disabled><span class="nav-num">07</span>Görev</button></li>
+      <li><button class="sidebar-link" data-tab="stl" disabled><span class="nav-num">08</span>STL indirme</button></li>
     </ol>
     <p class="nav-hint" id="navHint">Diğer adımlar ilk hesaplamadan sonra açılır.</p>
     <div class="sidebar-foot">
@@ -170,6 +171,63 @@
               <label for="maxAlpha">Maks. hücum açısı</label>
               <div class="input-wrap"><input type="number" id="maxAlpha" step="5" min="10" max="40" value="20"><span class="unit">°</span></div>
               <small class="hint">Grafiklerin α aralığı (10°–40°)</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-head">
+            <h3>Görev ve güç sistemi</h3>
+            <p>Hız, havada kalış ve manevra hesabı için. Yarışma profili, sonuçları kendi hedeflerinizle karşılaştırır.</p>
+          </div>
+          <div>
+            <div class="form-grid">
+              <div class="field wide">
+                <span class="field-label" id="lblMission">Görev profili</span>
+                <div class="segmented" role="radiogroup" aria-labelledby="lblMission">
+                  <label><input type="radio" name="mission_profile" value="general" checked><span>Genel model uçak</span></label>
+                  <label><input type="radio" name="mission_profile" value="competition"><span>Yarışma İHA'sı (Savaşan İHA vb.)</span></label>
+                </div>
+              </div>
+              <div class="field">
+                <label for="motorPower">Motor gücü</label>
+                <div class="input-wrap"><input type="number" id="motorPower" min="1" step="10" value="400"><span class="unit">W</span></div>
+                <small class="hint">Motorun azami elektrik gücü</small>
+              </div>
+              <div class="field">
+                <label for="batteryWh">Batarya enerjisi</label>
+                <div class="input-wrap"><input type="number" id="batteryWh" min="1" step="1" value="74"><span class="unit">Wh</span></div>
+                <small class="hint">Ör. 4S 5000 mAh ≈ 74 Wh</small>
+              </div>
+              <div class="field">
+                <label for="avionicsPower">Aviyonik tüketimi</label>
+                <div class="input-wrap"><input type="number" id="avionicsPower" min="0" step="1" value="5"><span class="unit">W</span></div>
+                <small class="hint">Otopilot, görev bilgisayarı, kamera</small>
+              </div>
+              <div class="field">
+                <label for="nLimit">Yük faktörü sınırı</label>
+                <div class="input-wrap"><input type="number" id="nLimit" min="1.5" max="12" step="0.5" value="4"><span class="unit">g</span></div>
+                <small class="hint">Yapının taşıyabildiği azami g</small>
+              </div>
+            </div>
+            <div id="competition-inputs" hidden>
+              <h4 class="form-subhead">Görev hedefleri</h4>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="targetEndurance">Havada kalış, en az</label>
+                  <div class="input-wrap"><input type="number" id="targetEndurance" min="1" step="1" value="20"><span class="unit">dk</span></div>
+                </div>
+                <div class="field">
+                  <label for="targetTurnRate">Sürekli dönüş, en az</label>
+                  <div class="input-wrap"><input type="number" id="targetTurnRate" min="1" step="1" value="30"><span class="unit">°/s</span></div>
+                </div>
+                <div class="field">
+                  <label for="targetStall">Stall hızı, en fazla</label>
+                  <div class="input-wrap"><input type="number" id="targetStall" min="1" step="0.5" value="12"><span class="unit">m/s</span></div>
+                </div>
+              </div>
+              <small class="hint">Hedefler başlangıç değerleridir; güncel yarışma şartnamesine ve takım stratejinize göre düzenleyin.</small>
+              <p class="preset-row"><button type="button" id="loadCompetitionPreset" class="btn">Örnek yarışma İHA'sı değerlerini yükle</button> <span class="hint">2 m açıklık, 5 kg, 1200 W, 6S 10 Ah</span></p>
             </div>
           </div>
         </div>
@@ -372,6 +430,39 @@
         </div>
       </header>
       <div id="flight-results"></div>
+    </section>
+
+    <!-- Tab: Mission -->
+    <section class="tab-pane" data-tab="mission">
+      <header class="page-head">
+        <div>
+          <h2>Görev performansı</h2>
+          <p class="page-desc">Güç sistemine göre hız zarfı, havada kalış ve dönüş (manevra) performansı.</p>
+        </div>
+      </header>
+      <div id="mission-summary" class="stat-row"></div>
+      <div id="mission-checks"></div>
+      <div class="charts-grid">
+        <figure class="chart-box">
+          <figcaption>
+            <h3>Dönüş hızı</h3>
+            <p id="noteTurn"></p>
+          </figcaption>
+          <div class="chart-canvas-wrap"><canvas id="chartTurn"></canvas></div>
+        </figure>
+        <figure class="chart-box">
+          <figcaption>
+            <h3>Güç eğrisi</h3>
+            <p id="notePower"></p>
+          </figcaption>
+          <div class="chart-canvas-wrap"><canvas id="chartPower"></canvas></div>
+        </figure>
+      </div>
+      <section class="spec-group mission-details">
+        <h3>Hesap ayrıntıları</h3>
+        <dl id="mission-details"></dl>
+      </section>
+      <p class="stl-note">Hesap parabolik sürükleme polarına ve hızdan bağımsız mevcut güce dayanır; rüzgâr, tırmanma ve manevra sırasındaki ek tüketim havada kalış süresine dahil değildir. Gerçek uçuşta süre daha kısa olur.</p>
     </section>
 
     <!-- Tab: STL -->
