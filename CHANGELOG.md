@@ -4,12 +4,20 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+### Added
+- Tek komutla başlatma: `start.sh` / `start.bat` sanal ortamı kurar, bağımlılıkları yükler ve tarayıcıyı açar. `app.py` `--port`, `--host`, `--no-browser` seçeneklerini alır; port doluysa sonraki boş portu seçer.
+- İskeletli kanat STL'i: kanat içi boş üretilir, ayarlanabilir aralıkta rib'ler ve rib'lerden geçen ana/arka spar delikleri içerir (rib aralığı, rib kalınlığı ve delik çapları STL sayfasından ayarlanır).
+- 3D model yenilendi: firar kenarında gerçek kontrol yüzeyi panelleri (flap, kanatçık, elevator, rudder), yuvarlatılmış kanat uçları, spinner ve pervane, zemin gölgesi.
+
 ### Changed
 - Arayüz baştan tasarlandı: sade teknik tema (açık/koyu), numaralı adımlar, bölümlere ayrılmış parametre formu, gruplu ölçü tabloları, kriter tablolu uçabilirlik sayfası, satır tabanlı STL sayfası.
 - 3D sahnede kamera ve ızgara modelin boyutuna göre kadrajlanıyor.
 - Analiz grafikleri temaya uyuyor; sürükleme poları yalnızca stall öncesi noktaları çiziyor (`cd_vs_cl` noktalarına `stalled` alanı eklendi).
 - `/api/stability` yanıtına yapısal `checks` listesi eklendi.
 - Ayarlar çerez yerine `localStorage`'da saklanıyor.
+- Ana 3D sahne ve gövde önizlemesi aynı model kurucuyu kullanıyor (`aircraftmodel.js`); `viewer3d.js` yaklaşık 1000 satır kısaldı.
+- T-kuyrukta yatay kuyruk artık dikey kuyruğun tepesinde.
+- `requirements.txt` sürüm alt sınırlarına geçti; varsayılan sunucu adresi `127.0.0.1`.
 
 ### Fixed
 - Özgün gövde kesitlerinin genişlik/yüksekliği metre yerine oran gibi yorumlanıyordu; varsayılan gövde 1 m çapında çıkıyordu.
