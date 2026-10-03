@@ -5,6 +5,9 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 ## [Unreleased]
 
 ### Added
+- Görev performansı adımı ve `/api/mission`: motor gücü ve bataryadan azami hız, havada kalış, menzil ve dönüş performansı; yarışma İHA'ları (Savaşan İHA vb.) için düzenlenebilir hedeflerle karşılaştırma ve örnek başlangıç değerleri.
+- Uçabilirlik testi artık 150 W/kg varsayımı yerine girilen motor gücünü kullanıyor.
+- Yeni logo ve favicon; README baştan yazıldı.
 - Tek komutla başlatma: `start.sh` / `start.bat` sanal ortamı kurar, bağımlılıkları yükler ve tarayıcıyı açar. `app.py` `--port`, `--host`, `--no-browser` seçeneklerini alır; port doluysa sonraki boş portu seçer.
 - İskeletli kanat STL'i: kanat içi boş üretilir, ayarlanabilir aralıkta rib'ler ve rib'lerden geçen ana/arka spar delikleri içerir (rib aralığı, rib kalınlığı ve delik çapları STL sayfasından ayarlanır).
 - 3D model yenilendi: firar kenarında gerçek kontrol yüzeyi panelleri (flap, kanatçık, elevator, rudder), yuvarlatılmış kanat uçları, spinner ve pervane, zemin gölgesi.
