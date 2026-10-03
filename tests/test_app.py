@@ -1,4 +1,5 @@
 """Smoke tests for Flask API endpoints in app.py."""
+import pytest
 
 
 class TestIndex:
@@ -106,3 +107,35 @@ class TestStability:
         for key in ("stall_speed", "cruise_speed", "static_margin",
                     "stability_status", "overall_passed", "assessments"):
             assert key in data
+
+
+class TestDesktopPresence:
+    """Masaüstü modunda sunucunun kendini kapatma kararı."""
+
+    @pytest.fixture(autouse=True)
+    def reset(self, app_module):
+        saved = dict(app_module._presence)
+        yield
+        app_module._presence.update(saved)
+
+    def test_waits_for_first_contact(self, app_module):
+        app_module._presence.update(started=0.0, seen=None, closing=None)
+        assert not app_module._should_exit(10.0)
+        assert app_module._should_exit(app_module.FIRST_CONTACT_TIMEOUT + 1.0)
+
+    def test_stays_alive_while_heartbeats_arrive(self, app_module):
+        app_module._presence.update(started=0.0, seen=100.0, closing=None)
+        assert not app_module._should_exit(100.0 + app_module.HEARTBEAT_TIMEOUT - 1)
+        assert app_module._should_exit(100.0 + app_module.HEARTBEAT_TIMEOUT + 1)
+
+    def test_exits_shortly_after_page_closes(self, app_module):
+        app_module._presence.update(started=0.0, seen=100.0, closing=101.0)
+        assert not app_module._should_exit(102.0)
+        assert app_module._should_exit(101.0 + app_module.CLOSE_GRACE + 1)
+
+    def test_reload_cancels_pending_close(self, client, app_module):
+        assert client.post('/api/closing').status_code == 204
+        assert app_module._presence['closing'] is not None
+        res = client.post('/api/heartbeat')
+        assert res.get_json() == {'desktop': False}
+        assert app_module._presence['closing'] is None

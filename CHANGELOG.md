@@ -4,6 +4,38 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+### Added
+- Kurulum gerektirmeyen masaüstü paketleri: Linux AppImage, Windows `.exe`, macOS `.app`. Uygulama tarayıcıda açılır, sekme kapanınca kendini kapatır, ikinci açılışta çalışan kopyaya gider.
+- Çevrimdışı çalışma: three.js, Chart.js, ikonlar ve yazı tipleri depoda (`static/vendor`).
+- CI/CD: üç işletim sisteminde test, her pakette duman testi, `v*` etiketiyle CHANGELOG notları ve SHA256 özetleriyle otomatik GitHub Release.
+- Yarışma İHA'sı gövde yerleşimi (`airframe: combat`): itici pervane, kamera için boş burun, çift bom, ikiz dikey kuyruk ya da ters V kuyruk; daha düşük açıklık oranı ve daha büyük kanatçıklar. 3D model ve ölçüler bu yerleşime göre üretilir.
+- Görev performansı adımı ve `/api/mission`: motor gücü ve bataryadan azami hız, havada kalış, menzil ve dönüş performansı; yarışma İHA'ları (Savaşan İHA vb.) için düzenlenebilir hedeflerle karşılaştırma ve örnek başlangıç değerleri.
+- Uçabilirlik testi artık 150 W/kg varsayımı yerine girilen motor gücünü kullanıyor.
+- Yeni logo ve favicon; README baştan yazıldı.
+- Tek komutla başlatma: `start.sh` / `start.bat` sanal ortamı kurar, bağımlılıkları yükler ve tarayıcıyı açar. `app.py` `--port`, `--host`, `--no-browser` seçeneklerini alır; port doluysa sonraki boş portu seçer.
+- İskeletli kanat STL'i: kanat içi boş üretilir, ayarlanabilir aralıkta rib'ler ve rib'lerden geçen ana/arka spar delikleri içerir (rib aralığı, rib kalınlığı ve delik çapları STL sayfasından ayarlanır).
+- 3D model yenilendi: firar kenarında gerçek kontrol yüzeyi panelleri (flap, kanatçık, elevator, rudder), yuvarlatılmış kanat uçları, spinner ve pervane, zemin gölgesi.
+
+### Changed
+- Kullanılmayan `scipy` bağımlılığı kaldırıldı.
+- Paketlenmiş uygulamada veritabanı kullanıcı veri dizininde tutulur.
+- Uygulama alt bilgisinden ve README'den yapımcı adı kaldırıldı.
+- Arayüz baştan tasarlandı: sade teknik tema (açık/koyu), numaralı adımlar, bölümlere ayrılmış parametre formu, gruplu ölçü tabloları, kriter tablolu uçabilirlik sayfası, satır tabanlı STL sayfası.
+- 3D sahnede kamera ve ızgara modelin boyutuna göre kadrajlanıyor.
+- Analiz grafikleri temaya uyuyor; sürükleme poları yalnızca stall öncesi noktaları çiziyor (`cd_vs_cl` noktalarına `stalled` alanı eklendi).
+- `/api/stability` yanıtına yapısal `checks` listesi eklendi.
+- Ayarlar çerez yerine `localStorage`'da saklanıyor.
+- Ana 3D sahne ve gövde önizlemesi aynı model kurucuyu kullanıyor (`aircraftmodel.js`); `viewer3d.js` yaklaşık 1000 satır kısaldı.
+- T-kuyrukta yatay kuyruk artık dikey kuyruğun tepesinde.
+- `requirements.txt` sürüm alt sınırlarına geçti; varsayılan sunucu adresi `127.0.0.1`.
+
+### Fixed
+- Özgün gövde kesitlerinin genişlik/yüksekliği metre yerine oran gibi yorumlanıyordu; varsayılan gövde 1 m çapında çıkıyordu.
+- Gövde sekmesi hesaplanan gövde ölçülerini eziyor, konvansiyonel gövde STL'i yanlış uzunlukla üretiliyordu.
+- Duvar kalınlığı değişikliği yeniden hesaplama yapılmadan STL'e yansımıyordu.
+- Statik marj "aşırı stabil" iken uçabilirlik kartı yeşil görünüyordu.
+- Tema değiştirildiğinde grafik renkleri güncellenmiyordu.
+
 ## [1.2.3] - 2026-06-28
 
 ### Added
@@ -52,16 +84,16 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ### Added
 - 19 yeni test (toplam 124): alpha_L0, cm_0, cl_max/cd_0 referans karşılaştırmaları, cambered CL@α=0, 3D CL_α eğimi, downwash AR-bağımlılığı, htail alan etkisi.
-- `app.py` `/api/version` endpoint'i — `VERSION` dosyasını döner.
+- `app.py` `/api/version` endpoint'i: `VERSION` dosyasını döner.
 - `app.py` `/healthz` endpoint'i.
 - `VERSION` dosyası (tek kaynak).
 - `pyproject.toml` (PEP 621 metadata, `setuptools.dynamic.version`).
 - `CHANGELOG.md`.
-- `.github/workflows/ci.yml` — push/PR'da testler.
-- `.github/workflows/release.yml` — `v*` tag'de GitHub Release.
-- `.github/release-drafter.yml` — otomatik release notes.
-- `scripts/bump_version.py` — semver atlama yardımcısı.
-- `RELEASING.md` — release süreci dokümanı.
+- `.github/workflows/ci.yml`: push/PR'da testler.
+- `.github/workflows/release.yml`: `v*` tag'de GitHub Release.
+- `.github/release-drafter.yml`: otomatik release notes.
+- `scripts/bump_version.py`: semver atlama yardımcısı.
+- `RELEASING.md`: release süreci dokümanı.
 
 ## [0.1.0] - 2026-05-23
 

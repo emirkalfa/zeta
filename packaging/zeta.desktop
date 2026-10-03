@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ZETA
+GenericName=Uçak Tasarım Aracı
+Comment=Sabit kanatlı uçak ve İHA tasarım, analiz ve 3D baskı aracı
+Exec=ZETA
+Icon=zeta
+Categories=Science;Engineering;Education;
+Terminal=false

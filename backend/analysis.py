@@ -112,6 +112,7 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
             'Cm': round(float(Cm), 4),
             'CL_CD': round(float(CL / CD if CD != 0 else 0), 2),
             'CL_2d': round(float(CL_2d), 4),
+            'stalled': bool(stall_overshoot > 0),
             'lift_distribution': lift_dist,
         })
 
@@ -130,7 +131,7 @@ def calculate_polars(geom, airfoil_props, max_alpha=20):
 
     for r in results:
         polars['cl_vs_alpha'].append({'x': r['alpha'], 'y': r['CL']})
-        polars['cd_vs_cl'].append({'x': r['CD'], 'y': r['CL']})
+        polars['cd_vs_cl'].append({'x': r['CD'], 'y': r['CL'], 'stalled': r['stalled']})
         polars['cm_vs_alpha'].append({'x': r['alpha'], 'y': r['Cm']})
         polars['efficiency'].append({'x': r['alpha'], 'y': r['CL_CD']})
 

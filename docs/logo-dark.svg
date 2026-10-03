@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="300" height="64" role="img" aria-label="ZETA">
+  <rect width="64" height="64" rx="14" fill="#f4f2ec"/>
+  <path d="M16 15h32v7H16zM16 42h32v7H16z" fill="#1b1c1e"/>
+  <path d="M48 22 23 42H16L39 22z" fill="#ff7a3d"/>
+  <g fill="none" stroke="#f4f2ec" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M95 17h28L95 47h28"/>
+    <path d="M171 17h-25v30h25M146 32h20"/>
+    <path d="M192 17h30M207 17v30"/>
+    <path d="M241 47l15-30 15 30M248 37h16"/>
+  </g>
+</svg>

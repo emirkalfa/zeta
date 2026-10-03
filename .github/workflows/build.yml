@@ -1,0 +1,66 @@
+name: Build
+
+# Masaüstü paketlerini üretir ve her birini çalıştırıp dener.
+# CI ve Release iş akışları tarafından çağrılır; elle de tetiklenebilir.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Eski dağıtımlarda da çalışması için AppImage en eski desteklenen Ubuntu'da derlenir
+          - name: Linux AppImage
+            os: ubuntu-22.04
+            artifact: zeta-linux
+          - name: Windows exe
+            os: windows-latest
+            artifact: zeta-windows
+          - name: macOS app
+            os: macos-latest
+            artifact: zeta-macos
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: python -m pip install -e ".[build]"
+
+      - name: Paketle
+        run: python packaging/build.py
+
+      - name: Paketi bul
+        id: pkg
+        shell: bash
+        run: |
+          file=$(ls dist/release/* | head -n 1)
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+          # macOS'ta zip yerine içindeki çalıştırılabilir dosya denenir
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            echo "run=dist/ZETA.app/Contents/MacOS/ZETA" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=$file" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Smoke test (paket)
+        run: python scripts/smoke_test.py "${{ steps.pkg.outputs.run }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ steps.pkg.outputs.file }}
+          if-no-files-found: error
+          retention-days: 14

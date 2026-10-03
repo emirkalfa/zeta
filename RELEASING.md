@@ -1,145 +1,85 @@
-# Release Süreci
+# Sürüm Yayınlama
 
-Bu doküman ZETA için versiyon yönetimi ve release yayınlama adımlarını açıklar.
+ZETA sürümleri bir `v*` etiketi itildiğinde GitHub Actions tarafından otomatik yayınlanır. Elle yapılacak iş sürüm numarasını yükseltmek, değişiklik notlarını gözden geçirmek ve etiketi itmektir.
 
-## Versiyon Şeması
+## İş akışları
 
-[Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH` (örn. `0.2.0`).
+| Dosya | Ne zaman çalışır | Ne yapar |
+|-------|------------------|----------|
+| `ci.yml` | Ana dala her push ve her PR | Testler (Linux'ta Python 3.10–3.13, Windows ve macOS'ta 3.12), kaynak koddan duman testi, JavaScript sözdizimi kontrolü, ardından paketleme |
+| `build.yml` | CI ve Release tarafından çağrılır; Actions sekmesinden elle de başlatılabilir | Linux AppImage, Windows `.exe` ve macOS `.app` üretir, her paketi çalıştırıp dener, 14 gün saklanan artifact olarak yükler |
+| `release.yml` | `v*` etiketi itildiğinde | Etiket, `VERSION` ve `CHANGELOG.md` uyumunu doğrular, CI'ın tamamını çalıştırır, paketleri ve `SHA256SUMS.txt` dosyasını GitHub Release'e ekler |
 
-- **MAJOR**: Geriye uyumsuz API/komut davranışı değişiklikleri.
-- **MINOR**: Geriye uyumlu yeni özellikler.
-- **PATCH**: Geriye uyumlu hata düzeltmeleri, dokümantasyon, refactor.
+Herhangi bir adım başarısız olursa Release oluşturulmaz.
 
-**Mevcut sürüm:** `VERSION` dosyasından okunur (tek kaynak). `pyproject.toml`
-`setuptools.dynamic.version` ile bunu otomatik çeker. `app.py` `APP_VERSION`
-sabitine yükler ve `/api/version` endpoint'inde döner.
+## Sürüm numarası
 
-## Branch Stratejisi
+[Semantic Versioning](https://semver.org/) kullanılır: `MAJOR.MINOR.PATCH`.
 
-- `main` — kararlı sürüm, her release sonrası güncellenir.
-- `feat/*`, `fix/*` — geliştirme branch'leri. PR yoluyla `main`'e birleşir.
-- `v*` tag'leri — release işaretçileri.
+- **MAJOR**: geriye uyumsuz değişiklik (API alanı kaldırma, kayıtlı proje biçimini bozma)
+- **MINOR**: geriye uyumlu yeni özellik
+- **PATCH**: hata düzeltmesi, doküman, iç düzenleme
 
-CI (`ci.yml`) `main` push'larında + tüm PR'larda test çalıştırır.
-Release workflow (`release.yml`) sadece `v*` tag push'unda tetiklenir,
-otomatik olarak GitHub Release oluşturur.
+Sürümün tek kaynağı `VERSION` dosyasıdır. `pyproject.toml`, `app.py` (`/api/version`), paket dosya adları ve arayüzdeki sürüm etiketi buradan okur.
 
-## Release Yayınlama Adımları
+`1.4.0-rc.1` gibi tire içeren sürümler GitHub'da ön sürüm olarak işaretlenir.
 
-### 1. Hazırlık
+## Adımlar
 
 ```bash
-# main'i güncelle
-git checkout main
-git pull origin main
+# 1. Ana dal güncel ve temiz olsun
+git checkout main && git pull
 
-# Tüm testlerin geçtiğinden emin ol
-python -m pytest -q
+# 2. Sürümü yükselt: patch, minor, major ya da açık bir sürüm (ör. 1.4.0-rc.1)
+python scripts/bump_version.py minor
 ```
 
-### 2. Versiyonu Yükselt
-
-Otomatik (önerilen):
+Betik `VERSION` dosyasını günceller, `CHANGELOG.md` içindeki `[Unreleased]` başlığının altına tarihli yeni sürüm başlığını açar ve dosya sonundaki karşılaştırma bağlantılarını düzeltir.
 
 ```bash
-python scripts/bump_version.py minor   # veya patch/major/0.3.0
+# 3. CHANGELOG'daki yeni bölümü gözden geçir, yayın notlarını önizle
+python scripts/release_notes.py v1.4.0
+
+# 4. Commit, etiket, push
+git commit -am "release: v1.4.0"
+git tag -a v1.4.0 -m "Release v1.4.0"
+git push origin HEAD v1.4.0
 ```
 
-Bu komut:
-- `VERSION` dosyasını günceller
-- `CHANGELOG.md` `[Unreleased]` bölümünü yeni tarihle değiştirir
-- Sonraki commit/tag komutlarını yazdırır
+Etiket itildikten sonra Actions sekmesinde **Release** iş akışı çalışır. Bittiğinde Releases sayfasında şunlar bulunmalıdır:
 
-Manuel alternatif:
+- `ZETA-<sürüm>-linux-x86_64.AppImage`
+- `ZETA-<sürüm>-windows-x64.exe`
+- `ZETA-<sürüm>-macos-arm64.zip`
+- `SHA256SUMS.txt`
+
+Yayın notları `CHANGELOG.md` içindeki ilgili bölümden alınır; bu yüzden geliştirme sırasında her değişikliği `[Unreleased]` altına yazmak yeterlidir.
+
+## Yerelde paket üretmek
 
 ```bash
-# VERSION: 0.2.0 -> 0.3.0
-echo "0.3.0" > VERSION
+pip install -e ".[build]"
+python packaging/build.py                      # dist/release/ altına yazar
+python scripts/smoke_test.py dist/release/ZETA-*.AppImage
 ```
 
-### 3. CHANGELOG'u Düzenle
+`build.py` yalnızca üzerinde çalıştığı işletim sisteminin paketini üretir. Duman testi uygulamayı başlatır, arayüz dosyalarının pakete girdiğini ve hesap uç noktalarını dener, sonra uygulamanın kendini kapattığını doğrular.
 
-`CHANGELOG.md` yeni sürüm bölümünü doldur:
+## Sorun giderme
 
-```markdown
-## [0.3.0] - 2026-06-XX
-
-### Added
-- Yeni özellik açıklaması (#PR_NUM) @kullanici
-
-### Fixed
-- Bug düzeltmesi (#PR_NUM) @kullanici
-```
-
-### 4. Commit + Tag
+**"etiket vX, VERSION dosyası Y" hatası:** etiket `VERSION` ile eşleşmiyor. Etiketi silin, sürümü düzeltin, yeniden etiketleyin:
 
 ```bash
-git add VERSION CHANGELOG.md
-git commit -m "release: v0.3.0"
-git tag -a v0.3.0 -m "Release v0.3.0"
-git push origin main
-git push origin v0.3.0
+git tag -d v1.4.0
+git push origin :refs/tags/v1.4.0
+python scripts/bump_version.py 1.4.0
+git commit -am "release: v1.4.0"
+git tag -a v1.4.0 -m "Release v1.4.0"
+git push origin HEAD v1.4.0
 ```
 
-### 5. Release Workflow
+**"CHANGELOG.md içinde bölüm yok ya da boş" hatası:** başlık tam olarak `## [1.4.0] - YYYY-AA-GG` biçiminde olmalı ve altında en az bir satır bulunmalıdır.
 
-`v*` tag push'unda `release.yml` otomatik olarak:
+**Release oluşturulamıyor (403):** depo ayarlarında Settings → Actions → General → Workflow permissions altında yazma izni kapalı olabilir. `release.yml` yalnızca yayın işinde `contents: write` ister.
 
-1. Testleri çalıştırır
-2. sdist + wheel build eder
-3. GitHub Release oluşturur ve artifact'leri ekler
-
-### 6. Doğrulama
-
-Release yayınlandıktan sonra:
-
-- https://github.com/emirkalfa/zeta/releases adresinde yeni sürüm görünmeli
-- Artifact'ler indirilebilir olmalı
-- `pip install` ile wheel kurulabilmeli (test edin)
-
-## Hotfix (Acil Düzeltme)
-
-`main`'de kritik bug varsa:
-
-```bash
-git checkout -b fix/critical-bug main
-# düzelt + test
-git commit -m "fix: kritik bug"
-git push origin fix/critical-bug
-# PR aç -> main'e merge
-# sonra normal release akışı (patch bump)
-```
-
-## İlk Yayın (0.1.0)
-
-Eğer hiç tag yoksa:
-
-```bash
-# 0.1.0 sürümü için
-echo "0.1.0" > VERSION
-# CHANGELOG.md'e 0.1.0 bölümü ekle (Unreleased'i düzenle)
-git add VERSION CHANGELOG.md
-git commit -m "release: v0.1.0"
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push origin main --tags
-```
-
-## Troubleshooting
-
-**"VERSION != tag" hatası:** Tag ile `VERSION` dosyası eşleşmiyor. Tag'i sil,
-`VERSION`'u düzelt, tekrar tag'le:
-
-```bash
-git tag -d v0.3.0
-git push origin :refs/tags/v0.3.0
-# VERSION'ı düzelt
-git commit -am "fix: VERSION dosyasi"
-git tag -a v0.3.0 -m "Release v0.3.0"
-git push origin main --tags
-```
-
-**Workflow izinleri:** GitHub repo Settings → Actions → Workflow permissions
-→ "Read and write permissions" açık olmalı (GH Release için).
-
-**CHANGELOG excerpt boş:** `CHANGELOG.md`'de `[0.3.0]` başlığı tam olarak
-`## [0.3.0] - YYYY-AA-GG` formatında olmalı.
+**Paketler imzasızdır.** Windows SmartScreen ve macOS Gatekeeper ilk açılışta uyarı gösterir; kullanıcıya gösterilecek adımlar README'dedir. Kod imzalama eklemek için sertifikalar depo sırlarına konup `build.yml` içine imzalama adımı eklenmelidir.

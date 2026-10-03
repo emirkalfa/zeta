@@ -1,16 +1,51 @@
-import os, sys, sqlite3, json
-import numpy as np
+import os, sys, sqlite3, threading, time
 from contextlib import contextmanager
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Paketlenmiş uygulamada (PyInstaller) kaynak dosyalar geçici bir dizine açılır
+FROZEN = getattr(sys, 'frozen', False)
+BASE_DIR = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+
+# Konsolsuz (pencereli) derlemede stdout/stderr yoktur; yazma denemeleri çökmesin
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
+# Windows konsolu (cp1252 vb.) Türkçe karakterleri kodlayamayınca print çökmesin
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, 'reconfigure'):
+        _stream.reconfigure(errors='replace')
+
 from flask import Flask, jsonify, request, send_from_directory
 from backend.geometry import calculate_geometry
 from backend.airfoil import get_airfoil_properties
 from backend.analysis import calculate_polars
 from backend.stability import flight_test
+from backend.mission import mission_performance
 
+APP_NAME = 'zeta-aircraft-designer'
 app = Flask(__name__, static_url_path='')
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'database', 'zeta.db')
+
+
+def _data_dir():
+    """Veritabanının yazılacağı dizin. Kaynak koddan çalışırken depo içindeki database/,
+    paketlenmiş uygulamada kullanıcıya ait veri dizini (paket salt okunur olabilir)."""
+    override = os.environ.get('ZETA_DATA_DIR')
+    if override:
+        return override
+    if not FROZEN:
+        return os.path.join(BASE_DIR, 'database')
+    home = os.path.expanduser('~')
+    if sys.platform == 'win32':
+        base = os.environ.get('LOCALAPPDATA') or os.path.join(home, 'AppData', 'Local')
+    elif sys.platform == 'darwin':
+        base = os.path.join(home, 'Library', 'Application Support')
+    else:
+        base = os.environ.get('XDG_DATA_HOME') or os.path.join(home, '.local', 'share')
+    return os.path.join(base, 'ZETA')
+
+
+DB_PATH = os.path.join(_data_dir(), 'zeta.db')
 
 
 def _read_version():
@@ -37,15 +72,15 @@ def get_db():
         conn.close()
 
 def init_db():
-    os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with get_db() as conn:
-        with open(os.path.join(BASE_DIR, 'database', 'schema.sql')) as f:
+        with open(os.path.join(BASE_DIR, 'database', 'schema.sql'), encoding='utf-8') as f:
             conn.executescript(f.read())
         conn.commit()
-
-        if not conn.execute('SELECT COUNT(*) as c FROM airfoils').fetchone()['c']:
-            import database.seed as seed_module
-            seed_module.seed()
+        empty = not conn.execute('SELECT COUNT(*) as c FROM airfoils').fetchone()['c']
+    if empty:
+        from database.seed import seed
+        seed(DB_PATH)
 
 init_db()
 
@@ -101,6 +136,7 @@ def api_calculate():
                               fuse_type=data.get('fuse_type', 'conventional'),
                               man_fuse_length=data.get('man_fuse_length'),
                               man_fuse_width=data.get('man_fuse_width'),
+                              airframe=data.get('airframe', 'standard'),
                                )
     cg_pct = data.get('cg_percent')
     if cg_pct is not None:
@@ -129,8 +165,27 @@ def api_stability():
     Re = float(data.get('reynolds_number', 200000))
     props = get_airfoil_properties(airfoil_code, Re=Re)
     tail_props = get_airfoil_properties(tail_airfoil_code, Re=Re)
-    result = flight_test(geom, props, tail_props)
+    power_available = None
+    if data.get('motor_power') is not None:
+        power_available = float(data['motor_power']) * float(data.get('prop_efficiency', 0.6))
+    result = flight_test(geom, props, tail_props, power_available=power_available)
     result['Reynolds'] = int(Re)
+    return jsonify(result)
+
+@app.route('/api/mission', methods=['POST'])
+def api_mission():
+    data = request.get_json()
+    props = get_airfoil_properties(data.get('airfoil_code', '2412'),
+                                   Re=float(data.get('reynolds_number', 200000)))
+    result = mission_performance(
+        data.get('geometry', {}), props,
+        motor_power=float(data.get('motor_power', 0)),
+        battery_wh=float(data.get('battery_wh', 0)),
+        prop_efficiency=float(data.get('prop_efficiency', 0.6)),
+        n_limit=float(data.get('n_limit', 4.0)),
+        avionics_power=float(data.get('avionics_power', 0)),
+        targets=data.get('targets'),
+    )
     return jsonify(result)
 
 @app.route('/api/airfoil_props/<code>')
@@ -141,11 +196,46 @@ def api_airfoil_props(code):
 
 @app.route('/api/version')
 def api_version():
-    import time
-    return jsonify({
-        'version': APP_VERSION,
-        'name': 'zeta-aircraft-designer',
-    })
+    return jsonify({'version': APP_VERSION, 'name': APP_NAME})
+
+
+# ─── Masaüstü modu: tarayıcı sekmesi kapanınca sunucu da kapanır ───
+# Paketlenmiş uygulamanın penceresi ya da konsolu olmadığı için, sayfa düzenli aralıkla
+# yoklama gönderir; yoklama kesilirse süreç kendini sonlandırır.
+DESKTOP_MODE = False
+HEARTBEAT_TIMEOUT = 150   # arka plandaki sekmelerde tarayıcı zamanlayıcıları dakikada bire düşebilir
+CLOSE_GRACE = 6           # sayfa yenilemede yeni sayfanın yoklaması için tanınan süre
+FIRST_CONTACT_TIMEOUT = 300
+_presence = {'started': time.monotonic(), 'seen': None, 'closing': None}
+
+
+@app.route('/api/heartbeat', methods=['POST'])
+def api_heartbeat():
+    _presence['seen'] = time.monotonic()
+    _presence['closing'] = None
+    return jsonify({'desktop': DESKTOP_MODE})
+
+
+@app.route('/api/closing', methods=['POST'])
+def api_closing():
+    _presence['closing'] = time.monotonic()
+    return '', 204
+
+
+def _should_exit(now):
+    seen, closing = _presence['seen'], _presence['closing']
+    if seen is None:
+        return now - _presence['started'] > FIRST_CONTACT_TIMEOUT
+    if closing is not None and now - closing > CLOSE_GRACE:
+        return True
+    return now - seen > HEARTBEAT_TIMEOUT
+
+
+def _watchdog():
+    while True:
+        time.sleep(1)
+        if _should_exit(time.monotonic()):
+            os._exit(0)
 
 
 @app.route('/healthz')
@@ -156,7 +246,70 @@ def healthz():
 def serve_static(path):
     return send_from_directory(os.path.join(BASE_DIR, 'static'), path)
 
-if __name__ == '__main__':
-    import os
+def _free_port(host, preferred):
+    """Tercih edilen port doluysa (ör. macOS'ta 5000'i AirPlay kullanır) sonraki boş portu bulur."""
+    import socket
+    for port in range(preferred, preferred + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            if sock.connect_ex((host, port)) != 0:
+                return port
+    return preferred
+
+
+def _running_instance(host, port):
+    """Portta zaten bir ZETA çalışıyorsa adresini döner."""
+    import json
+    import urllib.request
+    url = f'http://{host}:{port}'
+    try:
+        with urllib.request.urlopen(url + '/api/version', timeout=0.5) as res:
+            if json.load(res).get('name') == APP_NAME:
+                return url
+    except Exception:
+        pass
+    return None
+
+
+def main():
+    global DESKTOP_MODE
+    import argparse
+    import webbrowser
+
+    parser = argparse.ArgumentParser(description='ZETA uçak tasarım aracını başlatır.')
+    parser.add_argument('--host', default=os.environ.get('ZETA_HOST', '127.0.0.1'),
+                        help='Dinlenecek adres (ağdan erişim için 0.0.0.0)')
+    parser.add_argument('--port', type=int, default=int(os.environ.get('ZETA_PORT', 5000)))
+    parser.add_argument('--no-browser', action='store_true', help='Tarayıcıyı otomatik açma')
+    parser.add_argument('--desktop', action=argparse.BooleanOptionalAction, default=FROZEN,
+                        help='Tarayıcı sekmesi kapanınca sunucuyu da kapat (paketlenmiş uygulamada varsayılan)')
+    parser.add_argument('--version', action='version', version=f'ZETA {APP_VERSION}')
+    args = parser.parse_args()
+
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
-    app.run(debug=debug, host='0.0.0.0', port=5000)
+    # Debug modunda reloader süreci yeniden başlatır; port ve tarayıcı yalnızca ilk süreçte seçilir
+    reloader_child = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    probe_host = '127.0.0.1' if args.host == '0.0.0.0' else args.host
+
+    # Uygulama ikinci kez açılırsa yeni sunucu başlatmak yerine çalışan kopyaya gidilir
+    if args.desktop and not reloader_child:
+        existing = _running_instance(probe_host, args.port)
+        if existing:
+            if not args.no_browser:
+                webbrowser.open(existing)
+            return
+
+    port = args.port if reloader_child else _free_port(probe_host, args.port)
+    url = f'http://{probe_host}:{port}'
+
+    if not reloader_child:
+        print(f'ZETA v{APP_VERSION} çalışıyor: {url}  (durdurmak için Ctrl+C)')
+        if not args.no_browser:
+            threading.Timer(1.0, webbrowser.open, args=(url,)).start()
+    if args.desktop:
+        DESKTOP_MODE = True
+        threading.Thread(target=_watchdog, daemon=True).start()
+    app.run(debug=debug, host=args.host, port=port)
+
+
+if __name__ == '__main__':
+    main()

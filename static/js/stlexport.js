@@ -6,7 +6,7 @@ function getNumSegments(id) {
 
 function checkGeom() {
   if (!state.geometry) {
-    alert('STL için model bulunamadı. Önce HESAPLA butonuna tıklayın.');
+    notify('STL için model bulunamadı. Önce hesaplama yapın.');
     return false;
   }
   return true;
@@ -14,17 +14,12 @@ function checkGeom() {
 
 function showDownloadConfirm(files) {
   return new Promise((resolve) => {
-    const list = document.getElementById('downloadFileList');
-    list.innerHTML = files.map(f => `<li>📄 ${f}</li>`).join('');
-    document.getElementById('downloadModal').style.display = 'flex';
-    document.getElementById('downloadConfirmBtn').onclick = () => {
-      document.getElementById('downloadModal').style.display = 'none';
-      resolve(true);
-    };
-    document.getElementById('downloadCancelBtn').onclick = () => {
-      document.getElementById('downloadModal').style.display = 'none';
-      resolve(false);
-    };
+    const dialog = document.getElementById('downloadModal');
+    document.getElementById('downloadFileList').innerHTML = files.map(f => `<li>${f}</li>`).join('');
+    dialog.returnValue = '';
+    // Esc ile kapatmada returnValue boş kalır, iptal sayılır
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
+    dialog.showModal();
   });
 }
 
@@ -148,6 +143,47 @@ function buildVTailPanel(geom, coords, vAngle, sign, wallM) {
   }));
 }
 
+function mmInput(id) {
+  return (parseFloat(document.getElementById(id).value) || 0) / 1000;
+}
+
+// Kanat yarısının [yStart, yEnd] aralığını üretir. Duvar kalınlığı verilmişse içi boş,
+// rib'li ve spar delikli; 0 ise (ya da kanat boşaltılamayacak kadar inceyse) dolu katı.
+function buildWingPart(geom, coords, yStart, yEnd, sign, capTip) {
+  const wall = (state.wallThickness || 0) / 1000;
+  if (wall > 0) {
+    const spars = [
+      { name: 'Ana spar', pos: SPAR_MAIN_POS, dia: mmInput('sparMainDia') },
+      { name: 'Arka spar', pos: SPAR_REAR_POS, dia: mmInput('sparRearDia') },
+    ].filter(sp => sp.dia > 0);
+    const part = buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, {
+      wall,
+      ribSpacing: Math.max(mmInput('ribSpacing'), 0.005),
+      ribThickness: Math.max(mmInput('ribThickness'), 0.0004),
+      spars,
+      capTip,
+    });
+    if (part) return { ...part, spars };
+  }
+  return { mesh: buildWingSegment(geom, coords, yStart, yEnd, sign, false, false, 0, capTip), solid: true };
+}
+
+// İndirilen kanat parçalarının iç yapısını özetler (kesilecek spar boyu için)
+function reportWingStructure(parts) {
+  if (parts.some(p => p.solid)) {
+    notify(state.wallThickness > 0
+      ? 'Kanat bu duvar kalınlığıyla boşaltılamayacak kadar ince; dolu katı olarak üretildi.'
+      : 'Duvar kalınlığı 0: kanat dolu katı olarak üretildi (rib ve spar deliği yok).');
+    return;
+  }
+  const ribs = parts.reduce((n, p) => n + p.ribCount, 0);
+  const sparText = parts[0].spars.map((sp, i) => {
+    const reach = Math.max(...parts.map(p => p.sparReach[i]));
+    return `${sp.name} Ø${(sp.dia * 1000).toFixed(1)} mm, kökten ${Math.round(reach * 1000)} mm`;
+  });
+  notify([`Kanat yarısı başına ${ribs} rib`, ...sparText].join(' · '));
+}
+
 async function exportSTL(part) {
   if (!checkGeom()) return;
   const filename = part === 'wing' ? 'z_wing.stl' : `zeta_${part}.stl`;
@@ -156,69 +192,31 @@ async function exportSTL(part) {
 
   const wallM = (state.wallThickness || 0) / 1000;
   const geom = state.geometry;
-  let meshes = [];
+  const meshes = [];
 
-  if (wallM > 0) {
-    switch (part) {
-      case 'wing': {
-        const coords = state.airfoilCoords;
-        const halfSpan = geom.wingspan / 2;
-        meshes.push(buildWingSegment(geom, coords, 0, halfSpan, 1, false, false, wallM, true));
-        meshes.push(buildWingSegment(geom, coords, 0, halfSpan, -1, false, false, wallM, true));
-        break;
-      }
-      case 'tail': {
-        const tailType = geom.tail_type || 'conventional';
-        const coords = state.tailCoords;
-        if (tailType === 'vtail') {
-          const vAngle = THREE.MathUtils.degToRad(35);
-          for (const sign of [1, -1]) {
-            meshes.push(buildVTailPanel(geom, coords, vAngle, sign, wallM));
-          }
-        } else {
-          const vCoords = state.vtailCoords || state.tailCoords;
-          const hHalf = geom.htail_span / 2;
-          meshes.push(buildHTailSegment(geom, coords, 0, hHalf, 1, false, false, wallM, true));
-          meshes.push(buildHTailSegment(geom, coords, 0, hHalf, -1, false, false, wallM, true));
-          meshes.push(buildVTailSegment(geom, vCoords, 0, geom.vtail_span, false, false, wallM, true));
-        }
-        break;
-      }
-      case 'fuselage':
-        meshes = getAllMeshes();
-        break;
-      default:
-        meshes = getAllMeshes();
+  if (part === 'wing') {
+    const halfSpan = geom.wingspan / 2;
+    const right = buildWingPart(geom, state.airfoilCoords, 0, halfSpan, 1, true);
+    const left = buildWingPart(geom, state.airfoilCoords, 0, halfSpan, -1, true);
+    meshes.push(right.mesh, left.mesh);
+    reportWingStructure([right]);
+  } else if (geom.tail_type === 'vtail') {
+    const vAngle = THREE.MathUtils.degToRad(35);
+    for (const sign of [1, -1]) {
+      meshes.push(buildVTailPanel(geom, state.tailCoords, vAngle, sign, wallM));
     }
   } else {
-    switch (part) {
-      case 'wing':
-        meshes = getWingMesh();
-        break;
-      case 'fuselage':
-        meshes = getFuselageMesh();
-        break;
-      case 'tail':
-        meshes = getTailMesh();
-        break;
-      default:
-        meshes = getAllMeshes();
-    }
-  }
-
-  if (!meshes.length) {
-    alert('STL için model bulunamadı. Önce HESAPLA butonuna tıklayın.');
-    return;
+    const vCoords = state.vtailCoords || state.tailCoords;
+    const hHalf = geom.htail_span / 2;
+    meshes.push(buildHTailSegment(geom, state.tailCoords, 0, hHalf, 1, false, false, wallM, true));
+    meshes.push(buildHTailSegment(geom, state.tailCoords, 0, hHalf, -1, false, false, wallM, true));
+    meshes.push(buildVTailSegment(geom, vCoords, 0, geom.vtail_span, false, false, wallM, true));
+    if (geom.vtail_count === 2) notify('Dikey kuyruk ikizdir: dosyadaki dikey kuyruğu iki kez basın.');
   }
 
   const merged = mergeMeshes(meshes);
   if (!merged) return;
-
-  if (part === 'wing') {
-    exportMeshAsSTL(merged, `z_wing.stl`);
-  } else {
-    exportMeshAsSTL(merged, `zeta_${part}.stl`);
-  }
+  exportMeshAsSTL(merged, filename);
 }
 
 function buildFuselageSections(geom, type, airfoilCoords) {
@@ -279,56 +277,7 @@ function buildFuselageSections(geom, type, airfoilCoords) {
     return { sections, nCirc };
   }
 
-  // Manual (özgün) fuselage
-  const length = geom.fuselage_length || 1.2;
-  const maxW = (geom.fuselage_max_width || 0.14) / 2;
-  const maxH = (geom.fuselage_max_height || 0.14) / 2;
-
-  const raw = (geom.fuse_sections && geom.fuse_sections.length >= 2)
-    ? geom.fuse_sections.map(s => ({ t: s.t, w: s.w, h: s.h }))
-    : [
-        { t: 0.00, w: 0.143, h: 0.111 },
-        { t: 0.15, w: 0.571, h: 0.667 },
-        { t: 0.45, w: 1.000, h: 1.000 },
-        { t: 0.90, w: 0.429, h: 0.444 },
-        { t: 1.10, w: 0.100, h: 0.100 },
-        { t: 1.20, w: 0.057, h: 0.044 },
-      ];
-
-  const totalLen = Math.max(raw[raw.length - 1].t, 0.01);
-  const keyframes = raw.map(s => ({ t: s.t / totalLen, w: s.w, h: s.h }));
-  keyframes.sort((a, b) => a.t - b.t);
-
-  function interpolate(t) {
-    if (t <= keyframes[0].t) return { w: keyframes[0].w, h: keyframes[0].h };
-    if (t >= keyframes[keyframes.length - 1].t) return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
-    for (let i = 0; i < keyframes.length - 1; i++) {
-      const a = keyframes[i], b = keyframes[i + 1];
-      if (t >= a.t && t <= b.t) {
-        const localT = (t - a.t) / (b.t - a.t);
-        const smoothT = localT * localT * (3 - 2 * localT);
-        return { w: a.w + (b.w - a.w) * smoothT, h: a.h + (b.h - a.h) * smoothT };
-      }
-    }
-    return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
-  }
-
-  const nSecs = 48;
-  const nCirc = 32;
-  const sections = [];
-  for (let i = 0; i <= nSecs; i++) {
-    const t = i / nSecs, x = t * totalLen;
-    const prof = interpolate(t);
-    const w = maxW * prof.w, h = maxH * prof.h;
-    const sec = [];
-    for (let j = 0; j < nCirc; j++) {
-      const theta = (j / nCirc) * Math.PI * 2;
-      sec.push({ x, y: h * Math.sin(theta), z: w * Math.cos(theta) });
-    }
-    sections.push(sec);
-  }
-  if (airfoilCoords) applyWingRootCutout(sections, nCirc, geom, airfoilCoords);
-  return { sections, nCirc };
+  return manualFuselageSections(geom, airfoilCoords);
 }
 
 function meshFromSections(sections, nCirc) {
@@ -403,7 +352,7 @@ async function exportFuselageSTL(type) {
   const geom = state.geometry;
   const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
   if (!sections.length) {
-    alert('Gövde modeli oluşturulamadı.');
+    notify('Gövde modeli oluşturulamadı.');
     return;
   }
 
@@ -414,7 +363,7 @@ async function exportFuselageSTL(type) {
 async function exportSlicedFuselage(type) {
   if (!checkGeom()) return;
   const n = getNumSegments(type === 'conventional' ? 'fuseConvSliceCount' : 'fuseManualSliceCount');
-  if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+  if (n <= 1) { notify('Parça sayısı en az 2 olmalıdır.'); return; }
 
   const ext = type === 'conventional' ? 'conv' : 'manual';
   const filenames = Array.from({length: n}, (_, i) => `zeta_fuselage_${ext}_${i+1}of${n}.stl`);
@@ -424,7 +373,7 @@ async function exportSlicedFuselage(type) {
   const wallM = (state.wallThickness || 0) / 1000;
   const geom = state.geometry;
   const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
-  if (!sections.length) { alert('Gövde modeli oluşturulamadı.'); return; }
+  if (!sections.length) { notify('Gövde modeli oluşturulamadı.'); return; }
 
   const totalSecs = sections.length;
   const segSize = totalSecs / n;
@@ -442,7 +391,7 @@ async function exportSlicedFuselage(type) {
 async function exportSlicedWing() {
   if (!checkGeom()) return;
   const n = getNumSegments('sliceCount');
-  if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+  if (n <= 1) { notify('Parça sayısı en az 2 olmalıdır.'); return; }
 
   const filenames = [];
   for (const sideName of ['right', 'left']) {
@@ -457,27 +406,22 @@ async function exportSlicedWing() {
   const coords = state.airfoilCoords;
   const halfSpan = geom.wingspan / 2;
   const segLen = halfSpan / n;
-  const wallM = (state.wallThickness || 0) / 1000;
 
-  for (let side = 0; side < 2; side++) {
-    const sign = side === 0 ? 1 : -1;
-    const sideName = side === 0 ? 'right' : 'left';
-
+  for (const [sideName, sign] of [['right', 1], ['left', -1]]) {
+    const parts = [];
     for (let seg = 0; seg < n; seg++) {
-      const yStart = seg * segLen;
-      const yEnd = (seg + 1) * segLen;
-      const capTip = seg === n - 1;
-
-      const mesh = buildWingSegment(geom, coords, yStart, yEnd, sign, false, false, wallM, capTip);
-      exportMeshAsSTL(mesh, `z_wing_${sideName}_${seg+1}of${n}.stl`);
+      const part = buildWingPart(geom, coords, seg * segLen, (seg + 1) * segLen, sign, seg === n - 1);
+      exportMeshAsSTL(part.mesh, `z_wing_${sideName}_${seg+1}of${n}.stl`);
+      parts.push(part);
     }
+    if (sign === 1) reportWingStructure(parts);
   }
 }
 
 async function exportSlicedTail() {
   if (!checkGeom()) return;
   const n = getNumSegments('tailSliceCount');
-  if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+  if (n <= 1) { notify('Parça sayısı en az 2 olmalıdır.'); return; }
 
   const geom = state.geometry;
   const tailType = geom.tail_type || 'conventional';

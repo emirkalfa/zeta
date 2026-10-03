@@ -54,14 +54,28 @@ def update_changelog(old: str, new: str) -> None:
         text = "# Changelog\n\n"
     replacement = (
         f"## [Unreleased]\n\n"
-        f"## [{new}] - {today}\n"
+        f"## [{new}] - {today}\n\n"
     )
     if "## [Unreleased]" in text:
         text = text.replace("## [Unreleased]\n\n", replacement, 1)
     else:
         text = text + f"\n## [{new}] - {today}\n"
+    text = update_compare_links(text, new)
     CHANGELOG.write_text(text, encoding="utf-8")
     print(f"CHANGELOG.md guncellendi (yeni: {new})")
+
+
+def update_compare_links(text: str, new: str) -> str:
+    """Dosya sonundaki karşılaştırma bağlantılarını yeni sürüme göre günceller."""
+    m = re.search(r"^\[Unreleased\]: (\S+)/compare/v(\S+?)\.\.\.HEAD$", text, re.M)
+    if not m:
+        return text
+    base, prev = m.group(1), m.group(2)
+    links = (
+        f"[Unreleased]: {base}/compare/v{new}...HEAD\n"
+        f"[{new}]: {base}/compare/v{prev}...v{new}"
+    )
+    return text[:m.start()] + links + text[m.end():]
 
 
 def main() -> None:
@@ -98,11 +112,11 @@ def main() -> None:
     print(f"  Yeni: {new_str}")
     print()
     print("Sonraki adimlar:")
-    print(f"  1. CHANGELOG.md'i duzenle (Unreleased bolumunu doldur)")
-    print(f"  2. git add VERSION CHANGELOG.md")
-    print(f"  3. git commit -m 'release: v{new_str}'")
+    print(f"  1. CHANGELOG.md'deki [{new_str}] bolumunu gozden gecir")
+    print(f"  2. python scripts/release_notes.py v{new_str}   # yayin notlarini onizle")
+    print(f"  3. git commit -am 'release: v{new_str}'")
     print(f"  4. git tag -a v{new_str} -m 'Release v{new_str}'")
-    print(f"  5. git push origin main --tags")
+    print(f"  5. git push origin HEAD v{new_str}")
 
 
 if __name__ == "__main__":
