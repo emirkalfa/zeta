@@ -1,48 +1,66 @@
 name: Release
 
+# v* etiketi itildiğinde: sürümü doğrular, testleri çalıştırır, üç platform için
+# paketleri üretip dener ve GitHub Release'i CHANGELOG notlarıyla yayınlar.
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build & Publish
+  verify:
+    name: Sürümü doğrula
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Etiket, VERSION ve CHANGELOG uyumu
+        run: python3 scripts/release_notes.py "$GITHUB_REF_NAME" > release-notes.md
+
+      - uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
+          name: release-notes
+          path: release-notes.md
 
-      - name: Read version from tag
-        id: version
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+  ci:
+    name: CI
+    needs: verify
+    uses: ./.github/workflows/ci.yml
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+  publish:
+    name: Yayınla
+    needs: [verify, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
         with:
-          python-version: "3.12"
+          path: artifacts
 
-      - name: Install + run tests
+      - name: Dosyaları topla
         run: |
-          pip install -e ".[dev]"
-          python -m pytest -q
+          mkdir release
+          cp artifacts/zeta-*/* release/
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          ls -l
 
-      - name: Build sdist + wheel
+      - name: GitHub Release oluştur
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          pip install build
-          python -m build --sdist --wheel
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: "ZETA ${{ steps.version.outputs.version }}"
-          generate_release_notes: true
-          files: |
-            dist/*
+          flags=""
+          # 1.4.0-rc.1 gibi ön sürümler "latest" olarak işaretlenmez
+          case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --title "ZETA ${GITHUB_REF_NAME#v}" \
+            --notes-file artifacts/release-notes/release-notes.md \
+            --verify-tag $flags

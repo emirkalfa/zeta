@@ -18,7 +18,27 @@ ZETA, kanat açıklığı ve ağırlık gibi birkaç temel değerden yola çıka
 
 ![3D model görünümü](docs/screenshot-3d.png)
 
-## Hızlı başlangıç
+## İndir ve çalıştır
+
+Kurulum gerektirmeyen paketler [Releases](https://github.com/emirkalfa/zeta/releases/latest) sayfasındadır. Python kurmanıza gerek yoktur ve uygulama internet olmadan çalışır.
+
+| İşletim sistemi | Dosya | Çalıştırma |
+|-----------------|-------|------------|
+| Windows 10/11 | `ZETA-<sürüm>-windows-x64.exe` | Çift tıklayın |
+| Linux (x86_64) | `ZETA-<sürüm>-linux-x86_64.AppImage` | `chmod +x ZETA-*.AppImage` sonra çift tıklayın ya da terminalden çalıştırın |
+| macOS (Apple Silicon) | `ZETA-<sürüm>-macos-arm64.zip` | Zip'i açın, `ZETA.app`'i Uygulamalar'a taşıyın |
+
+Uygulama varsayılan tarayıcınızda açılır; sekmeyi kapattığınızda kendiliğinden kapanır. Yeniden çift tıklarsanız çalışan kopya açılır.
+
+Paketler imzasız olduğu için ilk açılışta işletim sistemi uyarı gösterir:
+
+- **Windows:** "Windows kişisel bilgisayarınızı korudu" penceresinde *Ek bilgi* ve ardından *Yine de çalıştır*.
+- **macOS:** uygulamaya sağ tıklayıp *Aç* seçin ve çıkan pencerede yeniden *Aç* deyin.
+- **Linux:** AppImage açılmıyorsa `libfuse2` eksik olabilir; `./ZETA-*.AppImage --appimage-extract-and-run` ile FUSE olmadan çalışır.
+
+İndirdiğiniz dosyayı `SHA256SUMS.txt` ile doğrulayabilirsiniz.
+
+## Kaynak koddan çalıştırma
 
 Tek gereksinim **Python 3.10+**. Başlatma betiği ilk çalıştırmada sanal ortamı (`.venv`) kurar, bağımlılıkları yükler ve uygulamayı tarayıcıda açar; sonraki çalıştırmalarda doğrudan başlar.
 
@@ -41,10 +61,9 @@ uv run app.py
 | `--port 8080` | Farklı port (varsayılan 5000; doluysa sonraki boş port seçilir) |
 | `--host 0.0.0.0` | Ağdaki diğer cihazlardan erişim (varsayılan yalnızca bu bilgisayar) |
 | `--no-browser` | Tarayıcıyı otomatik açma |
+| `--desktop` | Tarayıcı sekmesi kapanınca sunucuyu da kapat (paketlerde varsayılan) |
 
 Elle kurmak isterseniz: `pip install -r requirements.txt && python app.py`
-
-Arayüz, Three.js, Chart.js, ikonlar ve yazı tiplerini CDN'den yüklediği için internet bağlantısı gerekir.
 
 ## Nasıl kullanılır
 
@@ -137,14 +156,24 @@ Sonuçlar ön tasarım içindir; ayrıntılı tasarım ve uçuş güvenliği iç
 
 ```bash
 pip install -e ".[dev]"
-pytest                       # 150+ test
-FLASK_DEBUG=1 python app.py  # otomatik yeniden yüklemeli geliştirme sunucusu
+pytest                          # 160+ test
+python scripts/smoke_test.py    # uygulamayı başlatıp uç noktaları dener
+FLASK_DEBUG=1 python app.py     # otomatik yeniden yüklemeli geliştirme sunucusu
 ```
+
+Masaüstü paketi üretmek için:
+
+```bash
+pip install -e ".[build]"
+python packaging/build.py       # dist/release/ altına AppImage, .exe ya da .app
+```
+
+Her push ve PR'da testler üç işletim sisteminde çalışır ve paketler derlenip denenir. Bir `v*` etiketi itildiğinde paketler GitHub Release olarak yayınlanır; ayrıntılar [RELEASING.md](RELEASING.md) dosyasındadır.
 
 ```
 zeta/
-├── app.py                  # Flask sunucusu ve API
-├── start.sh / start.bat    # Tek komutla başlatma
+├── app.py                  # Flask sunucusu, API ve başlatıcı
+├── start.sh / start.bat    # Kaynak koddan tek komutla başlatma
 ├── backend/
 │   ├── geometry.py         # Geometri boyutlandırma
 │   ├── airfoil.py          # NACA profil özellikleri
@@ -155,15 +184,13 @@ zeta/
 ├── templates/index.html    # Tek sayfalık arayüz
 ├── static/
 │   ├── css/style.css       # Tema ve bileşen stilleri
-│   └── js/
-│       ├── app.js          # Form, sekmeler, sonuç sayfaları
-│       ├── charts.js       # Chart.js grafikleri
-│       ├── aircraftmodel.js# Ekrandaki 3D uçak modeli
-│       ├── viewer3d.js     # Three.js sahneleri, STL parça üreticileri
-│       ├── wingstructure.js# Rib'li, spar delikli kanat STL'i
-│       └── stlexport.js    # STL dışa aktarma
+│   ├── js/                 # Arayüz, grafikler, 3D model, STL üretimi
+│   └── vendor/             # three.js, Chart.js, ikonlar ve yazı tipleri (çevrimdışı)
+├── packaging/              # PyInstaller derleme betiği, simge, .desktop
+├── scripts/                # Sürüm yükseltme, yayın notları, duman testi
 ├── tests/                  # pytest testleri
-└── docs/                   # Logo ve ekran görüntüleri
+├── docs/                   # Logo ve ekran görüntüleri
+└── .github/workflows/      # ci.yml, build.yml, release.yml
 ```
 
 Sürüm notları [CHANGELOG.md](CHANGELOG.md), sürüm çıkarma adımları [RELEASING.md](RELEASING.md) dosyasındadır.

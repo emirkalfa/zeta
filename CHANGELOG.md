@@ -5,6 +5,9 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 ## [Unreleased]
 
 ### Added
+- Kurulum gerektirmeyen masaüstü paketleri: Linux AppImage, Windows `.exe`, macOS `.app`. Uygulama tarayıcıda açılır, sekme kapanınca kendini kapatır, ikinci açılışta çalışan kopyaya gider.
+- Çevrimdışı çalışma: three.js, Chart.js, ikonlar ve yazı tipleri depoda (`static/vendor`).
+- CI/CD: üç işletim sisteminde test, her pakette duman testi, `v*` etiketiyle CHANGELOG notları ve SHA256 özetleriyle otomatik GitHub Release.
 - Yarışma İHA'sı gövde yerleşimi (`airframe: combat`): itici pervane, kamera için boş burun, çift bom, ikiz dikey kuyruk ya da ters V kuyruk; daha düşük açıklık oranı ve daha büyük kanatçıklar. 3D model ve ölçüler bu yerleşime göre üretilir.
 - Görev performansı adımı ve `/api/mission`: motor gücü ve bataryadan azami hız, havada kalış, menzil ve dönüş performansı; yarışma İHA'ları (Savaşan İHA vb.) için düzenlenebilir hedeflerle karşılaştırma ve örnek başlangıç değerleri.
 - Uçabilirlik testi artık 150 W/kg varsayımı yerine girilen motor gücünü kullanıyor.
@@ -14,6 +17,8 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - 3D model yenilendi: firar kenarında gerçek kontrol yüzeyi panelleri (flap, kanatçık, elevator, rudder), yuvarlatılmış kanat uçları, spinner ve pervane, zemin gölgesi.
 
 ### Changed
+- Kullanılmayan `scipy` bağımlılığı kaldırıldı.
+- Paketlenmiş uygulamada veritabanı kullanıcı veri dizininde tutulur.
 - Uygulama alt bilgisinden ve README'den yapımcı adı kaldırıldı.
 - Arayüz baştan tasarlandı: sade teknik tema (açık/koyu), numaralı adımlar, bölümlere ayrılmış parametre formu, gruplu ölçü tabloları, kriter tablolu uçabilirlik sayfası, satır tabanlı STL sayfası.
 - 3D sahnede kamera ve ızgara modelin boyutuna göre kadrajlanıyor.
