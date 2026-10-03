@@ -54,7 +54,7 @@ def update_changelog(old: str, new: str) -> None:
         text = "# Changelog\n\n"
     replacement = (
         f"## [Unreleased]\n\n"
-        f"## [{new}] - {today}\n"
+        f"## [{new}] - {today}\n\n"
     )
     if "## [Unreleased]" in text:
         text = text.replace("## [Unreleased]\n\n", replacement, 1)
