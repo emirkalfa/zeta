@@ -98,17 +98,33 @@ Kanat, gövde ve kuyruğa ait ~45 geometrik ölçüyü hesaplar:
 - **Modern bir web tarayıcı** (Chrome, Firefox, Edge, Safari)
 - **İnternet bağlantısı** (CDN'den kütüphaneler yüklenir)
 
-## Kurulum
+## Kurulum ve Çalıştırma
+
+Tek gereksinim **Python 3.10+**. Başlatma betiği ilk çalıştırmada sanal ortamı (`.venv`) kurar, bağımlılıkları yükler ve uygulamayı tarayıcıda açar; sonraki çalıştırmalarda doğrudan başlar.
 
 ```bash
-# Bağımlılıkları yükleyin
-pip3 install --break-system-packages flask numpy scipy
+# Linux / macOS
+./start.sh
 
-# Uygulamayı başlatın
-python3 app.py
-
-# Tarayıcıda açın: http://localhost:5000
+# Windows (çift tıklayarak da çalışır)
+start.bat
 ```
+
+[uv](https://docs.astral.sh/uv/) kuruluysa betiğe gerek yok:
+
+```bash
+uv run app.py
+```
+
+Seçenekler:
+
+| Seçenek | Açıklama |
+|---------|----------|
+| `--port 8080` | Farklı port (varsayılan 5000; doluysa sonraki boş port seçilir) |
+| `--host 0.0.0.0` | Ağdaki diğer cihazlardan erişim (varsayılan yalnızca bu bilgisayar) |
+| `--no-browser` | Tarayıcıyı otomatik açma |
+
+Elle kurmak isterseniz: `pip install -r requirements.txt && python app.py`
 
 ## API Uç Noktaları
 
@@ -127,7 +143,7 @@ python3 app.py
 ## Testler
 
 ```bash
-pip3 install pytest
+pip install -e ".[dev]"
 pytest
 ```
 

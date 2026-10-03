@@ -154,6 +154,41 @@ def healthz():
 def serve_static(path):
     return send_from_directory(os.path.join(BASE_DIR, 'static'), path)
 
-if __name__ == '__main__':
+def _free_port(host, preferred):
+    """Tercih edilen port doluysa (ör. macOS'ta 5000'i AirPlay kullanır) sonraki boş portu bulur."""
+    import socket
+    for port in range(preferred, preferred + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            if sock.connect_ex((host, port)) != 0:
+                return port
+    return preferred
+
+
+def main():
+    import argparse
+    import threading
+    import webbrowser
+
+    parser = argparse.ArgumentParser(description='ZETA uçak tasarım aracını başlatır.')
+    parser.add_argument('--host', default=os.environ.get('ZETA_HOST', '127.0.0.1'),
+                        help='Dinlenecek adres (ağdan erişim için 0.0.0.0)')
+    parser.add_argument('--port', type=int, default=int(os.environ.get('ZETA_PORT', 5000)))
+    parser.add_argument('--no-browser', action='store_true', help='Tarayıcıyı otomatik açma')
+    args = parser.parse_args()
+
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
-    app.run(debug=debug, host='0.0.0.0', port=5000)
+    # Debug modunda reloader süreci yeniden başlatır; port ve tarayıcı yalnızca ilk süreçte seçilir
+    reloader_child = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    probe_host = '127.0.0.1' if args.host == '0.0.0.0' else args.host
+    port = args.port if reloader_child else _free_port(probe_host, args.port)
+    url = f'http://{probe_host}:{port}'
+
+    if not reloader_child:
+        print(f'ZETA v{APP_VERSION} çalışıyor: {url}  (durdurmak için Ctrl+C)')
+        if not args.no_browser:
+            threading.Timer(1.0, webbrowser.open, args=(url,)).start()
+    app.run(debug=debug, host=args.host, port=port)
+
+
+if __name__ == '__main__':
+    main()
