@@ -590,6 +590,63 @@ input[type="range"]::-moz-range-thumb {
   background: var(--c);
 }
 
+/* ─── Gövde tasarımı ─── */
+.fuse-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+#fuse-three-container {
+  position: sticky;
+  top: 24px;
+  height: calc(100vh - 48px);
+  max-height: 640px;
+  min-height: 320px;
+}
+
+.fuse-section {
+  border: none;
+  border-top: 1px solid var(--border);
+  padding: 12px 0 16px;
+}
+
+.fuse-section:first-child { border-top: none; padding-top: 0; }
+
+.fuse-section legend {
+  float: left;
+  width: 100%;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.fuse-section legend .num {
+  color: var(--primary);
+  font-size: 0.75rem;
+  margin-right: 6px;
+}
+
+.fuse-row {
+  clear: both;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.fuse-row label {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.fuse-row input[type="number"] {
+  height: 28px;
+  font-size: 0.8125rem;
+  padding-left: 8px;
+}
+
 /* ─── Footer ─── */
 footer {
   padding: 16px 40px;
@@ -641,6 +698,9 @@ footer a:hover { color: var(--text); }
   footer { padding: 16px; }
 
   .form-section { grid-template-columns: 1fr; gap: 12px; }
+
+  .fuse-layout { grid-template-columns: 1fr; }
+  #fuse-three-container { position: static; height: 300px; }
   .segmented { display: flex; }
   .segmented label { flex: 1; text-align: center; }
   .segmented span { padding: 5px 6px; }
@@ -651,125 +711,6 @@ footer a:hover { color: var(--text); }
 }
 
 /* ═══ Legacy (sayfa sayfa yenilenecek) ═══ */
-/* ─── Fuselage ─── */
-.fuse-layout {
-  display: flex;
-  gap: 20px;
-  min-height: 400px;
-}
-
-#fuse-three-container {
-  flex: 1;
-  min-height: 400px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--bg);
-  position: relative;
-}
-
-#fuse-manual-controls {
-  width: 340px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  max-height: calc(100vh - 200px);
-}
-
-.fuse-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.fuse-section-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.fuse-section-header {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text);
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.fuse-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.fuse-label {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  width: 24px;
-  flex-shrink: 0;
-}
-
-.fuse-row input[type="range"] {
-  flex: 1;
-  height: 10px;
-  border-radius: 5px;
-  background: var(--border);
-  appearance: none;
-  outline: none;
-  cursor: pointer;
-}
-
-.fuse-row input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--primary);
-  cursor: pointer;
-  border: 3px solid var(--card-bg);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-}
-
-.fuse-row input[type="range"]::-moz-range-thumb {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--primary);
-  cursor: pointer;
-  border: 3px solid var(--card-bg);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-}
-
-.fuse-row input[type="number"] {
-  width: 64px;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card-bg);
-  color: var(--text);
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.fuse-row input[type="number"]:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
-}
-
-.fuse-unit {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-weight: 600;
-  width: 18px;
-  flex-shrink: 0;
-}
-
 /* ─── Charts ─── */
 .charts-grid {
   display: grid;

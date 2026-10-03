@@ -13,6 +13,15 @@ const MANUAL_FIELDS = [
   'htail_span', 'htail_root', 'htail_tip', 'htail_sweep',
   'vtail_span', 'vtail_root', 'vtail_tip',
 ];
+// Varsayılan gövde biçimi: uzunluğa ve azami en/boya oranlı altı kesit
+const FUSE_DEFAULT_SHAPE = [
+  { t: 0.000, w: 0.143, h: 0.111 },
+  { t: 0.125, w: 0.571, h: 0.667 },
+  { t: 0.375, w: 1.000, h: 1.000 },
+  { t: 0.750, w: 0.429, h: 0.444 },
+  { t: 0.917, w: 0.100, h: 0.100 },
+  { t: 1.000, w: 0.057, h: 0.044 },
+];
 const RESULT_TABS = ['results', 'viewer', 'fuse', 'charts', 'flight', 'stl'];
 
 const state = {
@@ -25,16 +34,18 @@ const state = {
   vtailCoords: null,
   airfoilCode: '2412',
   wallThickness: 1.2,
-  fuseType: 'conventional',
-  fuseSections: [
-    { t: 0.00, w: 0.143, h: 0.111 },
-    { t: 0.15, w: 0.571, h: 0.667 },
-    { t: 0.45, w: 1.000, h: 1.000 },
-    { t: 0.90, w: 0.429, h: 0.444 },
-    { t: 1.10, w: 0.100, h: 0.100 },
-    { t: 1.20, w: 0.057, h: 0.044 },
-  ],
+  // Özgün gövde kesitleri, metre cinsinden (t: burundan uzaklık, w: genişlik, h: yükseklik)
+  fuseSections: scaleFuseShape(1.2, 0.14, 0.14),
+  // Kullanıcı kesitlere dokunana kadar her hesaplamada otomatik gövde ölçülerine uydurulur
+  fuseSectionsEdited: false,
 };
+
+function scaleFuseShape(length, maxWidth, maxHeight) {
+  const round = v => Math.round(v * 1000) / 1000;
+  return FUSE_DEFAULT_SHAPE.map(s => ({
+    t: round(s.t * length), w: round(s.w * maxWidth), h: round(s.h * maxHeight),
+  }));
+}
 
 async function fetchAPI(url, body = null) {
   const opts = { headers: { 'Content-Type': 'application/json' } };
@@ -105,44 +116,84 @@ function setupSidebar() {
 }
 
 /* ─── Fuselage Helpers ─── */
-function readFuseSections() {
-  for (let i = 0; i < 6; i++) {
-    state.fuseSections[i].t = parseFloat($('sec_' + i + '_pos').value);
-    state.fuseSections[i].w = parseFloat($('sec_' + i + '_w').value);
-    state.fuseSections[i].h = parseFloat($('sec_' + i + '_h').value);
-  }
+const FUSE_SECTION_NAMES = ['Burun', 'Ön', 'Orta', 'Arka', 'Arka kuyruk', 'Kuyruk ucu'];
+const FUSE_PARAMS = [
+  { key: 'pos', prop: 't', label: 'Konum' },
+  { key: 'w', prop: 'w', label: 'Genişlik' },
+  { key: 'h', prop: 'h', label: 'Yükseklik' },
+];
+
+function renderFuseControls() {
+  $('fuse-manual-controls').innerHTML = state.fuseSections.map((_, i) => {
+    const rows = FUSE_PARAMS.map(({ key, label }) => {
+      const id = `sec_${i}_${key}`;
+      return `<div class="fuse-row">
+        <label for="${id}">${label}</label>
+        <input type="range" id="${id}" min="0" step="0.001">
+        <div class="input-wrap"><input type="number" id="${id}_inp" min="0" step="0.001" aria-label="K${i + 1} ${label}"><span class="unit">m</span></div>
+      </div>`;
+    }).join('');
+    return `<fieldset class="fuse-section">
+      <legend><span class="num">K${i + 1}</span> ${FUSE_SECTION_NAMES[i]}</legend>
+      ${rows}
+    </fieldset>`;
+  }).join('');
+
+  state.fuseSections.forEach((_, i) => {
+    for (const { key, prop } of FUSE_PARAMS) {
+      const slider = $(`sec_${i}_${key}`);
+      const input = $(`sec_${i}_${key}_inp`);
+      const onChange = (value) => {
+        if (isNaN(value) || value < 0) return;
+        state.fuseSections[i][prop] = value;
+        state.fuseSectionsEdited = true;
+        syncFuseControls();
+        updateFuselageViews();
+      };
+      slider.addEventListener('input', () => onChange(parseFloat(slider.value)));
+      input.addEventListener('change', () => onChange(parseFloat(input.value)));
+    }
+  });
+  syncFuseControls();
 }
 
-function updateSectionDisplays() {
-  for (let i = 0; i < 6; i++) {
-    $('sec_' + i + '_pos_inp').value = parseFloat($('sec_' + i + '_pos').value).toFixed(3);
-    $('sec_' + i + '_w_inp').value = parseFloat($('sec_' + i + '_w').value).toFixed(3);
-    $('sec_' + i + '_h_inp').value = parseFloat($('sec_' + i + '_h').value).toFixed(3);
-  }
+// state.fuseSections → kaydırıcı ve sayı alanları. Kaydırıcı aralığı gövde boyutuna göre ayarlanır.
+function syncFuseControls() {
+  const secs = state.fuseSections;
+  const range = {
+    t: Math.max(1, Math.ceil(Math.max(...secs.map(s => s.t)) * 2)),
+    w: Math.max(0.2, Math.ceil(Math.max(...secs.map(s => s.w)) * 30) / 10),
+    h: Math.max(0.2, Math.ceil(Math.max(...secs.map(s => s.h)) * 30) / 10),
+  };
+  secs.forEach((sec, i) => {
+    for (const { key, prop } of FUSE_PARAMS) {
+      const slider = $(`sec_${i}_${key}`);
+      // Sürükleme sırasında aralık değişirse kaydırıcı elin altından kayar
+      if (document.activeElement !== slider) slider.max = range[prop];
+      slider.value = sec[prop];
+      const input = $(`sec_${i}_${key}_inp`);
+      if (document.activeElement !== input) input.value = sec[prop].toFixed(3);
+    }
+  });
 }
 
-function applyManualFuselage(geom) {
-  geom.fuse_type = 'manual';
+function updateFuselageViews() {
+  const geom = state.geometry;
+  if (!geom) return;
   geom.fuse_sections = state.fuseSections.map(s => ({ ...s }));
-  const maxW = Math.max(...state.fuseSections.map(s => s.w));
-  geom.fuselage_length = state.fuseSections[5].t;
-  geom.fuselage_max_width = maxW;
-  geom.fuselage_max_height = maxW;
-}
-
-function updateFuseFromSliders() {
-  readFuseSections();
-  updateSectionDisplays();
-  if (state.geometry) {
-    applyManualFuselage(state.geometry);
-    updateFuseViewer(state.geometry, state.airfoilCoords);
+  updateFuseViewer(geom, state.airfoilCoords);
+  if (geom.fuse_type === 'manual' && typeof rebuildFuselage === 'function' && fuseGroup) {
+    rebuildFuselage(geom, state.airfoilCoords);
   }
+  displayResults(geom);
+  saveProject();
 }
 
 /* ─── Init ─── */
 async function init() {
   setupTheme();
   setupSidebar();
+  renderFuseControls();
   setupEventListeners();
   loadVersion();
   try {
@@ -213,14 +264,10 @@ function restoreProject() {
   if (data.cg_percent) { $('cgSlider').value = data.cg_percent; updateCGDisplay(); }
   if (data.max_alpha) $('maxAlpha').value = data.max_alpha;
 
-  if (Array.isArray(data.man_fuse_sections) && data.man_fuse_sections.length === 6) {
-    state.fuseSections = data.man_fuse_sections;
-    for (let i = 0; i < 6; i++) {
-      $('sec_' + i + '_pos').value = state.fuseSections[i].t;
-      $('sec_' + i + '_w').value = state.fuseSections[i].w;
-      $('sec_' + i + '_h').value = state.fuseSections[i].h;
-    }
-    updateSectionDisplays();
+  if (Array.isArray(data.fuse_sections_m) && data.fuse_sections_m.length === 6) {
+    state.fuseSections = data.fuse_sections_m;
+    state.fuseSectionsEdited = true;
+    syncFuseControls();
   }
 }
 
@@ -235,7 +282,7 @@ function saveProject() {
     wing_position: radioValue('wing_pos', 'mid'),
     tail_type: radioValue('tail_type', 'conventional'),
     fuse_type: radioValue('fuse_type', 'conventional'),
-    man_fuse_sections: state.fuseSections.map(s => ({ ...s })),
+    fuse_sections_m: state.fuseSectionsEdited ? state.fuseSections : undefined,
     reynolds: parseInt($('reynolds').value) || 200000,
     cg_percent: parseInt($('cgSlider').value) || 25,
     max_alpha: parseInt($('maxAlpha').value) || 20,
@@ -274,19 +321,6 @@ function setupEventListeners() {
     state.wallThickness = parseFloat($('wallThickness').value) || 0;
   });
 
-  for (let i = 0; i < 6; i++) {
-    for (const key of ['pos', 'w', 'h']) {
-      const slider = $(`sec_${i}_${key}`);
-      const input = $(`sec_${i}_${key}_inp`);
-      slider.addEventListener('input', updateFuseFromSliders);
-      input.addEventListener('input', () => {
-        const val = parseFloat(input.value);
-        if (isNaN(val)) return;
-        slider.value = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), val));
-        updateFuseFromSliders();
-      });
-    }
-  }
 }
 
 async function calculateAll() {
@@ -339,7 +373,13 @@ async function calculateAll() {
       }),
     ]);
 
-    readFuseSections();
+    if (!state.fuseSectionsEdited) {
+      const g = state.geometry;
+      state.fuseSections = scaleFuseShape(g.fuselage_length, g.fuselage_max_width, g.fuselage_max_height);
+      syncFuseControls();
+    }
+    state.geometry.fuse_type = fuse_type;
+    state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
     saveProject();
 
     displayResults(state.geometry);
@@ -348,13 +388,10 @@ async function calculateAll() {
 
     // 3D sahneler boyutlarını kapsayıcıdan aldığı için sekme görünürken kurulur
     switchTab('viewer');
-    if (fuse_type === 'manual') applyManualFuselage(state.geometry);
-    else state.geometry.fuse_type = 'conventional';
     initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, tail_type);
 
     // Gövde sekmesi her zaman kesit (K1–K6) önizlemesini gösterir
     switchTab('fuse');
-    applyManualFuselage(state.geometry);
     initFuseViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, tail_type);
 
     switchTab('charts');
@@ -372,6 +409,15 @@ const WING_POSITION_LABELS = { low: 'Alçak', mid: 'Orta', high: 'Yüksek' };
 const TAIL_TYPE_LABELS = { conventional: 'Konvansiyonel', ttail: 'T-tail', vtail: 'V-tail' };
 
 function displayResults(geom) {
+  const manualFuse = geom.fuse_type === 'manual' && geom.fuse_sections;
+  const fuse = manualFuse ? {
+    length: Math.max(...geom.fuse_sections.map(s => s.t)),
+    width: Math.max(...geom.fuse_sections.map(s => s.w)),
+    height: Math.max(...geom.fuse_sections.map(s => s.h)),
+  } : {
+    length: geom.fuselage_length, width: geom.fuselage_max_width, height: geom.fuselage_max_height,
+  };
+
   const summary = [
     ['Kanat alanı', geom.wing_area, 'm²'],
     ['Açıklık oranı', geom.aspect_ratio, ''],
@@ -400,10 +446,10 @@ function displayResults(geom) {
       ['X pozisyonu', geom.tail_x_pos, 'm'],
       ['Kuyruk tipi', TAIL_TYPE_LABELS[geom.tail_type] || 'Konvansiyonel', ''],
     ]],
-    ['Gövde ve denge', [
-      ['Gövde uzunluğu', geom.fuselage_length, 'm'],
-      ['Gövde genişliği', geom.fuselage_max_width, 'm'],
-      ['Gövde yüksekliği', geom.fuselage_max_height, 'm'],
+    [manualFuse ? 'Gövde (özgün) ve denge' : 'Gövde ve denge', [
+      ['Gövde uzunluğu', fuse.length, 'm'],
+      ['Gövde genişliği', fuse.width, 'm'],
+      ['Gövde yüksekliği', fuse.height, 'm'],
       ['CG pozisyonu', geom.cg_position, 'm'],
     ]],
     ['Dikey kuyruk', [

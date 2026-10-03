@@ -444,67 +444,52 @@ function buildConventionalFuselage(geom, wingCoords) {
 
 }
 
-function buildManualFuselage(geom, wingCoords) {
-  const length = geom.fuselage_length || 1.2;
-  const maxW = (geom.fuselage_max_width || 0.14) / 2;
-  const maxH = (geom.fuselage_max_height || 0.14) / 2;
-
+// Özgün gövde kesitleri. geom.fuse_sections metre cinsindendir:
+// t = burundan uzaklık, w = genişlik, h = yükseklik. Aradaki kesitler smoothstep ile yumuşatılır.
+function manualFuselageSections(geom, wingCoords) {
   const nSecs = 48;
   const nCirc = 32;
+  const keys = geom.fuse_sections.map(s => ({ ...s })).sort((a, b) => a.t - b.t);
+  const totalLen = Math.max(keys[keys.length - 1].t, 0.01);
 
-  // Mutlak metre cinsinden kesit pozisyonlarını normalize et
-  const raw = (geom.fuse_sections && geom.fuse_sections.length >= 2)
-    ? geom.fuse_sections.map(s => ({ t: s.t, w: s.w, h: s.h }))
-    : [
-        { t: 0.00, w: 0.143, h: 0.111 },
-        { t: 0.15, w: 0.571, h: 0.667 },
-        { t: 0.45, w: 1.000, h: 1.000 },
-        { t: 0.90, w: 0.429, h: 0.444 },
-        { t: 1.10, w: 0.100, h: 0.100 },
-        { t: 1.20, w: 0.057, h: 0.044 },
-      ];
-
-  const totalLen = Math.max(raw[raw.length - 1].t, 0.01);
-  const keyframes = raw.map(s => ({ t: s.t / totalLen, w: s.w, h: s.h }));
-  keyframes.sort((a, b) => a.t - b.t);
-
-  function interpolate(t) {
-    if (t <= keyframes[0].t) return { w: keyframes[0].w, h: keyframes[0].h };
-    if (t >= keyframes[keyframes.length - 1].t) return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
-    for (let i = 0; i < keyframes.length - 1; i++) {
-      const a = keyframes[i];
-      const b = keyframes[i + 1];
-      if (t >= a.t && t <= b.t) {
-        const localT = (t - a.t) / (b.t - a.t);
+  function interpolate(x) {
+    if (x <= keys[0].t) return keys[0];
+    for (let i = 0; i < keys.length - 1; i++) {
+      const a = keys[i];
+      const b = keys[i + 1];
+      if (x <= b.t) {
+        const localT = b.t > a.t ? (x - a.t) / (b.t - a.t) : 1;
         const smoothT = localT * localT * (3 - 2 * localT);
-        return {
-          w: a.w + (b.w - a.w) * smoothT,
-          h: a.h + (b.h - a.h) * smoothT,
-        };
+        return { w: a.w + (b.w - a.w) * smoothT, h: a.h + (b.h - a.h) * smoothT };
       }
     }
-    return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
+    return keys[keys.length - 1];
   }
 
   const sections = [];
   for (let i = 0; i <= nSecs; i++) {
-    const t = i / nSecs;
-    const x = t * totalLen;
-    const prof = interpolate(t);
-    const w = maxW * prof.w;
-    const h = maxH * prof.h;
+    const x = (i / nSecs) * totalLen;
+    const prof = interpolate(x);
     const sec = [];
     for (let j = 0; j < nCirc; j++) {
       const theta = (j / nCirc) * Math.PI * 2;
-      const y = h * Math.sin(theta);
-      const z = w * Math.cos(theta);
-      sec.push(new THREE.Vector3(x, y, z));
+      sec.push(new THREE.Vector3(x, prof.h / 2 * Math.sin(theta), prof.w / 2 * Math.cos(theta)));
     }
     sections.push(sec);
   }
 
-  applyWingRootCutout(sections, nCirc, geom, wingCoords);
+  // Kanat kökü oyuğu gövdenin gerçek (özgün) en-boyuna göre açılır
+  applyWingRootCutout(sections, nCirc, {
+    ...geom,
+    fuselage_max_width: Math.max(...keys.map(k => k.w)),
+    fuselage_max_height: Math.max(...keys.map(k => k.h)),
+  }, wingCoords);
 
+  return { sections, nCirc, totalLen };
+}
+
+function buildManualFuselage(geom, wingCoords) {
+  const { sections } = manualFuselageSections(geom, wingCoords);
   tubeMesh(sections, 0x94a3b8, 0x475569, 1.0, true);
 }
 
@@ -1640,57 +1625,7 @@ function buildFuseViewerFuselage(geom, wingCoords) {
     fuseViewerGroup.remove(child);
   }
 
-  const length = geom.fuselage_length || 1.2;
-  const maxW = (geom.fuselage_max_width || 0.14) / 2;
-  const maxH = (geom.fuselage_max_height || 0.14) / 2;
-
-  const raw = (geom.fuse_sections && geom.fuse_sections.length >= 2)
-    ? geom.fuse_sections.map(s => ({ t: s.t, w: s.w, h: s.h }))
-    : [
-        { t: 0.00, w: 0.143, h: 0.111 },
-        { t: 0.15, w: 0.571, h: 0.667 },
-        { t: 0.45, w: 1.000, h: 1.000 },
-        { t: 0.90, w: 0.429, h: 0.444 },
-        { t: 1.10, w: 0.100, h: 0.100 },
-        { t: 1.20, w: 0.057, h: 0.044 },
-      ];
-
-  const totalLen = Math.max(raw[raw.length - 1].t, 0.01);
-  const keyframes = raw.map(s => ({ t: s.t / totalLen, w: s.w, h: s.h }));
-  keyframes.sort((a, b) => a.t - b.t);
-
-  function interpolate(t) {
-    if (t <= keyframes[0].t) return { w: keyframes[0].w, h: keyframes[0].h };
-    if (t >= keyframes[keyframes.length - 1].t) return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
-    for (let i = 0; i < keyframes.length - 1; i++) {
-      const a = keyframes[i], b = keyframes[i + 1];
-      if (t >= a.t && t <= b.t) {
-        const localT = (t - a.t) / (b.t - a.t);
-        const smoothT = localT * localT * (3 - 2 * localT);
-        return { w: a.w + (b.w - a.w) * smoothT, h: a.h + (b.h - a.h) * smoothT };
-      }
-    }
-    return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
-  }
-
-  const nSecs = 48;
-  const nCirc = 32;
-  const sections = [];
-  for (let i = 0; i <= nSecs; i++) {
-    const t = i / nSecs;
-    const x = t * totalLen;
-    const prof = interpolate(t);
-    const w = maxW * prof.w;
-    const h = maxH * prof.h;
-    const sec = [];
-    for (let j = 0; j < nCirc; j++) {
-      const theta = (j / nCirc) * Math.PI * 2;
-      sec.push(new THREE.Vector3(x, h * Math.sin(theta), w * Math.cos(theta)));
-    }
-    sections.push(sec);
-  }
-
-  applyWingRootCutout(sections, nCirc, geom, wingCoords);
+  const { sections, totalLen } = manualFuselageSections(geom, wingCoords);
 
   if (sections.length < 2) return;
   const nPts = sections[0].length;

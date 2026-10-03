@@ -279,56 +279,7 @@ function buildFuselageSections(geom, type, airfoilCoords) {
     return { sections, nCirc };
   }
 
-  // Manual (özgün) fuselage
-  const length = geom.fuselage_length || 1.2;
-  const maxW = (geom.fuselage_max_width || 0.14) / 2;
-  const maxH = (geom.fuselage_max_height || 0.14) / 2;
-
-  const raw = (geom.fuse_sections && geom.fuse_sections.length >= 2)
-    ? geom.fuse_sections.map(s => ({ t: s.t, w: s.w, h: s.h }))
-    : [
-        { t: 0.00, w: 0.143, h: 0.111 },
-        { t: 0.15, w: 0.571, h: 0.667 },
-        { t: 0.45, w: 1.000, h: 1.000 },
-        { t: 0.90, w: 0.429, h: 0.444 },
-        { t: 1.10, w: 0.100, h: 0.100 },
-        { t: 1.20, w: 0.057, h: 0.044 },
-      ];
-
-  const totalLen = Math.max(raw[raw.length - 1].t, 0.01);
-  const keyframes = raw.map(s => ({ t: s.t / totalLen, w: s.w, h: s.h }));
-  keyframes.sort((a, b) => a.t - b.t);
-
-  function interpolate(t) {
-    if (t <= keyframes[0].t) return { w: keyframes[0].w, h: keyframes[0].h };
-    if (t >= keyframes[keyframes.length - 1].t) return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
-    for (let i = 0; i < keyframes.length - 1; i++) {
-      const a = keyframes[i], b = keyframes[i + 1];
-      if (t >= a.t && t <= b.t) {
-        const localT = (t - a.t) / (b.t - a.t);
-        const smoothT = localT * localT * (3 - 2 * localT);
-        return { w: a.w + (b.w - a.w) * smoothT, h: a.h + (b.h - a.h) * smoothT };
-      }
-    }
-    return { w: keyframes[keyframes.length - 1].w, h: keyframes[keyframes.length - 1].h };
-  }
-
-  const nSecs = 48;
-  const nCirc = 32;
-  const sections = [];
-  for (let i = 0; i <= nSecs; i++) {
-    const t = i / nSecs, x = t * totalLen;
-    const prof = interpolate(t);
-    const w = maxW * prof.w, h = maxH * prof.h;
-    const sec = [];
-    for (let j = 0; j < nCirc; j++) {
-      const theta = (j / nCirc) * Math.PI * 2;
-      sec.push({ x, y: h * Math.sin(theta), z: w * Math.cos(theta) });
-    }
-    sections.push(sec);
-  }
-  if (airfoilCoords) applyWingRootCutout(sections, nCirc, geom, airfoilCoords);
-  return { sections, nCirc };
+  return manualFuselageSections(geom, airfoilCoords);
 }
 
 function meshFromSections(sections, nCirc) {
