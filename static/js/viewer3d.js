@@ -4,6 +4,27 @@ let wingGroup, fuseGroup, tailGroup;
 let autoRotate = false;
 let animFrame;
 let grid;
+const viewTarget = new THREE.Vector3(0.6, 0, 0);
+let viewDist = 4;
+const HOME_VIEW = [0.55, 0.35, 0.75];
+
+function cssColor(name) {
+  return new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue(name).trim());
+}
+
+// Tema renklerinde zemin ızgarası; boyut bilgisi tema değişiminde yeniden kurmak için saklanır
+function makeGrid(size, divisions) {
+  const g = new THREE.GridHelper(size, divisions, cssColor('--border-strong'), cssColor('--border'));
+  g.userData = { size, divisions };
+  return g;
+}
+
+function setCameraDirection(dir) {
+  const v = new THREE.Vector3(dir[0], dir[1], dir[2]).normalize().multiplyScalar(viewDist);
+  camera.position.copy(viewTarget).add(v);
+  controls.target.copy(viewTarget);
+  controls.update();
+}
 
 function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tailType) {
   if (viewer) disposeViewer();
@@ -13,11 +34,9 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tail
   const h = container.clientHeight || 500;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#f5f7fa');
+  scene.background = cssColor('--bg');
 
-  camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 100);
-  camera.position.set(3, 1.5, 4);
-  camera.lookAt(0.6, 0, 0);
+  camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 1000);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(w, h);
@@ -29,8 +48,6 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tail
   controls.dampingFactor = 0.1;
   controls.autoRotate = false;
   controls.autoRotateSpeed = 2.0;
-  controls.target.set(0.6, 0, 0);
-  controls.update();
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambient);
@@ -40,12 +57,6 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tail
   const dl2 = new THREE.DirectionalLight(0xffffff, 0.3);
   dl2.position.set(-5, 0, -5);
   scene.add(dl2);
-
-  grid = new THREE.GridHelper(5, 20, 0x888888, 0x444444);
-  grid.position.y = -0.3;
-  scene.add(grid);
-
-  addAxes(geom.fuselage_length);
 
   wingGroup = new THREE.Group();
   fuseGroup = new THREE.Group();
@@ -62,23 +73,38 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tail
   scene.add(fuseGroup);
   scene.add(tailGroup);
 
+  // Kamerayı ve ızgarayı modelin gerçek boyutuna göre yerleştir
+  const box = new THREE.Box3().setFromObject(wingGroup).union(new THREE.Box3().setFromObject(fuseGroup)).union(new THREE.Box3().setFromObject(tailGroup));
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  viewTarget.copy(sphere.center);
+  viewDist = sphere.radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.85;
+  setCameraDirection(HOME_VIEW);
+
+  const cell = sphere.radius > 3 ? 1 : 0.1;
+  const cells = Math.ceil(sphere.radius * 3 / cell / 2) * 2;
+  grid = makeGrid(cells * cell, cells);
+  grid.position.set(Math.round(sphere.center.x / cell) * cell, box.min.y - sphere.radius * 0.05, 0);
+  scene.add(grid);
+
+  addAxes(sphere.radius * 0.3);
+
   window.addEventListener('resize', onResize);
   viewer = { scene, camera, renderer, controls, container };
   animate();
 }
 
-function addAxes(fuseLen) {
-  const axLen = 0.4;
+function addAxes(axLen) {
   const makeArrow = (dir, clr, label) => {
-    const a = new THREE.ArrowHelper(new THREE.Vector3(dir[0], dir[1], dir[2]).normalize(), new THREE.Vector3(0, 0, 0), axLen, clr, 0.12, 0.06);
+    const a = new THREE.ArrowHelper(new THREE.Vector3(dir[0], dir[1], dir[2]).normalize(), new THREE.Vector3(0, 0, 0), axLen, clr, axLen * 0.25, axLen * 0.12);
     scene.add(a);
     const s = makeTextSprite(label, clr);
-    s.position.set(dir[0]*axLen*1.4, dir[1]*axLen*1.4, dir[2]*axLen*1.4);
+    s.scale.multiplyScalar(axLen / 0.4);
+    s.position.set(dir[0]*axLen*1.3, dir[1]*axLen*1.3, dir[2]*axLen*1.3);
     scene.add(s);
   };
-  makeArrow([1,0,0], 0xff4444, 'X');
-  makeArrow([0,1,0], 0x44ff44, 'Y');
-  makeArrow([0,0,1], 0x4488ff, 'Z');
+  makeArrow([1,0,0], 0xd9534f, 'X');
+  makeArrow([0,1,0], 0x3f9d5a, 'Y');
+  makeArrow([0,0,1], 0x3b7dd8, 'Z');
 }
 
 function makeTextSprite(text, color) {
@@ -569,8 +595,7 @@ function applyWingRootCutout(sections, nCirc, geom, airfoilCoords) {
 function toggleFuselage() {
   if (!fuseGroup) return;
   fuseGroup.visible = !fuseGroup.visible;
-  const btn = document.getElementById('toggleFuse');
-  if (btn) btn.classList.toggle('active');
+  document.getElementById('toggleFuse')?.setAttribute('aria-pressed', fuseGroup.visible);
 }
 
 // --- TAIL ---
@@ -837,7 +862,7 @@ function animate() {
 function onResize() {
   if (!viewer) return;
   const c = document.getElementById('three-container');
-  if (!c) return;
+  if (!c || !c.clientWidth || !c.clientHeight) return;
   camera.aspect = c.clientWidth / c.clientHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(c.clientWidth, c.clientHeight);
@@ -845,25 +870,22 @@ function onResize() {
 
 function viewerSetView(axis) {
   if (!viewer) return;
-  const d = 3.5;
-  const pos = { x: [d, 0, 0], y: [0, d, 0.1], z: [0, 0.1, d] }[axis] || [3, 1.5, 4];
-  camera.position.set(pos[0], pos[1], pos[2]);
-  controls.target.set(0.6, 0, 0);
-  controls.update();
+  // y: tam tepeden bakışta OrbitControls kilitlenmesin diye hafif eğik
+  const dir = { x: [-1, 0, 0], y: [0, 1, 0.001], z: [0, 0, 1] }[axis] || HOME_VIEW;
+  setCameraDirection(dir);
 }
 
 function viewerToggleRotate() {
   if (!viewer) return;
   controls.autoRotate = !controls.autoRotate;
+  document.getElementById('viewAutoRotate')?.setAttribute('aria-pressed', controls.autoRotate);
 }
 
 function viewerReset() {
   if (!viewer) return;
-  camera.position.set(3, 1.5, 4);
-  controls.target.set(0.6, 0, 0);
   controls.autoRotate = false;
-  document.getElementById('viewAutoRotate')?.classList.remove('active');
-  controls.update();
+  document.getElementById('viewAutoRotate')?.setAttribute('aria-pressed', 'false');
+  setCameraDirection(HOME_VIEW);
 }
 
 function getWingMesh() { return wingGroup ? wingGroup.children.filter(c => c.isMesh) : []; }
@@ -1557,7 +1579,7 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   const h = container.clientHeight || 350;
 
   fuseViewerScene = new THREE.Scene();
-  fuseViewerScene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#f5f7fa');
+  fuseViewerScene.background = cssColor('--bg');
 
   fuseViewerCamera = new THREE.PerspectiveCamera(40, w / h, 0.01, 100);
   fuseViewerCamera.position.set(1.5, 0.6, 1.8);
@@ -1582,7 +1604,7 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   dir2.position.set(-2, 1, -3);
   fuseViewerScene.add(dir2);
 
-  fuseViewerGridHelper = new THREE.GridHelper(2, 10, 0x888888, 0x444444);
+  fuseViewerGridHelper = makeGrid(2, 20);
   fuseViewerScene.add(fuseViewerGridHelper);
 
   fuseViewerGroup = new THREE.Group();
@@ -1601,7 +1623,7 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   function onFuseResize() {
     if (!fuseViewerRunning) return;
     const c = document.getElementById('fuse-three-container');
-    if (!c) return;
+    if (!c || !c.clientWidth || !c.clientHeight) return;
     fuseViewerCamera.aspect = c.clientWidth / c.clientHeight;
     fuseViewerCamera.updateProjectionMatrix();
     fuseViewerRenderer.setSize(c.clientWidth, c.clientHeight);
@@ -2110,28 +2132,19 @@ function disposeViewer() {
 }
 
 function updateViewerTheme() {
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || (isDark ? '#0f172a' : '#f5f7fa');
-  const gridColor = isDark ? 0x4a5568 : 0x888888;
-  const centerColor = isDark ? 0x2d3748 : 0x444444;
+  const bg = cssColor('--bg');
+  if (scene) scene.background = bg;
+  if (fuseViewerScene) fuseViewerScene.background = bg;
 
-  if (scene) {
-    scene.background = new THREE.Color(bg);
-  }
-  if (fuseViewerScene) {
-    fuseViewerScene.background = new THREE.Color(bg);
-  }
-  if (grid && scene) {
-    scene.remove(grid);
-    grid.dispose && grid.dispose();
-    grid = new THREE.GridHelper(5, 20, gridColor, centerColor);
-    grid.position.y = -0.3;
-    scene.add(grid);
-  }
-  if (fuseViewerGridHelper && fuseViewerScene) {
-    fuseViewerScene.remove(fuseViewerGridHelper);
-    fuseViewerGridHelper.dispose && fuseViewerGridHelper.dispose();
-    fuseViewerGridHelper = new THREE.GridHelper(2, 10, gridColor, centerColor);
-    fuseViewerScene.add(fuseViewerGridHelper);
-  }
+  const regrid = (parent, old) => {
+    const g = makeGrid(old.userData.size, old.userData.divisions);
+    g.position.copy(old.position);
+    parent.remove(old);
+    old.geometry.dispose();
+    old.material.dispose();
+    parent.add(g);
+    return g;
+  };
+  if (grid && scene) grid = regrid(scene, grid);
+  if (fuseViewerGridHelper && fuseViewerScene) fuseViewerGridHelper = regrid(fuseViewerScene, fuseViewerGridHelper);
 }

@@ -257,18 +257,30 @@
 
     <!-- Tab: 3D Viewer -->
     <section class="tab-pane" data-tab="viewer">
-      <div class="viewer-header">
-        <h2>3D Model</h2>
-        <div class="viewer-controls">
-          <button id="viewX" class="btn">X</button>
-          <button id="viewY" class="btn">Y</button>
-          <button id="viewZ" class="btn">Z</button>
-          <button id="viewAutoRotate" class="btn active">⟳</button>
-          <button id="viewReset" class="btn">↺</button>
-          <button id="toggleFuse" class="btn">Gövde</button>
+      <header class="page-head">
+        <div>
+          <h2>3D model</h2>
+          <p class="page-desc">Sürükleyerek döndürün, sağ tuşla kaydırın, tekerlekle yakınlaştırın.</p>
         </div>
-      </div>
-      <div id="three-container"></div>
+        <div class="page-actions">
+          <div class="btn-group" role="group" aria-label="Bakış yönü">
+            <button id="viewX" class="btn" title="X ekseni boyunca bakış">Ön</button>
+            <button id="viewY" class="btn" title="Y ekseni boyunca bakış">Üst</button>
+            <button id="viewZ" class="btn" title="Z ekseni boyunca bakış">Yan</button>
+          </div>
+          <button id="viewReset" class="btn"><i class="ph ph-arrow-counter-clockwise"></i> Sıfırla</button>
+          <button id="viewAutoRotate" class="btn" aria-pressed="false"><i class="ph ph-arrows-clockwise"></i> Döndür</button>
+          <button id="toggleFuse" class="btn" aria-pressed="true"><i class="ph ph-eye"></i> Gövde</button>
+        </div>
+      </header>
+      <div id="three-container" class="viewport"></div>
+      <ul class="legend" aria-label="Renk açıklaması">
+        <li><i style="--c:#3b82f6"></i>Kanat</li>
+        <li><i style="--c:#f59e0b"></i>Kuyruk</li>
+        <li><i style="--c:#f97316"></i>Flap · rudder</li>
+        <li><i style="--c:#22c55e"></i>Kanatçık · elevator</li>
+        <li><i style="--c:#94a3b8"></i>Gövde</li>
+      </ul>
     </section>
 
     <!-- Tab: Fuselage -->

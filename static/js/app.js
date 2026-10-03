@@ -258,10 +258,7 @@ function setupEventListeners() {
   $('viewX').addEventListener('click', () => viewerSetView('x'));
   $('viewY').addEventListener('click', () => viewerSetView('y'));
   $('viewZ').addEventListener('click', () => viewerSetView('z'));
-  $('viewAutoRotate').addEventListener('click', () => {
-    $('viewAutoRotate').classList.toggle('active');
-    viewerToggleRotate();
-  });
+  $('viewAutoRotate').addEventListener('click', viewerToggleRotate);
   $('viewReset').addEventListener('click', () => viewerReset());
   $('toggleFuse').addEventListener('click', toggleFuselage);
 

@@ -554,6 +554,42 @@ input[type="range"]::-moz-range-thumb {
 .spec-group dt { color: var(--text-secondary); }
 .spec-group dd { text-align: right; }
 
+/* ─── 3D viewport ─── */
+.viewport {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.viewport canvas { display: block; }
+
+#three-container {
+  height: calc(100vh - 250px);
+  min-height: 360px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  list-style: none;
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  background: var(--c);
+}
+
 /* ─── Footer ─── */
 footer {
   padding: 16px 40px;
@@ -615,34 +651,6 @@ footer a:hover { color: var(--text); }
 }
 
 /* ═══ Legacy (sayfa sayfa yenilenecek) ═══ */
-/* ─── 3D Viewer ─── */
-.viewer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.viewer-header h2 {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.viewer-controls {
-  display: flex;
-  gap: 6px;
-}
-
-#three-container {
-  width: 100%;
-  height: 500px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--bg);
-  position: relative;
-}
-
 /* ─── Fuselage ─── */
 .fuse-layout {
   display: flex;
