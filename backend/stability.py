@@ -1,5 +1,7 @@
 import numpy as np
 
+_GRADE_ICONS = {'pass': "✅", 'warn': "⚠️", 'fail': "❌"}
+
 def flight_test(geom, airfoil_props, tail_props=None, rho=1.225):
     if tail_props is None:
         tail_props = airfoil_props
@@ -57,47 +59,47 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225):
     cg_percent = cg / mac
     static_margin = np_position - cg_percent
 
-    # Stability assessment
+    # Her kriter: (durum, mesaj). Durum 'fail' ise uçak uçamaz sayılır.
     if 0.05 <= static_margin <= 0.20:
         stability_status = "Stabil"
-        stability_grade = "✅"
+        stability_level = 'pass'
     elif static_margin > 0.20:
         stability_status = "Aşırı stabil (manevra kabiliyeti düşük)"
-        stability_grade = "⚠️"
+        stability_level = 'warn'
     else:
         stability_status = "Kararsız"
-        stability_grade = "❌"
+        stability_level = 'fail'
+    stability_grade = _GRADE_ICONS[stability_level]
 
-    # Overall assessment
-    assessments = []
-    passed = True
-
-    # Stall speed check
     if V_stall < 5:
-        assessments.append("✅ Stall hızı çok düşük, harika!")
+        stall = ('pass', "Stall hızı çok düşük, harika!")
     elif V_stall < 10:
-        assessments.append("✅ Stall hızı normal")
+        stall = ('pass', "Stall hızı normal")
     elif V_stall < 15:
-        assessments.append("⚠️ Stall hızı biraz yüksek")
+        stall = ('warn', "Stall hızı biraz yüksek")
     else:
-        assessments.append("❌ Stall hızı çok yüksek")
-        passed = False
+        stall = ('fail', "Stall hızı çok yüksek")
 
-    # Climb check
     if climb_rate > 5:
-        assessments.append("✅ Tırmanma performansı mükemmel")
+        climb = ('pass', "Tırmanma performansı mükemmel")
     elif climb_rate > 2:
-        assessments.append("✅ Tırmanma performansı iyi")
+        climb = ('pass', "Tırmanma performansı iyi")
     elif climb_rate > 0:
-        assessments.append("⚠️ Tırmanma performansı zayıf")
+        climb = ('warn', "Tırmanma performansı zayıf")
     else:
-        assessments.append("❌ Tırmanma yetersiz")
-        passed = False
+        climb = ('fail', "Tırmanma yetersiz")
 
-    # Stability check
-    assessments.append(f"{stability_grade} {stability_status} (SM=%{static_margin*100:.1f})")
-    if static_margin < 0.05:
-        passed = False
+    checks = [
+        {'key': 'stall_speed', 'status': stall[0], 'message': stall[1]},
+        {'key': 'climb_rate', 'status': climb[0], 'message': climb[1]},
+        {'key': 'static_margin', 'status': stability_level, 'message': stability_status},
+    ]
+    passed = all(c['status'] != 'fail' for c in checks)
+    assessments = [
+        f"{_GRADE_ICONS[stall[0]]} {stall[1]}",
+        f"{_GRADE_ICONS[climb[0]]} {climb[1]}",
+        f"{stability_grade} {stability_status} (SM=%{static_margin*100:.1f})",
+    ]
 
     return {
         'stall_speed': round(V_stall, 2),
@@ -116,4 +118,5 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225):
         'stability_grade': stability_grade,
         'overall_passed': passed,
         'assessments': assessments,
+        'checks': checks,
     }

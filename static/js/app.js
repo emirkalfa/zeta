@@ -492,38 +492,73 @@ function displayResults(geom) {
   ).join('');
 }
 
+const STATUS = {
+  pass: { label: 'Uygun', icon: 'ph-check-circle' },
+  warn: { label: 'Sınırda', icon: 'ph-warning' },
+  fail: { label: 'Yetersiz', icon: 'ph-x-circle' },
+};
+// Sınırlar backend/stability.py ile aynı olmalı
+const FLIGHT_CHECKS = {
+  stall_speed: { label: 'Stall hızı', unit: 'm/s', limit: '< 15 m/s' },
+  climb_rate: { label: 'Tırmanma oranı', unit: 'm/s', limit: '> 0 m/s' },
+  static_margin: { label: 'Statik marj', unit: '% MAC', limit: '%5 – %20 arası ideal' },
+};
+
 function displayFlightTest(stab) {
-  const items = [
-    { label: 'Stall Hızı', value: stab.stall_speed + ' m/s', cls: stab.stall_speed < 12 ? 'pass' : 'warn', icon: '<i class="ph ph-speedometer"></i>', pct: Math.min(100, (stab.stall_speed / 20) * 100) },
-    { label: 'Seyir Hızı', value: stab.cruise_speed + ' m/s', cls: 'pass', icon: '<i class="ph ph-airplane-in-flight"></i>', pct: Math.min(100, (stab.cruise_speed / 30) * 100) },
-    { label: 'Tırmanma Oranı', value: stab.climb_rate + ' m/s', cls: stab.climb_rate > 2 ? 'pass' : 'warn', icon: '<i class="ph ph-arrow-up"></i>', pct: Math.min(100, (stab.climb_rate / 6) * 100) },
-    { label: 'Static Margin', value: '%' + stab.static_margin, cls: stab.static_margin >= 5 ? 'pass' : 'fail', icon: '<i class="ph ph-scales"></i>', pct: Math.min(100, (stab.static_margin / 15) * 100) },
-    { label: 'CL Maks', value: stab.cl_max, cls: 'pass', icon: '<i class="ph ph-chart-bar"></i>', pct: Math.min(100, (stab.cl_max / 2.5) * 100) },
-    { label: 'Seyir CD (total)', value: stab.cd_cruise, cls: 'pass', icon: '<i class="ph ph-trend-down"></i>', pct: Math.min(100, (1 - stab.cd_cruise / 0.1) * 100) },
-    { label: 'Reynolds (Re)', value: (stab.Reynolds || '').toLocaleString(), cls: 'pass', icon: '<i class="ph ph-atom"></i>', pct: Math.min(100, ((stab.Reynolds || 0) / 500000) * 100) },
+  const passed = stab.overall_passed;
+  const warnings = stab.checks.filter(c => c.status === 'warn').length;
+  const failures = stab.checks.filter(c => c.status === 'fail').length;
+  const summary = failures
+    ? `${stab.checks.length} kriterden ${failures} tanesi karşılanmıyor.`
+    : warnings
+      ? `Tüm kriterler karşılanıyor, ${warnings} tanesi sınırda.`
+      : 'Tüm kriterler karşılanıyor.';
+
+  const rows = stab.checks.map(c => {
+    const def = FLIGHT_CHECKS[c.key];
+    const st = STATUS[c.status];
+    return `<tr>
+      <th scope="row">${def.label}</th>
+      <td class="num">${escapeHtml(String(stab[c.key]))} <span class="unit">${def.unit}</span></td>
+      <td class="limit">${def.limit}</td>
+      <td><span class="status ${c.status}"><i class="ph ${st.icon}"></i>${st.label}</span></td>
+      <td class="note">${escapeHtml(c.message)}</td>
+    </tr>`;
+  }).join('');
+
+  const details = [
+    ['Seyir hızı', stab.cruise_speed, 'm/s'],
+    ['CL maks', stab.cl_max, ''],
+    ['Seyir CL', stab.cl_opt, ''],
+    ['Seyir CD', stab.cd_cruise, ''],
+    ['Seyir sürüklemesi', stab.drag_cruise, 'N'],
+    ['Gerekli güç', stab.power_required, 'W'],
+    ['Mevcut güç (150 W/kg varsayımı)', stab.power_available, 'W'],
+    ['Nötr nokta', (stab.neutral_point * 100).toFixed(1), '% MAC'],
+    ['Ağırlık merkezi', (stab.cg_position * 100).toFixed(1), '% MAC'],
+    ['Reynolds sayısı', stab.Reynolds.toLocaleString('tr-TR'), ''],
   ];
 
-  const assessments = stab.assessments || [];
-  const verdict = stab.overall_passed ? '<i class="ph ph-check-circle"></i> UÇABİLİR' : '<i class="ph ph-x-circle"></i> UÇAMAZ';
-
   $('flight-results').innerHTML =
-    items.map(item =>
-      `<div class="flight-item ${item.cls}">
-        <div class="flight-item-header">
-          <span class="flight-icon">${item.icon}</span>
-          <span class="flight-value">${escapeHtml(String(item.value))}</span>
-        </div>
-        <div class="flight-label">${escapeHtml(item.label)}</div>
-        <div class="progress-track">
-          <div class="progress-fill" style="width: ${item.pct}%"></div>
-        </div>
-      </div>`
-    ).join('') +
-    `<div class="flight-assessment">
-      <h3>Değerlendirme</h3>
-      <ul>${assessments.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>
+    `<div class="verdict ${passed ? 'pass' : 'fail'}">
+      <i class="ph ${passed ? 'ph-check-circle' : 'ph-x-circle'}"></i>
+      <div>
+        <strong>${passed ? 'Uçabilir' : 'Uçamaz'}</strong>
+        <p>${summary}</p>
+      </div>
     </div>
-    <div class="flight-verdict ${stab.overall_passed ? 'pass' : 'fail'}">${verdict}</div>`;
+    <div class="table-scroll">
+      <table class="check-table">
+        <thead><tr><th>Kriter</th><th>Değer</th><th>Sınır</th><th>Durum</th><th>Değerlendirme</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <section class="spec-group flight-details">
+      <h3>Hesap ayrıntıları</h3>
+      <dl>${details.map(([label, value, unit]) =>
+        `<div><dt>${escapeHtml(label)}</dt><dd class="num">${escapeHtml(String(value))}${unit ? ` <span class="unit">${unit}</span>` : ''}</dd></div>`
+      ).join('')}</dl>
+    </section>`;
 }
 
 window.addEventListener('DOMContentLoaded', init);
