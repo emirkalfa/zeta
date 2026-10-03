@@ -20,6 +20,11 @@ PORT = 5791
 BASE = f"http://127.0.0.1:{PORT}"
 ROOT = Path(__file__).resolve().parent.parent
 
+# Windows konsolu Türkçe karakterleri kodlayamayınca print çökmesin
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(errors="replace")
+
 
 def request(path, payload=None):
     data = None if payload is None else json.dumps(payload).encode()

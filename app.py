@@ -11,6 +11,10 @@ if sys.stdout is None:
     sys.stdout = open(os.devnull, 'w')
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
+# Windows konsolu (cp1252 vb.) Türkçe karakterleri kodlayamayınca print çökmesin
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, 'reconfigure'):
+        _stream.reconfigure(errors='replace')
 
 from flask import Flask, jsonify, request, send_from_directory
 from backend.geometry import calculate_geometry
