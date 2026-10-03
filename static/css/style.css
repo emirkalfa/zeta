@@ -647,6 +647,86 @@ input[type="range"]::-moz-range-thumb {
   padding-left: 8px;
 }
 
+/* ─── Grafikler ─── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px 40px;
+}
+
+.chart-box { min-width: 0; }
+.chart-box.wide { grid-column: 1 / -1; }
+
+.chart-box figcaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.chart-box h3 { font-size: 0.875rem; font-weight: 600; }
+
+.chart-box figcaption p {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.chart-canvas-wrap {
+  position: relative;
+  height: 260px;
+}
+
+.chart-box details { margin-top: 8px; }
+
+.chart-box summary {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.chart-box summary::-webkit-details-marker { display: none; }
+.chart-box summary::before { content: "+ "; font-family: var(--mono); }
+.chart-box details[open] summary::before { content: "− "; }
+.chart-box summary:hover { color: var(--text); }
+
+.chart-table {
+  max-height: 240px;
+  margin-top: 8px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 4px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table tr:last-child td { border-bottom: none; }
+
+.data-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 /* ─── Footer ─── */
 footer {
   padding: 16px 40px;
@@ -699,6 +779,7 @@ footer a:hover { color: var(--text); }
 
   .form-section { grid-template-columns: 1fr; gap: 12px; }
 
+  .charts-grid { grid-template-columns: 1fr; }
   .fuse-layout { grid-template-columns: 1fr; }
   #fuse-three-container { position: static; height: 300px; }
   .segmented { display: flex; }
@@ -711,82 +792,6 @@ footer a:hover { color: var(--text); }
 }
 
 /* ═══ Legacy (sayfa sayfa yenilenecek) ═══ */
-/* ─── Charts ─── */
-.charts-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.chart-box {
-  background: var(--bg);
-  border-radius: 12px;
-  padding: 16px;
-  aspect-ratio: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.chart-box h3 {
-  flex-shrink: 0;
-  margin-bottom: 8px;
-}
-
-.chart-box .chart-canvas-wrap {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.chart-box canvas {
-  width: 100% !important;
-  height: 100% !important;
-  max-height: none;
-}
-
-.chart-box.full-width {
-  grid-column: 1 / -1;
-  aspect-ratio: auto;
-  padding-bottom: 12px;
-}
-
-.chart-table {
-  margin-top: 8px;
-  max-height: 100px;
-  overflow-y: auto;
-  font-size: 0.75rem;
-  flex-shrink: 0;
-}
-
-.chart-table {
-  margin-top: 8px;
-  max-height: 120px;
-  overflow-y: auto;
-  font-size: 0.75rem;
-}
-
-.chart-table table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.chart-table th,
-.chart-table td {
-  padding: 3px 6px;
-  text-align: right;
-  border-bottom: 1px solid var(--border);
-}
-
-.chart-table th {
-  font-weight: 600;
-  color: var(--text-secondary);
-  position: sticky;
-  top: 0;
-  background: var(--bg);
-}
-
 /* ─── Flight Test (Progress Bar Cards) ─── */
 .flight-grid {
   display: grid;

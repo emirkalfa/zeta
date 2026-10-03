@@ -299,33 +299,68 @@
 
     <!-- Tab: Charts -->
     <section class="tab-pane" data-tab="charts">
-      <h2>Aerodinamik Analiz</h2>
+      <header class="page-head">
+        <div>
+          <h2>Aerodinamik analiz</h2>
+          <p class="page-desc">Lifting-line teorisiyle hesaplanan kanat polarları. Değerleri görmek için eğrilerin üzerine gelin.</p>
+        </div>
+      </header>
       <div class="charts-grid">
-        <div class="chart-box">
-          <h3>Cl vs α (Kaldırma Katsayısı)</h3>
+        <figure class="chart-box">
+          <figcaption>
+            <h3>Kaldırma eğrisi</h3>
+            <p id="noteClAlpha"></p>
+          </figcaption>
           <div class="chart-canvas-wrap"><canvas id="chartClAlpha"></canvas></div>
-          <div class="chart-table" id="tableClAlpha"></div>
-        </div>
-        <div class="chart-box">
-          <h3>Cd vs Cl (Sürükleme Poları)</h3>
+          <details>
+            <summary>Veri tablosu</summary>
+            <div class="chart-table" id="tableClAlpha"></div>
+          </details>
+        </figure>
+        <figure class="chart-box">
+          <figcaption>
+            <h3>Sürükleme poları</h3>
+            <p id="noteCdCl"></p>
+          </figcaption>
           <div class="chart-canvas-wrap"><canvas id="chartCdCl"></canvas></div>
-          <div class="chart-table" id="tableCdCl"></div>
-        </div>
-        <div class="chart-box">
-          <h3>Cm vs α (Moment Katsayısı)</h3>
+          <details>
+            <summary>Veri tablosu</summary>
+            <div class="chart-table" id="tableCdCl"></div>
+          </details>
+        </figure>
+        <figure class="chart-box">
+          <figcaption>
+            <h3>Yunuslama momenti</h3>
+            <p id="noteCmAlpha"></p>
+          </figcaption>
           <div class="chart-canvas-wrap"><canvas id="chartCmAlpha"></canvas></div>
-          <div class="chart-table" id="tableCmAlpha"></div>
-        </div>
-        <div class="chart-box">
-          <h3>Cl/Cd vs α (Verim)</h3>
+          <details>
+            <summary>Veri tablosu</summary>
+            <div class="chart-table" id="tableCmAlpha"></div>
+          </details>
+        </figure>
+        <figure class="chart-box">
+          <figcaption>
+            <h3>Aerodinamik verim</h3>
+            <p id="noteEff"></p>
+          </figcaption>
           <div class="chart-canvas-wrap"><canvas id="chartEff"></canvas></div>
-          <div class="chart-table" id="tableEff"></div>
-        </div>
-        <div class="chart-box full-width">
-          <h3>Kanat Boyunca Lift Dağılımı</h3>
+          <details>
+            <summary>Veri tablosu</summary>
+            <div class="chart-table" id="tableEff"></div>
+          </details>
+        </figure>
+        <figure class="chart-box wide">
+          <figcaption>
+            <h3>Açıklık boyunca kaldırma dağılımı</h3>
+            <p id="noteLiftDist"></p>
+          </figcaption>
           <div class="chart-canvas-wrap"><canvas id="chartLiftDist"></canvas></div>
-          <div class="chart-table" id="tableLiftDist"></div>
-        </div>
+          <details>
+            <summary>Veri tablosu</summary>
+            <div class="chart-table" id="tableLiftDist"></div>
+          </details>
+        </figure>
       </div>
     </section>
 

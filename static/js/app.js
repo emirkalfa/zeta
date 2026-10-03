@@ -243,6 +243,8 @@ function applyTheme() {
   const dark = document.documentElement.dataset.theme === 'dark';
   $('darkToggle').querySelector('i').className = dark ? 'ph ph-sun' : 'ph ph-moon';
   if (typeof updateViewerTheme === 'function') updateViewerTheme();
+  // Chart.js renkleri oluşturulurken okuduğu için grafikler yeniden çizilir
+  if (state.polars) displayCharts(state.polars);
 }
 
 /* ─── Proje kaydı ─── */
