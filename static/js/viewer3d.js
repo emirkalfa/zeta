@@ -58,7 +58,10 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tail
   const box = new THREE.Box3().setFromObject(wingGroup).union(new THREE.Box3().setFromObject(fuseGroup)).union(new THREE.Box3().setFromObject(tailGroup));
   const sphere = box.getBoundingSphere(new THREE.Sphere());
   viewTarget.copy(sphere.center);
-  viewDist = sphere.radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.85;
+  // Dar (dikey) ekranlarda yatay görüş açısı belirleyici olur
+  const halfV = THREE.MathUtils.degToRad(camera.fov / 2);
+  const halfH = Math.atan(Math.tan(halfV) * camera.aspect);
+  viewDist = sphere.radius / Math.sin(Math.min(halfV, halfH)) * 0.85;
   setCameraDirection(HOME_VIEW);
 
   const cell = sphere.radius > 3 ? 1 : 0.1;
