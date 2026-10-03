@@ -83,6 +83,15 @@ function showFormError(message) {
   el.hidden = !message;
 }
 
+let toastTimer;
+function notify(message) {
+  const el = $('toast');
+  el.textContent = message;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
+}
+
 /* ─── Sidebar / Tab System ─── */
 function switchTab(tabId) {
   document.querySelectorAll('.tab-pane').forEach(pane => {

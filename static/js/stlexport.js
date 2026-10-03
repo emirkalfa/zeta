@@ -6,7 +6,7 @@ function getNumSegments(id) {
 
 function checkGeom() {
   if (!state.geometry) {
-    alert('STL için model bulunamadı. Önce HESAPLA butonuna tıklayın.');
+    notify('STL için model bulunamadı. Önce hesaplama yapın.');
     return false;
   }
   return true;
@@ -14,17 +14,12 @@ function checkGeom() {
 
 function showDownloadConfirm(files) {
   return new Promise((resolve) => {
-    const list = document.getElementById('downloadFileList');
-    list.innerHTML = files.map(f => `<li>${f}</li>`).join('');
-    document.getElementById('downloadModal').style.display = 'flex';
-    document.getElementById('downloadConfirmBtn').onclick = () => {
-      document.getElementById('downloadModal').style.display = 'none';
-      resolve(true);
-    };
-    document.getElementById('downloadCancelBtn').onclick = () => {
-      document.getElementById('downloadModal').style.display = 'none';
-      resolve(false);
-    };
+    const dialog = document.getElementById('downloadModal');
+    document.getElementById('downloadFileList').innerHTML = files.map(f => `<li>${f}</li>`).join('');
+    dialog.returnValue = '';
+    // Esc ile kapatmada returnValue boş kalır, iptal sayılır
+    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
+    dialog.showModal();
   });
 }
 
@@ -207,7 +202,7 @@ async function exportSTL(part) {
   }
 
   if (!meshes.length) {
-    alert('STL için model bulunamadı. Önce HESAPLA butonuna tıklayın.');
+    notify('STL için model bulunamadı. Önce hesaplama yapın.');
     return;
   }
 
@@ -354,7 +349,7 @@ async function exportFuselageSTL(type) {
   const geom = state.geometry;
   const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
   if (!sections.length) {
-    alert('Gövde modeli oluşturulamadı.');
+    notify('Gövde modeli oluşturulamadı.');
     return;
   }
 
@@ -365,7 +360,7 @@ async function exportFuselageSTL(type) {
 async function exportSlicedFuselage(type) {
   if (!checkGeom()) return;
   const n = getNumSegments(type === 'conventional' ? 'fuseConvSliceCount' : 'fuseManualSliceCount');
-  if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+  if (n <= 1) { notify('Parça sayısı en az 2 olmalıdır.'); return; }
 
   const ext = type === 'conventional' ? 'conv' : 'manual';
   const filenames = Array.from({length: n}, (_, i) => `zeta_fuselage_${ext}_${i+1}of${n}.stl`);
@@ -375,7 +370,7 @@ async function exportSlicedFuselage(type) {
   const wallM = (state.wallThickness || 0) / 1000;
   const geom = state.geometry;
   const { sections, nCirc } = buildFuselageSections(geom, type, state.airfoilCoords);
-  if (!sections.length) { alert('Gövde modeli oluşturulamadı.'); return; }
+  if (!sections.length) { notify('Gövde modeli oluşturulamadı.'); return; }
 
   const totalSecs = sections.length;
   const segSize = totalSecs / n;
@@ -393,7 +388,7 @@ async function exportSlicedFuselage(type) {
 async function exportSlicedWing() {
   if (!checkGeom()) return;
   const n = getNumSegments('sliceCount');
-  if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+  if (n <= 1) { notify('Parça sayısı en az 2 olmalıdır.'); return; }
 
   const filenames = [];
   for (const sideName of ['right', 'left']) {
@@ -428,7 +423,7 @@ async function exportSlicedWing() {
 async function exportSlicedTail() {
   if (!checkGeom()) return;
   const n = getNumSegments('tailSliceCount');
-  if (n <= 1) { alert('Parça sayısı en az 2 olmalıdır.'); return; }
+  if (n <= 1) { notify('Parça sayısı en az 2 olmalıdır.'); return; }
 
   const geom = state.geometry;
   const tailType = geom.tail_type || 'conventional';

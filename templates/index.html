@@ -377,124 +377,93 @@
 
     <!-- Tab: STL -->
     <section class="tab-pane" data-tab="stl">
-      <h2>STL İndirme</h2>
-      <p class="stl-info-code" style="margin-bottom:16px">3D modeli 3D yazıcıda basmak için aşağıdaki formatlarda indirin.</p>
+      <header class="page-head">
+        <div>
+          <h2>STL indirme</h2>
+          <p class="page-desc">Parçaları 3D yazıcı için tek parça ya da yazıcı tablasına sığacak şekilde dilimlenmiş olarak indirin.</p>
+        </div>
+      </header>
 
-      <!-- Tek Parça -->
-      <div class="stl-section-title"><i class="ph ph-airplane"></i> Tek Parça STL</div>
-      <div class="stl-cards-grid">
-        <div class="stl-card">
-          <div class="stl-card-icon"><i class="ph ph-airplane"></i></div>
-          <h4>Kanat STL</h4>
-          <p>Tek parça halinde kanat modeli. Küçük uçaklar için idealdir.</p>
-          <button id="stlWing" class="stl-btn wing-btn"><i class="ph ph-arrow-down"></i> Kanat STL</button>
-        </div>
-        <div class="stl-card">
-          <div class="stl-card-icon"><i class="ph ph-swap"></i></div>
-          <h4>Kuyruk STL</h4>
-          <p>Yatay ve dikey kuyruk tek parça. Hızlı baskı için uygundur.</p>
-          <button id="stlTail" class="stl-btn tail-btn"><i class="ph ph-arrow-down"></i> Kuyruk STL</button>
-        </div>
-        <div class="stl-card">
-          <div class="stl-card-icon"><i class="ph ph-airplane-tilt"></i></div>
-          <h4>Konvansiyonel Gövde STL</h4>
-          <p>Hesaplanan boyutlara göre oluşturulmuş konvansiyonel gövde.</p>
-          <button id="stlFuseConv" class="stl-btn fuse-btn"><i class="ph ph-arrow-down"></i> Konv. Gövde STL</button>
-        </div>
-        <div class="stl-card">
-          <div class="stl-card-icon"><i class="ph ph-airplane-tilt"></i></div>
-          <h4>Özgün Gövde STL</h4>
-          <p>K1–K6 kesitlerine göre oluşturulmuş özgün gövde tasarımı.</p>
-          <button id="stlFuseManual" class="stl-btn fuse-btn"><i class="ph ph-arrow-down"></i> Özgün Gövde STL</button>
-        </div>
-      </div>
-
-      <!-- Dilimleme -->
-      <div class="stl-section-title"><i class="ph ph-scissors"></i> Dilimleme (Parçalı STL)</div>
-      <p class="stl-info-code">Büyük parçaları yazıcıya sığdırmak için eşit parçalara bölün. Parçaları yapıştırarak birleştirin.</p>
-      <div class="stl-cards-grid">
-        <div class="stl-card">
-          <div class="stl-card-icon"><i class="ph ph-scissors"></i></div>
-          <h4>Kanat Dilimli</h4>
-          <p>Her yarıdaki parça sayısını ayarlayın.</p>
-          <div class="form-group">
-            <label for="sliceCount">Parça Sayısı</label>
-            <input type="number" id="sliceCount" min="1" max="20" value="3" step="1">
-          </div>
-          <button id="stlWingSliced" class="stl-btn wing-btn sliced-btn"><i class="ph ph-scissors"></i> Kanat Dilimli STL</button>
-        </div>
-        <div class="stl-card">
-          <div class="stl-card-icon"><i class="ph ph-scissors"></i></div>
-          <h4>Kuyruk Dilimli</h4>
-          <p>Kuyruk için parça sayısını ayarlayın.</p>
-          <div class="form-group">
-            <label for="tailSliceCount">Parça Sayısı</label>
-            <input type="number" id="tailSliceCount" min="1" max="20" value="2" step="1">
-          </div>
-          <button id="stlTailSliced" class="stl-btn tail-btn sliced-btn"><i class="ph ph-scissors"></i> Kuyruk Dilimli STL</button>
-        </div>
-        <div class="stl-card">
-          <div class="stl-card-icon"><i class="ph ph-scissors"></i></div>
-          <h4>Konvansiyonel Gövde Dilimli</h4>
-          <p>Konvansiyonel gövdeyi eşit parçalara bölün.</p>
-          <div class="form-group">
-            <label for="fuseConvSliceCount">Parça Sayısı</label>
-            <input type="number" id="fuseConvSliceCount" min="1" max="20" value="3" step="1">
-          </div>
-          <button id="stlFuseConvSliced" class="stl-btn fuse-btn sliced-btn"><i class="ph ph-scissors"></i> Konv. Gövde Dilimli STL</button>
-        </div>
-        <div class="stl-card">
-          <div class="stl-card-icon"><i class="ph ph-scissors"></i></div>
-          <h4>Özgün Gövde Dilimli</h4>
-          <p>Özgün gövdeyi eşit parçalara bölün.</p>
-          <div class="form-group">
-            <label for="fuseManualSliceCount">Parça Sayısı</label>
-            <input type="number" id="fuseManualSliceCount" min="1" max="20" value="3" step="1">
-          </div>
-          <button id="stlFuseManualSliced" class="stl-btn fuse-btn sliced-btn"><i class="ph ph-scissors"></i> Özgün Gövde Dilimli STL</button>
-        </div>
-      </div>
-      <p class="stl-info-code"><i class="ph ph-lightbulb"></i> Dosya adları: <code>zeta_kanat_sag_1of3.stl</code> (1=kök, son=uç)</p>
-
-      <!-- Duvar Kalınlığı -->
-      <div class="stl-section-title"><i class="ph ph-wrench"></i> Duvar Kalınlığı</div>
-      <p class="stl-info-code">Dış yüzey bozulmaz, içe doğru et kalınlığı eklenir. 0 = yüzey (içi boş).</p>
-      <div class="stl-cards-grid">
-        <div class="stl-card">
-          <div class="stl-card-icon"><i class="ph ph-wrench"></i></div>
-          <h4>Et Kalınlığı Ayarı</h4>
+      <div class="form-section">
+        <div class="form-section-head">
+          <h3>Duvar kalınlığı</h3>
           <p>Tüm STL çıktılarına uygulanır.</p>
-          <div class="form-group">
-            <label for="wallThickness">Duvar Kalınlığı (mm)</label>
-            <input type="number" id="wallThickness" min="0" max="5" step="0.1" value="1.2">
+        </div>
+        <div class="field stl-wall">
+          <div class="input-wrap"><input type="number" id="wallThickness" min="0" max="5" step="0.1" value="1.2" aria-label="Duvar kalınlığı"><span class="unit">mm</span></div>
+          <small class="hint">Dış yüzey korunur, kalınlık içe doğru eklenir. 0 girilirse yalnızca yüzey (içi boş) üretilir.</small>
+        </div>
+      </div>
+
+      <div class="stl-list">
+        <div class="stl-row">
+          <div class="stl-part">
+            <h3>Kanat</h3>
+            <p>Parça sayısı her kanat yarısı için geçerlidir.</p>
+          </div>
+          <button id="stlWing" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
+          <div class="stl-sliced">
+            <div class="input-wrap"><input type="number" id="sliceCount" min="2" max="20" value="3" step="1" aria-label="Kanat parça sayısı"><span class="unit">parça</span></div>
+            <button id="stlWingSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
+          </div>
+        </div>
+        <div class="stl-row">
+          <div class="stl-part">
+            <h3>Kuyruk</h3>
+            <p>Yatay ve dikey kuyruk birlikte.</p>
+          </div>
+          <button id="stlTail" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
+          <div class="stl-sliced">
+            <div class="input-wrap"><input type="number" id="tailSliceCount" min="2" max="20" value="2" step="1" aria-label="Kuyruk parça sayısı"><span class="unit">parça</span></div>
+            <button id="stlTailSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
+          </div>
+        </div>
+        <div class="stl-row">
+          <div class="stl-part">
+            <h3>Konvansiyonel gövde</h3>
+            <p>Hesaplanan ölçülere göre otomatik gövde.</p>
+          </div>
+          <button id="stlFuseConv" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
+          <div class="stl-sliced">
+            <div class="input-wrap"><input type="number" id="fuseConvSliceCount" min="2" max="20" value="3" step="1" aria-label="Konvansiyonel gövde parça sayısı"><span class="unit">parça</span></div>
+            <button id="stlFuseConvSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
+          </div>
+        </div>
+        <div class="stl-row">
+          <div class="stl-part">
+            <h3>Özgün gövde</h3>
+            <p>Gövde adımındaki K1–K6 kesitlerinden.</p>
+          </div>
+          <button id="stlFuseManual" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
+          <div class="stl-sliced">
+            <div class="input-wrap"><input type="number" id="fuseManualSliceCount" min="2" max="20" value="3" step="1" aria-label="Özgün gövde parça sayısı"><span class="unit">parça</span></div>
+            <button id="stlFuseManualSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
           </div>
         </div>
       </div>
+      <p class="stl-note">Dilimli parçalar <code>z_wing_right_1of3.stl</code> biçiminde adlandırılır; 1 kök tarafı, son parça uç tarafıdır. Parçalar yapıştırılarak birleştirilir.</p>
     </section>
 
     <!-- Footer -->
     <footer>
-      <p>ZETA — Üniversite Projeleri İçin Uçak Tasarım Aracı &mdash; <a href="https://emirkalfa.com" target="_blank">Muhammet Emir Kalfa</a> tarafından üretilmiştir &mdash; <a href="https://github.com/memirkalfa/zeta" target="_blank">GitHub</a></p>
+      <p>ZETA — Üniversite Projeleri İçin Uçak Tasarım Aracı &mdash; <a href="https://emirkalfa.com" target="_blank" rel="noopener">Muhammet Emir Kalfa</a> tarafından üretilmiştir &mdash; <a href="https://github.com/memirkalfa/zeta" target="_blank" rel="noopener">GitHub</a></p>
     </footer>
   </main>
 </div>
 
-<!-- Download Confirmation Modal -->
-<div id="downloadModal" class="modal-overlay" style="display:none">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h3>📥 İndirme Onayı</h3>
-    </div>
-    <div class="modal-body">
-      <p>Aşağıdaki dosya(lar) indirilecek:</p>
-      <ul id="downloadFileList"></ul>
-    </div>
+<dialog id="downloadModal" class="modal" aria-labelledby="downloadModalTitle">
+  <form method="dialog">
+    <h3 id="downloadModalTitle">İndirme onayı</h3>
+    <p>Aşağıdaki dosyalar indirilecek:</p>
+    <ul id="downloadFileList" class="num"></ul>
     <div class="modal-footer">
-      <button id="downloadCancelBtn" class="btn">İptal</button>
-      <button id="downloadConfirmBtn" class="btn btn-primary">İndir</button>
+      <button value="cancel" class="btn">İptal</button>
+      <button value="confirm" class="btn btn-primary" autofocus>İndir</button>
     </div>
-  </div>
-</div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" hidden></div>
 
 <script src="/static/js/app.js"></script>
 <script src="/static/js/viewer3d.js"></script>
