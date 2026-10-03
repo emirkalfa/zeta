@@ -4,6 +4,8 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-03
+
 ### Added
 - Kurulum gerektirmeyen masaüstü paketleri: Linux AppImage, Windows `.exe`, macOS `.app`. Uygulama tarayıcıda açılır, sekme kapanınca kendini kapatır, ikinci açılışta çalışan kopyaya gider.
 - Çevrimdışı çalışma: three.js, Chart.js, ikonlar ve yazı tipleri depoda (`static/vendor`).
@@ -109,7 +111,8 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - MIT lisansı.
 - Karanlık mod, favicon, profil README.
 
-[Unreleased]: https://github.com/emirkalfa/zeta/compare/v1.2.3...HEAD
+[Unreleased]: https://github.com/emirkalfa/zeta/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/emirkalfa/zeta/compare/v1.3.3...v2.0.0
 [1.2.3]: https://github.com/emirkalfa/zeta/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/emirkalfa/zeta/compare/v1.0.2...v1.2.2
 [1.0.2]: https://github.com/emirkalfa/zeta/compare/v1.0.0...v1.0.2
