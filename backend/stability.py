@@ -2,7 +2,7 @@ import numpy as np
 
 _GRADE_ICONS = {'pass': "✅", 'warn': "⚠️", 'fail': "❌"}
 
-def flight_test(geom, airfoil_props, tail_props=None, rho=1.225):
+def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available=None):
     if tail_props is None:
         tail_props = airfoil_props
     W = geom['weight'] * 9.81
@@ -40,8 +40,8 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225):
     cd_cruise = cd_0 + cd_i_opt
     D_cruise = 0.5 * rho * V_cruise**2 * S * cd_cruise
 
-    # Available power estimate (assume 150 W/kg)
-    power_avail = geom['weight'] * 150
+    # Mevcut güç: güç sistemi verilmişse ondan, yoksa 150 W/kg varsayımından
+    power_avail = power_available if power_available is not None else geom['weight'] * 150
     power_req = D_cruise * V_cruise
     excess_power = power_avail - power_req
     climb_rate = excess_power / W if excess_power > 0 else 0

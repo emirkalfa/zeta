@@ -6,6 +6,7 @@ from backend.geometry import calculate_geometry
 from backend.airfoil import get_airfoil_properties
 from backend.analysis import calculate_polars
 from backend.stability import flight_test
+from backend.mission import mission_performance
 
 app = Flask(__name__, static_url_path='')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -128,8 +129,27 @@ def api_stability():
     Re = float(data.get('reynolds_number', 200000))
     props = get_airfoil_properties(airfoil_code, Re=Re)
     tail_props = get_airfoil_properties(tail_airfoil_code, Re=Re)
-    result = flight_test(geom, props, tail_props)
+    power_available = None
+    if data.get('motor_power') is not None:
+        power_available = float(data['motor_power']) * float(data.get('prop_efficiency', 0.6))
+    result = flight_test(geom, props, tail_props, power_available=power_available)
     result['Reynolds'] = int(Re)
+    return jsonify(result)
+
+@app.route('/api/mission', methods=['POST'])
+def api_mission():
+    data = request.get_json()
+    props = get_airfoil_properties(data.get('airfoil_code', '2412'),
+                                   Re=float(data.get('reynolds_number', 200000)))
+    result = mission_performance(
+        data.get('geometry', {}), props,
+        motor_power=float(data.get('motor_power', 0)),
+        battery_wh=float(data.get('battery_wh', 0)),
+        prop_efficiency=float(data.get('prop_efficiency', 0.6)),
+        n_limit=float(data.get('n_limit', 4.0)),
+        avionics_power=float(data.get('avionics_power', 0)),
+        targets=data.get('targets'),
+    )
     return jsonify(result)
 
 @app.route('/api/airfoil_props/<code>')
