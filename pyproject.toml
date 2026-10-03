@@ -32,12 +32,15 @@ classifiers = [
 dependencies = [
     "flask>=3.0",
     "numpy>=2.0",
-    "scipy>=1.13",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+]
+build = [
+    "pyinstaller>=6.10",
+    "pillow>=10.0",
 ]
 
 [project.urls]
