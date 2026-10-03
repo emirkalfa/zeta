@@ -324,7 +324,6 @@ function updateMissionProfile() {
 function loadCompetitionPreset() {
   const values = { wingspan: 2.0, weight: 5.0, motorPower: 1200, batteryWh: 222, avionicsPower: 30, nLimit: 4 };
   for (const [id, value] of Object.entries(values)) $(id).value = value;
-  setRadio('wing_pos', 'high');
 }
 
 function updateCGDisplay() {
@@ -397,6 +396,8 @@ async function calculateAll() {
     wing_shape: radioValue('wing_shape', 'tapered'),
     wing_position: radioValue('wing_pos', 'mid'),
     cg_percent: parseInt($('cgSlider').value) || 25,
+    // Yarışma profili ayrı bir gövde yerleşimi kullanır (çift bom, itici pervane)
+    airframe: competition ? 'combat' : 'standard',
   };
   if (manual_mode) {
     for (const f of MANUAL_FIELDS) {
@@ -517,7 +518,7 @@ function displayResults(geom) {
       ['Gövde yüksekliği', fuse.height, 'm'],
       ['CG pozisyonu', geom.cg_position, 'm'],
     ]],
-    ['Dikey kuyruk', [
+    [geom.vtail_count === 2 ? 'Dikey kuyruk (ikiz, her biri)' : 'Dikey kuyruk', [
       ['Açıklık', geom.vtail_span, 'm'],
       ['Kök veter', geom.vtail_chord, 'm'],
       ['Uç veter', (geom.vtail_tip_chord || 0).toFixed(3), 'm'],
@@ -525,6 +526,14 @@ function displayResults(geom) {
       ['Alan', geom.vtail_area, 'm²'],
     ]],
   ];
+
+  if (geom.tail_booms) {
+    groups.push(['Kuyruk bomları (karbon boru, 2 adet)', [
+      ['Uzunluk', geom.tail_booms.length, 'm'],
+      ['Çap', geom.tail_booms.diameter, 'm'],
+      ['Merkezden uzaklık', geom.tail_booms.y, 'm'],
+    ]]);
+  }
 
   const cs = geom.control_surfaces;
   if (cs) {

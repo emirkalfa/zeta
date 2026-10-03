@@ -5,7 +5,7 @@ Elektrik-Elektronik Mühendisliği Öğrencisi | Embedded Systems & IoT Meraklı
 
 ### 🧑‍💻 Hakkımda
 
-- 🎓 **İstanbul AREL Üniversitesi** — Elektrik-Elektronik Mühendisliği (2023-2028)
+- 🎓 **İstanbul AREL Üniversitesi**: Elektrik-Elektronik Mühendisliği (2023-2028)
 - ⚡ **Embedded Systems**, **IoT** ve **Güç Elektroniği** alanlarında projeler geliştiriyorum
 - 🚀 **TEKNOFEST** ekibi **Merkutech** üyesi
 - 🛡️ Okulun **Savunma Sanayi Kulübü**'nde aktif rol alıyorum

@@ -10,6 +10,8 @@ const MODEL_COLORS = {
   elevator: 0x2a9d8f,
   rudder: 0xd4a017,
   dark: 0x4a5058,
+  carbon: 0x2e3238,
+  glass: 0x1c2733,
 };
 
 function modelMaterial(color) {
@@ -208,6 +210,11 @@ function buildTailGroup(geom, hCoords, vCoords) {
   const vTip = geom.vtail_chord * (geom.vtail_taper || 0.4);
   const vSweep = Math.tan(THREE.MathUtils.degToRad(geom.vtail_sweep || 5));
 
+  if (geom.tail_booms) {
+    buildBoomTail(group, geom, hCoords, vCoords, { tailX, elevator, rudder, vTip, vSweep });
+    return group;
+  }
+
   const horizontal = (root) => {
     for (const sign of [1, -1]) {
       buildSurface(group, {
@@ -250,6 +257,60 @@ function buildTailGroup(geom, hCoords, vCoords) {
   return group;
 }
 
+// Yarışma (çift bomlu) yerleşim: kuyruk, kanada bağlı iki karbon bomun ucunda taşınır
+function buildBoomTail(group, geom, hCoords, vCoords, { tailX, elevator, rudder, vTip, vSweep }) {
+  const booms = geom.tail_booms;
+  const dihedral = THREE.MathUtils.degToRad(geom.dihedral_angle != null ? geom.dihedral_angle : 3);
+  const y = (geom.wing_position_offset || 0) + booms.y * Math.sin(dihedral);
+  const vSpan = geom.vtail_span;
+
+  const carbon = new THREE.MeshStandardMaterial({ color: MODEL_COLORS.carbon, roughness: 0.45, metalness: 0.2 });
+  for (const sign of [1, -1]) {
+    const boom = new THREE.Mesh(new THREE.CylinderGeometry(booms.diameter / 2, booms.diameter / 2, booms.length, 20), carbon);
+    boom.rotation.z = Math.PI / 2;   // silindir ekseni +y → +x
+    boom.position.set((booms.x_start + booms.x_end) / 2, y, sign * booms.y);
+    boom.castShadow = true;
+    group.add(boom);
+  }
+
+  if (geom.tail_type === 'vtail') {
+    // Ters V: paneller bom uçlarından yükselip ortada birleşir
+    const angle = THREE.MathUtils.degToRad(35);
+    for (const sign of [1, -1]) {
+      buildSurface(group, {
+        rootLE: new THREE.Vector3(tailX, y, sign * booms.y),
+        tipLE: new THREE.Vector3(tailX + booms.y * vSweep, y + booms.y * Math.tan(angle), 0),
+        rootChord: geom.vtail_chord, tipChord: vTip, coords: hCoords, controls: elevator,
+        up: new THREE.Vector3(0, Math.cos(angle), sign * Math.sin(angle)),
+      });
+    }
+    return;
+  }
+
+  // İkiz dikey kuyruk, firar kenarı yatay kuyrukla hizalı
+  const finX = tailX + geom.htail_chord - geom.vtail_chord;
+  for (const sign of [1, -1]) {
+    buildSurface(group, {
+      rootLE: new THREE.Vector3(finX, y, sign * booms.y),
+      tipLE: new THREE.Vector3(finX + vSpan * vSweep, y + vSpan, sign * booms.y),
+      rootChord: geom.vtail_chord, tipChord: vTip, coords: vCoords, controls: rudder,
+      up: new THREE.Vector3(0, 0, 1),
+    });
+  }
+  // Yatay kuyruk bomlar arasında; T-kuyrukta dikey kuyrukların tepesinde
+  const top = geom.tail_type === 'ttail';
+  const hx = top ? finX + vSpan * vSweep + vTip - geom.htail_chord : tailX;
+  const hy = top ? y + vSpan : y;
+  for (const sign of [1, -1]) {
+    buildSurface(group, {
+      rootLE: new THREE.Vector3(hx, hy, 0),
+      tipLE: new THREE.Vector3(hx, hy, sign * booms.y),
+      rootChord: geom.htail_chord, tipChord: geom.htail_chord, coords: hCoords, controls: elevator,
+      up: new THREE.Vector3(0, 1, 0),
+    });
+  }
+}
+
 function buildFuselageGroup(geom, type, wingCoords) {
   const group = new THREE.Group();
   const { sections } = buildFuselageSections(geom, type, wingCoords);
@@ -282,12 +343,23 @@ function buildFuselageGroup(geom, type, wingCoords) {
   body.castShadow = true;
   group.add(body);
 
-  // Burun: spinner ve iki palli pervane
-  const length = sections[sections.length - 1][0].x - sections[0][0].x;
+  // Pervane: standart yerleşimde burunda (çekici), yarışma yerleşiminde gövde arkasında (itici)
+  const pusher = geom.airframe === 'combat';
+  const x0 = sections[0][0].x;
+  const x1 = sections[sections.length - 1][0].x;
+  const length = x1 - x0;
   const spinLen = length * 0.04;
-  const ref = sections.find(sec => sec[0].x >= spinLen) || sections[1];
-  const centerY = ref.reduce((s, p) => s + p.y, 0) / nCirc;
-  const radius = Math.max(...ref.map(p => Math.hypot(p.y - centerY, p.z))) * 1.06;
+  const sectionAt = (x) => sections.reduce((best, sec) =>
+    (Math.abs(sec[0].x - x) < Math.abs(best[0].x - x) ? sec : best));
+  const extent = (sec) => {
+    const ys = sec.map(p => p.y);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const centerY = (minY + maxY) / 2;
+    return { minY, maxY, centerY, radius: Math.max(...sec.map(p => Math.hypot(p.y - centerY, p.z))) };
+  };
+
+  const hub = extent(sectionAt(pusher ? x1 - spinLen : x0 + spinLen));
+  const radius = hub.radius * 1.06;
   const profile = [];
   for (let k = 0; k <= 12; k++) {
     const t = k / 12;
@@ -295,18 +367,32 @@ function buildFuselageGroup(geom, type, wingCoords) {
   }
   const dark = new THREE.MeshStandardMaterial({ color: MODEL_COLORS.dark, roughness: 0.4, metalness: 0.3 });
   const spinner = new THREE.Mesh(new THREE.LatheGeometry(profile, 32), dark);
-  spinner.rotation.z = -Math.PI / 2;   // lathe ekseni +y → +x
-  spinner.position.set(-spinLen * 0.25, centerY, 0);
+  // Lathe ekseni +y: çekicide ucu öne (−x), iticide arkaya (+x) bakar
+  spinner.rotation.z = pusher ? Math.PI / 2 : -Math.PI / 2;
+  spinner.position.set(pusher ? x1 + spinLen * 0.25 : x0 - spinLen * 0.25, hub.centerY, 0);
   spinner.castShadow = true;
   group.add(spinner);
 
-  const propRadius = Math.max(geom.wingspan * 0.11, radius * 2.5);
+  let propRadius = Math.max(geom.wingspan * 0.11, radius * 2.5);
+  if (geom.tail_booms) propRadius = Math.min(propRadius, geom.tail_booms.y * 0.85);
   const blade = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8), dark);
   blade.scale.set(radius * 0.12, propRadius, radius * 0.55);
   blade.rotation.x = Math.PI / 5;
-  blade.position.set(spinLen * 0.25, centerY, 0);
+  blade.position.set(pusher ? x1 - spinLen * 0.25 : x0 + spinLen * 0.25, hub.centerY, 0);
   blade.castShadow = true;
   group.add(blade);
+
+  if (pusher) {
+    // Burun altında öne bakan kamera kubbesi (hedef takibi için burun boş bırakılır)
+    const nose = extent(sectionAt(x0 + length * 0.12));
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(nose.radius * 0.5, 24, 16),
+      new THREE.MeshStandardMaterial({ color: MODEL_COLORS.glass, roughness: 0.15, metalness: 0.6 })
+    );
+    dome.position.set(x0 + length * 0.12, nose.minY + nose.radius * 0.15, 0);
+    dome.castShadow = true;
+    group.add(dome);
+  }
 
   return group;
 }

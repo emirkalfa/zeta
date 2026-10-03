@@ -101,6 +101,7 @@ def api_calculate():
                               fuse_type=data.get('fuse_type', 'conventional'),
                               man_fuse_length=data.get('man_fuse_length'),
                               man_fuse_width=data.get('man_fuse_width'),
+                              airframe=data.get('airframe', 'standard'),
                                )
     cg_pct = data.get('cg_percent')
     if cg_pct is not None:

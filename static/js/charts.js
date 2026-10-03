@@ -90,7 +90,7 @@ function displayMissionCharts(mission) {
   ], theme);
 }
 
-// series: [{ points, label?, secondary? }] — ikincil seriler nötr renkte ve kesikli çizilir
+// series: [{ points, label?, secondary? }]: ikincil seriler nötr renkte ve kesikli çizilir
 function createLineChart(canvasId, def, series, theme) {
   if (charts[canvasId]) charts[canvasId].destroy();
 

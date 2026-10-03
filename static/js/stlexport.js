@@ -211,6 +211,7 @@ async function exportSTL(part) {
     meshes.push(buildHTailSegment(geom, state.tailCoords, 0, hHalf, 1, false, false, wallM, true));
     meshes.push(buildHTailSegment(geom, state.tailCoords, 0, hHalf, -1, false, false, wallM, true));
     meshes.push(buildVTailSegment(geom, vCoords, 0, geom.vtail_span, false, false, wallM, true));
+    if (geom.vtail_count === 2) notify('Dikey kuyruk ikizdir: dosyadaki dikey kuyruğu iki kez basın.');
   }
 
   const merged = mergeMeshes(meshes);

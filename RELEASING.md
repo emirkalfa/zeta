@@ -4,7 +4,7 @@ Bu doküman ZETA için versiyon yönetimi ve release yayınlama adımlarını a�
 
 ## Versiyon Şeması
 
-[Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH` (örn. `0.2.0`).
+[Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH` (örn. `0.2.0`).
 
 - **MAJOR**: Geriye uyumsuz API/komut davranışı değişiklikleri.
 - **MINOR**: Geriye uyumlu yeni özellikler.
@@ -16,9 +16,9 @@ sabitine yükler ve `/api/version` endpoint'inde döner.
 
 ## Branch Stratejisi
 
-- `main` — kararlı sürüm, her release sonrası güncellenir.
-- `feat/*`, `fix/*` — geliştirme branch'leri. PR yoluyla `main`'e birleşir.
-- `v*` tag'leri — release işaretçileri.
+- `main`: kararlı sürüm, her release sonrası güncellenir.
+- `feat/*`, `fix/*`: geliştirme branch'leri. PR yoluyla `main`'e birleşir.
+- `v*` tag'leri: release işaretçileri.
 
 CI (`ci.yml`) `main` push'larında + tüm PR'larda test çalıştırır.
 Release workflow (`release.yml`) sadece `v*` tag push'unda tetiklenir,

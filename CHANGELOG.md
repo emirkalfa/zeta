@@ -5,6 +5,7 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 ## [Unreleased]
 
 ### Added
+- Yarışma İHA'sı gövde yerleşimi (`airframe: combat`): itici pervane, kamera için boş burun, çift bom, ikiz dikey kuyruk ya da ters V kuyruk; daha düşük açıklık oranı ve daha büyük kanatçıklar. 3D model ve ölçüler bu yerleşime göre üretilir.
 - Görev performansı adımı ve `/api/mission`: motor gücü ve bataryadan azami hız, havada kalış, menzil ve dönüş performansı; yarışma İHA'ları (Savaşan İHA vb.) için düzenlenebilir hedeflerle karşılaştırma ve örnek başlangıç değerleri.
 - Uçabilirlik testi artık 150 W/kg varsayımı yerine girilen motor gücünü kullanıyor.
 - Yeni logo ve favicon; README baştan yazıldı.
@@ -13,6 +14,7 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - 3D model yenilendi: firar kenarında gerçek kontrol yüzeyi panelleri (flap, kanatçık, elevator, rudder), yuvarlatılmış kanat uçları, spinner ve pervane, zemin gölgesi.
 
 ### Changed
+- Uygulama alt bilgisinden ve README'den yapımcı adı kaldırıldı.
 - Arayüz baştan tasarlandı: sade teknik tema (açık/koyu), numaralı adımlar, bölümlere ayrılmış parametre formu, gruplu ölçü tabloları, kriter tablolu uçabilirlik sayfası, satır tabanlı STL sayfası.
 - 3D sahnede kamera ve ızgara modelin boyutuna göre kadrajlanıyor.
 - Analiz grafikleri temaya uyuyor; sürükleme poları yalnızca stall öncesi noktaları çiziyor (`cd_vs_cl` noktalarına `stalled` alanı eklendi).
@@ -77,16 +79,16 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ### Added
 - 19 yeni test (toplam 124): alpha_L0, cm_0, cl_max/cd_0 referans karşılaştırmaları, cambered CL@α=0, 3D CL_α eğimi, downwash AR-bağımlılığı, htail alan etkisi.
-- `app.py` `/api/version` endpoint'i — `VERSION` dosyasını döner.
+- `app.py` `/api/version` endpoint'i: `VERSION` dosyasını döner.
 - `app.py` `/healthz` endpoint'i.
 - `VERSION` dosyası (tek kaynak).
 - `pyproject.toml` (PEP 621 metadata, `setuptools.dynamic.version`).
 - `CHANGELOG.md`.
-- `.github/workflows/ci.yml` — push/PR'da testler.
-- `.github/workflows/release.yml` — `v*` tag'de GitHub Release.
-- `.github/release-drafter.yml` — otomatik release notes.
-- `scripts/bump_version.py` — semver atlama yardımcısı.
-- `RELEASING.md` — release süreci dokümanı.
+- `.github/workflows/ci.yml`: push/PR'da testler.
+- `.github/workflows/release.yml`: `v*` tag'de GitHub Release.
+- `.github/release-drafter.yml`: otomatik release notes.
+- `scripts/bump_version.py`: semver atlama yardımcısı.
+- `RELEASING.md`: release süreci dokümanı.
 
 ## [0.1.0] - 2026-05-23
 

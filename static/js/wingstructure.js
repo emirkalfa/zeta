@@ -7,7 +7,7 @@
  * Kanat doğrusal daraldığı için istasyonlar arası yüzeyler düz çizgilerle birleştirilir.
  */
 
-const SPAR_MAIN_POS = 0.28;   // veter oranı — profilin en kalın bölgesi
+const SPAR_MAIN_POS = 0.28;   // veter oranı: profilin en kalın bölgesi
 const SPAR_REAR_POS = 0.62;
 const SPAR_CLEARANCE = 0.0006; // delik ile iç kabuk arasında bırakılan en az et (m)
 const PROFILE_POINTS = 40;

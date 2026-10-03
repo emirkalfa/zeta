@@ -11,7 +11,12 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                        man_vtail_tip=None,
                        fuse_type='conventional',
                        man_fuse_length=None, man_fuse_width=None,
+                       airframe='standard',
                        ):
+    """airframe: 'standard' klasik çekici pervaneli model uçak yerleşimi,
+    'combat' it dalaşı yarışmaları (Savaşan İHA vb.) için çift bomlu, itici pervaneli yerleşim:
+    burun kameraya ayrılır, kısa gövde (pod) kanada bağlanır, kuyruk iki bomla taşınır."""
+    combat = airframe == "combat"
     if manual_mode:
         root_chord = float(man_root_chord or 0.2)
         tip_chord = float(man_tip_chord or 0.1)
@@ -21,7 +26,8 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         wing_area = (root_chord + tip_chord) / 2 * wingspan
         aspect_ratio = wingspan**2 / wing_area if wing_area > 0 else 7.0
     else:
-        ar = 7.0
+        # Yarışma uçağında daha düşük açıklık oranı: daha sağlam kanat, daha hızlı yuvarlanma
+        ar = 6.0 if combat else 7.0
         dihedral_angle = 3.0
         if wing_shape == 'rectangular':
             taper_ratio = 1.0
@@ -49,6 +55,12 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     fuse_max_height = 0.05 * wingspan
     wing_x_pos = 0.30 * fuse_length
     tail_x_pos = 0.82 * fuse_length
+
+    if combat:
+        # Kısa gövde; kuyruk kolu bomlarla gövdeden bağımsız uzatılır
+        fuse_length = 0.50 * wingspan
+        wing_x_pos = 0.40 * fuse_length
+        tail_x_pos = wing_x_pos + 0.50 * wingspan
 
     if fuse_type == 'manual' and man_fuse_length is not None:
         fuse_length = float(man_fuse_length)
@@ -87,6 +99,20 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         vtail_area = vtail_Vv * wing_area * wingspan / max(htail_arm, 0.01)
         vtail_root_chord = 2 * vtail_area / (vtail_span * (1 + vtail_taper))
         vtail_tip_chord = vtail_root_chord * vtail_taper
+
+        if combat:
+            # Bomlar arasında dikdörtgen yatay kuyruk ve bom uçlarında ikiz dikey kuyruk.
+            # vtail_* değerleri tek bir dikey kuyruğa aittir (toplam alanın yarısı).
+            htail_taper = 1.0
+            htail_sweep = 0.0
+            htail_span = 0.36 * wingspan
+            htail_root_chord = htail_area / htail_span
+            htail_tip_chord = htail_root_chord
+            vtail_taper = 0.6
+            vtail_span = 0.16 * wingspan
+            vtail_area = vtail_area / 2
+            vtail_root_chord = 2 * vtail_area / (vtail_span * (1 + vtail_taper))
+            vtail_tip_chord = vtail_root_chord * vtail_taper
 
     # V-tail override: replaces both horizontal and vertical
     if tail_type == 'vtail':
@@ -170,28 +196,41 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'fuse_type': fuse_type,
     }
 
+    result['airframe'] = 'combat' if combat else 'standard'
+    if combat:
+        boom_y = htail_span / 2
+        chord_at_boom = root_chord * (1 - (boom_y / (wingspan / 2)) * (1 - taper_ratio))
+        result['vtail_count'] = 1 if tail_type == 'vtail' else 2
+        result['tail_booms'] = {
+            'y': round(boom_y, 3),
+            'x_start': round(wing_x_pos + 0.25 * chord_at_boom, 3),
+            'x_end': round(tail_x_pos + htail_root_chord, 3),
+            'length': round(tail_x_pos + htail_root_chord - wing_x_pos - 0.25 * chord_at_boom, 3),
+            'diameter': round(max(0.012 * wingspan, 0.008), 3),
+        }
+
     result['control_surfaces'] = calculate_control_surfaces(
         wingspan, wing_area, root_chord, taper_ratio, htail_area, vtail_area,
-        wing_shape,
+        wing_shape, combat=combat,
     )
     return result
 
 
 def calculate_control_surfaces(wingspan, wing_area, root_chord, taper_ratio,
-                                htail_area, vtail_area, wing_shape):
+                                htail_area, vtail_area, wing_shape, combat=False):
     half_span = wingspan / 2
 
-    # Aileron: outer portion, ~25% chord
-    ail_eta_start = 0.55
-    ail_eta_end = 0.90
-    ail_chord_ratio = 0.25
+    # Aileron: outer portion, ~25% chord (yarışma uçağında yuvarlanma hızı için daha büyük)
+    ail_eta_start = 0.45 if combat else 0.55
+    ail_eta_end = 0.95 if combat else 0.90
+    ail_chord_ratio = 0.30 if combat else 0.25
     ail_c_root = root_chord * (1 - ail_eta_start * (1 - taper_ratio)) * ail_chord_ratio
     ail_c_tip = root_chord * (1 - ail_eta_end * (1 - taper_ratio)) * ail_chord_ratio
     ail_area = (ail_c_root + ail_c_tip) / 2 * (ail_eta_end - ail_eta_start) * half_span * 2
 
     # Flap: inner portion, ~30% chord
     flap_eta_start = 0.08
-    flap_eta_end = 0.50
+    flap_eta_end = 0.42 if combat else 0.50
     flap_chord_ratio = 0.30
     flap_c_root = root_chord * (1 - flap_eta_start * (1 - taper_ratio)) * flap_chord_ratio
     flap_c_tip = root_chord * (1 - flap_eta_end * (1 - taper_ratio)) * flap_chord_ratio
@@ -318,7 +357,7 @@ def generate_conventional_fuselage_mesh_data(geom, n_circumferential=28):
         h = max_h * t
         sections.append(el_pts(x_pos, w, h))
 
-    # Cylindrical section — elliptical
+    # Cylindrical section: elliptical
     for i in range(n_cyl + 1):
         eta = i / n_cyl
         x_pos = nose_len + eta * cyl_len

@@ -65,7 +65,16 @@ Girilen değerler tarayıcıda saklanır ve sayfa yeniden açıldığında geri 
 
 ## Yarışma İHA'ları (Savaşan İHA vb.)
 
-Parametreler adımında görev profilini **Yarışma İHA'sı** yapıp motor gücünü, batarya enerjisini, aviyonik tüketimini ve yapısal yük faktörü sınırını girin. **Görev** adımı şunları hesaplar:
+Parametreler adımında görev profilini **Yarışma İHA'sı** yapınca uçak, klasik model uçaktan farklı bir yerleşimle boyutlandırılır:
+
+- **İtici pervane ve boş burun:** motor kısa gövdenin arkasındadır; burun, hedef takibi kamerası için ayrılır.
+- **Çift bom:** kuyruk, kanada bağlı iki karbon boruyla taşınır. Bom uzunluğu ve çapı Ölçüler adımında verilir.
+- **Kuyruk:** bomlar arasında dikdörtgen yatay kuyruk ve ikiz dikey kuyruk. Kuyruk tipi V seçilirse bomları birleştiren ters V kuyruk kullanılır.
+- **Manevra için boyutlandırma:** daha düşük açıklık oranı (6) ve daha büyük kanatçıklar.
+
+![Yarışma İHA'sı yerleşimi](docs/screenshot-iha.png)
+
+Aynı adımda motor gücünü, batarya enerjisini, aviyonik tüketimini ve yapısal yük faktörü sınırını girin. **Görev** adımı şunları hesaplar:
 
 - **Hız zarfı:** stall, seyir ve güçle sınırlı azami hız; azami tırmanma oranı
 - **Havada kalış ve menzil:** seyir hızında, bataryanın %80'i kullanılarak, aviyonik tüketimi dahil
@@ -75,6 +84,8 @@ Parametreler adımında görev profilini **Yarışma İHA'sı** yapıp motor gü
 ![Görev performansı](docs/screenshot-gorev.png)
 
 Hedeflerin varsayılan değerleri (20 dk, 30 °/s, 12 m/s) yalnızca başlangıç noktasıdır; güncel yarışma şartnamesine ve takım stratejinize göre düzenleyin. "Örnek yarışma İHA'sı değerlerini yükle" düğmesi 2 m açıklıklı, 5 kg'lık, 1200 W motorlu ve 6S 10 Ah bataryalı bir başlangıç tasarımı doldurur.
+
+STL çıktısında ikiz dikey kuyruk tek parça olarak verilir ve iki kez basılır; bomlar basılmaz, karbon borudan kesilir.
 
 Model idealdir: parabolik sürükleme poları (profil sürüklemesine gövde ve kuyruk için 0,015 eklenir), hızdan bağımsız mevcut güç ve %60 toplam tahrik verimi varsayılır. Rüzgâr, tırmanma ve manevra tüketimi hesaba katılmadığından gerçek havada kalış süresi daha kısadır.
 
@@ -159,4 +170,4 @@ Sürüm notları [CHANGELOG.md](CHANGELOG.md), sürüm çıkarma adımları [REL
 
 ## Lisans
 
-[MIT](LICENSE) — Muhammet Emir Kalfa
+[MIT](LICENSE)

@@ -277,3 +277,42 @@ class TestMeshGeneration:
         assert "horizontal" in m and "vertical" in m
         assert "right" in m["horizontal"] and "left" in m["horizontal"]
         assert len(m["vertical"]) == 9
+
+
+class TestCombatAirframe:
+    """Yarışma (it dalaşı) İHA'sı: çift bomlu, itici pervaneli yerleşim."""
+
+    def test_standard_is_default_and_unchanged(self):
+        g = calculate_geometry(2.0, 5.0, "2412")
+        assert g["airframe"] == "standard"
+        assert "tail_booms" not in g
+        assert g["aspect_ratio"] == 7.0
+
+    def test_combat_layout_differs_from_standard(self):
+        std = calculate_geometry(2.0, 5.0, "2412")
+        cmb = calculate_geometry(2.0, 5.0, "2412", airframe="combat")
+        assert cmb["airframe"] == "combat"
+        assert cmb["aspect_ratio"] < std["aspect_ratio"]
+        assert cmb["fuselage_length"] < std["fuselage_length"]
+        # Kuyruk gövdenin gerisinde, bomlarla taşınır
+        assert cmb["tail_x_pos"] > cmb["fuselage_length"]
+        assert cmb["control_surfaces"]["aileron"]["area"] > std["control_surfaces"]["aileron"]["area"]
+
+    def test_combat_booms_and_twin_fins(self):
+        g = calculate_geometry(2.0, 5.0, "2412", airframe="combat")
+        booms = g["tail_booms"]
+        assert booms["y"] == pytest.approx(g["htail_span"] / 2, abs=1e-3)
+        assert booms["x_start"] < g["tail_x_pos"] < booms["x_end"]
+        assert booms["length"] > 0
+        assert g["vtail_count"] == 2
+        assert g["htail_taper"] == 1.0
+
+    def test_combat_keeps_tail_volume(self):
+        g = calculate_geometry(2.0, 5.0, "2412", airframe="combat")
+        vh = g["htail_area"] * g["htail_arm"] / (g["wing_area"] * g["mac"])
+        assert vh == pytest.approx(0.70, abs=0.03)
+
+    def test_combat_vtail_spans_between_booms(self):
+        g = calculate_geometry(2.0, 5.0, "2412", tail_type="vtail", airframe="combat")
+        assert g["vtail_count"] == 1
+        assert g["tail_booms"]["y"] > 0
