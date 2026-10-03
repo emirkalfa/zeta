@@ -395,6 +395,36 @@
         </div>
       </div>
 
+      <div class="form-section">
+        <div class="form-section-head">
+          <h3>Kanat iç yapısı</h3>
+          <p>Kanat içi boş üretilir; rib'ler boşluğu bölmelere ayırır ve iskelet (spar) boruları rib'lerdeki deliklerden geçer.</p>
+        </div>
+        <div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="ribSpacing">Rib aralığı</label>
+              <div class="input-wrap"><input type="number" id="ribSpacing" min="10" max="500" step="5" value="60"><span class="unit">mm</span></div>
+            </div>
+            <div class="field">
+              <label for="ribThickness">Rib kalınlığı</label>
+              <div class="input-wrap"><input type="number" id="ribThickness" min="0.4" max="10" step="0.1" value="1.6"><span class="unit">mm</span></div>
+            </div>
+            <div class="field">
+              <label for="sparMainDia">Ana spar deliği</label>
+              <div class="input-wrap"><input type="number" id="sparMainDia" min="0" max="50" step="0.1" value="6.2"><span class="unit">mm</span></div>
+              <small class="hint">Veterin %28'inde. 0 = yok</small>
+            </div>
+            <div class="field">
+              <label for="sparRearDia">Arka spar deliği</label>
+              <div class="input-wrap"><input type="number" id="sparRearDia" min="0" max="50" step="0.1" value="4.2"><span class="unit">mm</span></div>
+              <small class="hint">Veterin %62'sinde. 0 = yok</small>
+            </div>
+          </div>
+          <small class="hint">Delik çapını borunun çapından yaklaşık 0,2 mm büyük girin. Kanat uca doğru inceldiğinden delik sığmadığı rib'de spar sonlanır; uç kapalıdır. Duvar kalınlığı 0 ise kanat dolu üretilir.</small>
+        </div>
+      </div>
+
       <div class="stl-list">
         <div class="stl-row">
           <div class="stl-part">
@@ -468,6 +498,7 @@
 <script src="/static/js/app.js"></script>
 <script src="/static/js/viewer3d.js"></script>
 <script src="/static/js/charts.js"></script>
+<script src="/static/js/wingstructure.js"></script>
 <script src="/static/js/stlexport.js"></script>
 </body>
 </html>
