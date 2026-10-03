@@ -1,36 +1,29 @@
-/* ─── Cookie Helpers (fallback to localStorage) ─── */
-function setCookie(name, value, days) {
-  try {
-    const encoded = encodeURIComponent(value);
-    if (encoded.length > 4096) throw new Error('Cookie size exceeded');
-    document.cookie = `${name}=${encoded}; path=/; max-age=${days * 86400}; SameSite=Lax`;
-    return true;
-  } catch (e) {
-    localStorage.setItem(name, value);
-    return false;
-  }
-}
+/* ─── Kalıcı ayarlar (localStorage) ─── */
+const store = {
+  get(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) { /* gizli sekme vb. */ }
+  },
+};
 
-function getCookie(name) {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  if (match) return decodeURIComponent(match[2]);
-  return localStorage.getItem(name);
-}
-
-function deleteCookie(name) {
-  document.cookie = `${name}=; path=/; max-age=0`;
-  localStorage.removeItem(name);
-}
+const MANUAL_FIELDS = [
+  'root_chord', 'tip_chord', 'sweep', 'dihedral',
+  'htail_span', 'htail_root', 'htail_tip', 'htail_sweep',
+  'vtail_span', 'vtail_root', 'vtail_tip',
+];
+const RESULT_TABS = ['results', 'viewer', 'fuse', 'charts', 'flight', 'stl'];
 
 const state = {
   geometry: null,
   polars: null,
   stability: null,
+  airfoils: [],
   airfoilCoords: null,
   tailCoords: null,
   vtailCoords: null,
   airfoilCode: '2412',
-  darkMode: getCookie('zeta-dark') === 'true',
   wallThickness: 1.2,
   fuseType: 'conventional',
   fuseSections: [
@@ -59,45 +52,55 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function showLoading(btn) {
-  btn.disabled = true;
-  btn.innerHTML = '<span class="loading"></span> Hesaplanıyor...';
+function radioValue(name, fallback) {
+  return document.querySelector(`input[name="${name}"]:checked`)?.value || fallback;
 }
 
-function hideLoading(btn, text) {
-  btn.disabled = false;
-  btn.innerHTML = text || 'HESAPLA';
+function setRadio(name, value) {
+  const input = document.querySelector(`input[name="${name}"][value="${value}"]`);
+  if (input) input.checked = true;
+}
+
+function setBusy(btn, busy) {
+  btn.disabled = busy;
+  btn.innerHTML = busy ? '<span class="loading"></span> Hesaplanıyor…' : 'Hesapla';
+}
+
+function showFormError(message) {
+  const el = $('formError');
+  el.textContent = message || '';
+  el.hidden = !message;
 }
 
 /* ─── Sidebar / Tab System ─── */
 function switchTab(tabId) {
   document.querySelectorAll('.tab-pane').forEach(pane => {
-    pane.classList.remove('active');
+    pane.classList.toggle('active', pane.dataset.tab === tabId);
   });
   document.querySelectorAll('.sidebar-link').forEach(link => {
-    link.classList.remove('active');
+    const active = link.dataset.tab === tabId;
+    link.classList.toggle('active', active);
+    if (active) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
   });
-  const pane = document.querySelector(`.tab-pane[data-tab="${tabId}"]`);
-  const link = document.querySelector(`.sidebar-link[data-tab="${tabId}"]`);
-  if (pane) pane.classList.add('active');
-  if (link) link.classList.add('active');
+  window.scrollTo(0, 0);
+  // Gizliyken 0×0 ölçülen 3D sahneler görünür olunca yeniden boyutlansın
+  window.dispatchEvent(new Event('resize'));
+  if (tabId === 'fuse' && typeof fitFuseViewerToModel === 'function') {
+    fitFuseViewerToModel();
+  }
 }
 
-function enableTab(tabId) {
-  const link = document.querySelector(`.sidebar-link[data-tab="${tabId}"]`);
-  if (link) link.classList.remove('disabled');
+function enableResultTabs() {
+  for (const tab of RESULT_TABS) {
+    document.querySelector(`.sidebar-link[data-tab="${tab}"]`).disabled = false;
+  }
+  $('navHint').hidden = true;
 }
 
 function setupSidebar() {
   document.querySelectorAll('.sidebar-link').forEach(link => {
-    link.addEventListener('click', () => {
-      const tab = link.dataset.tab;
-      if (link.classList.contains('disabled')) return;
-      switchTab(tab);
-      if (tab === 'fuse' && typeof fitFuseViewerToModel === 'function') {
-        fitFuseViewerToModel();
-      }
-    });
+    link.addEventListener('click', () => switchTab(link.dataset.tab));
   });
 }
 
@@ -118,138 +121,140 @@ function updateSectionDisplays() {
   }
 }
 
+function applyManualFuselage(geom) {
+  geom.fuse_type = 'manual';
+  geom.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+  const maxW = Math.max(...state.fuseSections.map(s => s.w));
+  geom.fuselage_length = state.fuseSections[5].t;
+  geom.fuselage_max_width = maxW;
+  geom.fuselage_max_height = maxW;
+}
+
 function updateFuseFromSliders() {
   readFuseSections();
   updateSectionDisplays();
   if (state.geometry) {
-    const len = state.fuseSections[5].t;
-    const maxW = Math.max(...state.fuseSections.map(s => s.w));
-    state.geometry.fuselage_length = len;
-    state.geometry.fuselage_max_width = maxW;
-    state.geometry.fuselage_max_height = maxW;
-    state.geometry.fuse_type = 'manual';
-    state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+    applyManualFuselage(state.geometry);
     updateFuseViewer(state.geometry, state.airfoilCoords);
   }
 }
 
 /* ─── Init ─── */
 async function init() {
-  await loadAirfoils();
-  setupDarkMode();
-  setupSaveLoad();
-  setupEventListeners();
-  applyDarkMode();
-  checkSavedProject();
+  setupTheme();
   setupSidebar();
+  setupEventListeners();
+  loadVersion();
+  try {
+    await loadAirfoils();
+  } catch (err) {
+    showFormError('Airfoil listesi yüklenemedi. Sunucunun çalıştığından emin olup sayfayı yenileyin.');
+    return;
+  }
+  restoreProject();
+}
+
+async function loadVersion() {
+  try {
+    const { version } = await fetchAPI('/api/version');
+    $('appVersion').textContent = 'v' + version;
+  } catch (e) { /* sürüm etiketi zorunlu değil */ }
 }
 
 async function loadAirfoils() {
-  const data = await fetchAPI('/api/airfoils');
-  const opts = data.map(a =>
-    `<option value="${escapeHtml(a.code)}">${escapeHtml(a.name)} (t=${(a.max_thickness * 100).toFixed(0)}%)</option>`
+  state.airfoils = await fetchAPI('/api/airfoils');
+  const opts = state.airfoils.map(a =>
+    `<option value="${escapeHtml(a.code)}">${escapeHtml(a.name)} · %${(a.max_thickness * 100).toFixed(0)} kalınlık</option>`
   ).join('');
-  $('airfoil').innerHTML = opts;
-  $('htailAirfoil').innerHTML = opts;
-  $('htailAirfoil').value = '0012';
-  $('vtailAirfoil').innerHTML = opts;
-  $('vtailAirfoil').value = '0012';
+  for (const [id, code] of [['airfoil', '2412'], ['htailAirfoil', '0012'], ['vtailAirfoil', '0012']]) {
+    $(id).innerHTML = opts;
+    $(id).value = code;
+  }
 }
 
-function setupDarkMode() {
+async function fetchAirfoilCoords(code) {
+  const found = state.airfoils.find(a => a.code === code) || state.airfoils[0];
+  const data = await fetchAPI(`/api/airfoil/${found.id}`);
+  return data.coordinates;
+}
+
+function setupTheme() {
+  applyTheme();
   $('darkToggle').addEventListener('click', () => {
-    state.darkMode = !state.darkMode;
-    setCookie('zeta-dark', state.darkMode, 365);
-    applyDarkMode();
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    store.set('zeta-theme', next);
+    applyTheme();
   });
 }
 
-function applyDarkMode() {
-  document.documentElement.setAttribute('data-theme', state.darkMode ? 'dark' : 'light');
-  const icon = $('darkToggle').querySelector('i');
-  if (icon) icon.className = state.darkMode ? 'ph ph-sun' : 'ph ph-moon';
+function applyTheme() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  $('darkToggle').querySelector('i').className = dark ? 'ph ph-sun' : 'ph ph-moon';
   if (typeof updateViewerTheme === 'function') updateViewerTheme();
 }
 
-function setupSaveLoad() {
-  $('saveBtn')?.addEventListener('click', saveProject);
-  $('loadBtn')?.addEventListener('click', loadProject);
-}
+/* ─── Proje kaydı ─── */
+function restoreProject() {
+  let data;
+  try { data = JSON.parse(store.get('zeta-project')); } catch (e) { return; }
+  if (!data || !data.wingspan) return;
 
-function checkSavedProject() {
-  try {
-    const saved = getCookie('zeta-project');
-    if (saved) {
-      const data = JSON.parse(saved);
-      if (data.wingspan) {
-        $('wingspan').value = data.wingspan;
-        $('weight').value = data.weight;
-        $('airfoil').value = data.airfoil_code || '2412';
-        $('htailAirfoil').value = data.tail_airfoil_code || '0012';
-        const ws = document.querySelector(`input[name="wing_shape"][value="${data.wing_shape || 'tapered'}"]`);
-        if (ws) ws.checked = true;
-        const wp = document.querySelector(`input[name="wing_pos"][value="${data.wing_position || 'mid'}"]`);
-        if (wp) wp.checked = true;
-        const tt = document.querySelector(`input[name="tail_type"][value="${data.tail_type || 'conventional'}"]`);
-        if (tt) tt.checked = true;
-        if (data.reynolds) $('reynolds').value = data.reynolds;
-        if (data.cg_percent) { $('cgSlider').value = data.cg_percent; updateCGDisplay(); }
-        if (data.max_alpha) $('maxAlpha').value = data.max_alpha;
+  $('wingspan').value = data.wingspan;
+  $('weight').value = data.weight;
+  if (data.airfoil_code) $('airfoil').value = data.airfoil_code;
+  if (data.tail_airfoil_code) $('htailAirfoil').value = data.tail_airfoil_code;
+  if (data.vtail_airfoil_code) $('vtailAirfoil').value = data.vtail_airfoil_code;
+  setRadio('wing_shape', data.wing_shape);
+  setRadio('wing_pos', data.wing_position);
+  setRadio('tail_type', data.tail_type);
+  setRadio('fuse_type', data.fuse_type);
+  if (data.reynolds) $('reynolds').value = data.reynolds;
+  if (data.cg_percent) { $('cgSlider').value = data.cg_percent; updateCGDisplay(); }
+  if (data.max_alpha) $('maxAlpha').value = data.max_alpha;
 
-        if (data.fuse_type && data.man_fuse_sections) {
-          state.fuseType = 'manual';
-          state.fuseSections = data.man_fuse_sections;
-          for (let i = 0; i < 6; i++) {
-            $('sec_' + i + '_pos').value = state.fuseSections[i].t;
-            $('sec_' + i + '_w').value = state.fuseSections[i].w;
-            $('sec_' + i + '_h').value = state.fuseSections[i].h;
-          }
-          updateSectionDisplays();
-        }
-      }
+  if (Array.isArray(data.man_fuse_sections) && data.man_fuse_sections.length === 6) {
+    state.fuseSections = data.man_fuse_sections;
+    for (let i = 0; i < 6; i++) {
+      $('sec_' + i + '_pos').value = state.fuseSections[i].t;
+      $('sec_' + i + '_w').value = state.fuseSections[i].w;
+      $('sec_' + i + '_h').value = state.fuseSections[i].h;
     }
-  } catch (e) { }
+    updateSectionDisplays();
+  }
 }
 
 function saveProject() {
-  const data = {
+  store.set('zeta-project', JSON.stringify({
     wingspan: $('wingspan').value,
     weight: $('weight').value,
     airfoil_code: $('airfoil').value,
     tail_airfoil_code: $('htailAirfoil').value,
-    wing_shape: document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered',
-    wing_position: document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid',
-    tail_type: document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional',
-    fuse_type: state.fuseType,
+    vtail_airfoil_code: $('vtailAirfoil').value,
+    wing_shape: radioValue('wing_shape', 'tapered'),
+    wing_position: radioValue('wing_pos', 'mid'),
+    tail_type: radioValue('tail_type', 'conventional'),
+    fuse_type: radioValue('fuse_type', 'conventional'),
     man_fuse_sections: state.fuseSections.map(s => ({ ...s })),
     reynolds: parseInt($('reynolds').value) || 200000,
     cg_percent: parseInt($('cgSlider').value) || 25,
     max_alpha: parseInt($('maxAlpha').value) || 20,
-  };
-  setCookie('zeta-project', JSON.stringify(data), 365);
-  const sb = $('saveBtn');
-  if (sb) { sb.textContent = '✅'; setTimeout(() => { sb.textContent = '💾'; }, 1500); }
-}
-
-function loadProject() {
-  try {
-    const saved = getCookie('zeta-project');
-    if (saved) {
-      checkSavedProject();
-      const lb = $('loadBtn');
-      if (lb) { lb.textContent = '✅'; setTimeout(() => { lb.textContent = '📂'; }, 1500); }
-    }
-  } catch (e) { alert('Kayıtlı proje bulunamadı.'); }
+  }));
 }
 
 function updateCGDisplay() {
-  const val = $('cgSlider').value;
-  $('cgValue').textContent = val;
+  $('cgValue').textContent = $('cgSlider').value;
 }
 
 function setupEventListeners() {
-  $('calculateBtn').addEventListener('click', calculateAll);
+  $('paramForm').addEventListener('submit', (e) => { e.preventDefault(); calculateAll(); });
   $('cgSlider').addEventListener('input', updateCGDisplay);
+  document.querySelectorAll('input[name="mode"]').forEach(input => {
+    input.addEventListener('change', () => {
+      $('manual-inputs').hidden = radioValue('mode') !== 'manual';
+    });
+  });
+
   $('viewX').addEventListener('click', () => viewerSetView('x'));
   $('viewY').addEventListener('click', () => viewerSetView('y'));
   $('viewZ').addEventListener('click', () => viewerSetView('z'));
@@ -258,6 +263,8 @@ function setupEventListeners() {
     viewerToggleRotate();
   });
   $('viewReset').addEventListener('click', () => viewerReset());
+  $('toggleFuse').addEventListener('click', toggleFuselage);
+
   $('stlWing').addEventListener('click', () => exportSTL('wing'));
   $('stlTail').addEventListener('click', () => exportSTL('tail'));
   $('stlFuseConv').addEventListener('click', () => exportFuselageSTL('conventional'));
@@ -266,161 +273,102 @@ function setupEventListeners() {
   $('stlFuseManualSliced').addEventListener('click', () => exportSlicedFuselage('manual'));
   $('stlWingSliced').addEventListener('click', exportSlicedWing);
   $('stlTailSliced').addEventListener('click', exportSlicedTail);
-
-  $('toggleFuse').addEventListener('click', toggleFuselage);
-
-  function setMode(mode) {
-    $('autoMode').classList.toggle('active', mode === 'auto');
-    $('manualMode').classList.toggle('active', mode === 'manual');
-    $('manual-inputs').style.display = mode === 'manual' ? '' : 'none';
-  }
-  $('autoMode').addEventListener('click', () => setMode('auto'));
-  $('manualMode').addEventListener('click', () => setMode('manual'));
-
-  state.fuseType = 'manual';
+  $('wallThickness').addEventListener('input', () => {
+    state.wallThickness = parseFloat($('wallThickness').value) || 0;
+  });
 
   for (let i = 0; i < 6; i++) {
-    $('sec_' + i + '_pos').addEventListener('input', updateFuseFromSliders);
-    $('sec_' + i + '_w').addEventListener('input', updateFuseFromSliders);
-    $('sec_' + i + '_h').addEventListener('input', updateFuseFromSliders);
-  }
-
-  function makeSync(sliderId, inputId) {
-    return () => {
-      const val = parseFloat($(inputId).value);
-      const slider = $(sliderId);
-      if (!isNaN(val)) {
-        const clamped = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), val));
-        slider.value = clamped;
+    for (const key of ['pos', 'w', 'h']) {
+      const slider = $(`sec_${i}_${key}`);
+      const input = $(`sec_${i}_${key}_inp`);
+      slider.addEventListener('input', updateFuseFromSliders);
+      input.addEventListener('input', () => {
+        const val = parseFloat(input.value);
+        if (isNaN(val)) return;
+        slider.value = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), val));
         updateFuseFromSliders();
-      }
-    };
-  }
-  for (let i = 0; i < 6; i++) {
-    $('sec_' + i + '_pos_inp').addEventListener('input', makeSync('sec_' + i + '_pos', 'sec_' + i + '_pos_inp'));
-    $('sec_' + i + '_w_inp').addEventListener('input', makeSync('sec_' + i + '_w', 'sec_' + i + '_w_inp'));
-    $('sec_' + i + '_h_inp').addEventListener('input', makeSync('sec_' + i + '_h', 'sec_' + i + '_h_inp'));
+      });
+    }
   }
 }
 
 async function calculateAll() {
   const btn = $('calculateBtn');
-  showLoading(btn);
+  showFormError('');
 
   const wingspan = parseFloat($('wingspan').value);
   const weight = parseFloat($('weight').value);
-  const airfoil_code = $('airfoil').value;
-  const htail_airfoil = $('htailAirfoil').value;
-  const vtail_airfoil = $('vtailAirfoil').value;
-  const wing_position = document.querySelector('input[name="wing_pos"]:checked')?.value || 'mid';
-  const wing_shape = document.querySelector('input[name="wing_shape"]:checked')?.value || 'tapered';
-  const tail_type = document.querySelector('input[name="tail_type"]:checked')?.value || 'conventional';
-  const fuse_type = document.querySelector('input[name="fuse_type"]:checked')?.value || 'conventional';
-  const cg_percent = parseInt($('cgSlider').value) || 25;
-  const max_alpha = parseInt($('maxAlpha').value) || 20;
-
-  if (!wingspan || !weight || wingspan <= 0 || weight <= 0) {
-    alert('Lütfen geçerli bir kanat açıklığı ve ağırlık girin.');
-    hideLoading(btn);
+  if (!(wingspan > 0) || !(weight > 0)) {
+    showFormError('Kanat açıklığı ve ağırlık sıfırdan büyük olmalı.');
     return;
   }
 
+  const airfoil_code = $('airfoil').value;
+  const htail_airfoil = $('htailAirfoil').value;
+  const vtail_airfoil = $('vtailAirfoil').value;
+  const tail_type = radioValue('tail_type', 'conventional');
+  const fuse_type = radioValue('fuse_type', 'conventional');
+  const manual_mode = radioValue('mode', 'auto') === 'manual';
+  const reynolds_number = parseInt($('reynolds').value) || 200000;
+
+  const body = {
+    wingspan, weight, airfoil_code, tail_type, fuse_type, manual_mode,
+    wing_shape: radioValue('wing_shape', 'tapered'),
+    wing_position: radioValue('wing_pos', 'mid'),
+    cg_percent: parseInt($('cgSlider').value) || 25,
+  };
+  if (manual_mode) {
+    for (const f of MANUAL_FIELDS) {
+      body['man_' + f] = parseFloat($('man_' + f).value) || undefined;
+    }
+  }
+
+  setBusy(btn, true);
   try {
     state.airfoilCode = airfoil_code;
-
-    const airfoilId = await getAirfoilId(airfoil_code);
-    const airfoilData = await fetchAPI(`/api/airfoil/${airfoilId}`);
-    state.airfoilCoords = airfoilData.coordinates;
-
-    const htailId = await getAirfoilId(htail_airfoil);
-    const htailData = await fetchAPI(`/api/airfoil/${htailId}`);
-    state.tailCoords = htailData.coordinates;
-
-    const vtailId = await getAirfoilId(vtail_airfoil);
-    const vtailData = await fetchAPI(`/api/airfoil/${vtailId}`);
-    state.vtailCoords = vtailData.coordinates;
-
-    const manual_mode = $('manual-inputs').style.display !== 'none';
-    const body = {
-      wingspan, weight, airfoil_code, wing_shape, wing_position, tail_type, manual_mode,
-      fuse_type,
-    };
-    if (manual_mode) {
-      body.man_root_chord = parseFloat($('man_root_chord').value) || undefined;
-      body.man_tip_chord = parseFloat($('man_tip_chord').value) || undefined;
-      body.man_sweep = parseFloat($('man_sweep').value) || undefined;
-      body.man_dihedral = parseFloat($('man_dihedral').value) || undefined;
-      body.man_htail_span = parseFloat($('man_htail_span').value) || undefined;
-      body.man_htail_root = parseFloat($('man_htail_root').value) || undefined;
-      body.man_htail_tip = parseFloat($('man_htail_tip').value) || undefined;
-      body.man_htail_sweep = parseFloat($('man_htail_sweep').value) || undefined;
-      body.man_vtail_span = parseFloat($('man_vtail_span').value) || undefined;
-      body.man_vtail_root = parseFloat($('man_vtail_root').value) || undefined;
-      body.man_vtail_tip = parseFloat($('man_vtail_tip').value) || undefined;
-    }
     state.wallThickness = parseFloat($('wallThickness').value) || 0;
-    const reynolds_number = parseInt($('reynolds').value) || 200000;
-    body.cg_percent = cg_percent;
+    [state.airfoilCoords, state.tailCoords, state.vtailCoords] = await Promise.all(
+      [airfoil_code, htail_airfoil, vtail_airfoil].map(fetchAirfoilCoords)
+    );
+
     state.geometry = await fetchAPI('/api/calculate', body);
-    state.polars = await fetchAPI('/api/analyze', {
-      geometry: state.geometry, airfoil_code, reynolds_number, max_alpha
-    });
+    [state.polars, state.stability] = await Promise.all([
+      fetchAPI('/api/analyze', {
+        geometry: state.geometry, airfoil_code, reynolds_number,
+        max_alpha: parseInt($('maxAlpha').value) || 20,
+      }),
+      fetchAPI('/api/stability', {
+        geometry: state.geometry, airfoil_code, tail_airfoil_code: htail_airfoil, reynolds_number,
+      }),
+    ]);
 
-    state.stability = await fetchAPI('/api/stability', {
-      geometry: state.geometry, airfoil_code, tail_airfoil_code: htail_airfoil, reynolds_number
-    });
-
+    readFuseSections();
     saveProject();
 
     displayResults(state.geometry);
     displayFlightTest(state.stability);
+    enableResultTabs();
+
+    // 3D sahneler boyutlarını kapsayıcıdan aldığı için sekme görünürken kurulur
+    switchTab('viewer');
+    if (fuse_type === 'manual') applyManualFuselage(state.geometry);
+    else state.geometry.fuse_type = 'conventional';
+    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, tail_type);
+
+    // Gövde sekmesi her zaman kesit (K1–K6) önizlemesini gösterir
+    switchTab('fuse');
+    applyManualFuselage(state.geometry);
+    initFuseViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, tail_type);
+
+    switchTab('charts');
     displayCharts(state.polars);
 
-    // Enable sidebar tabs
-    enableTab('results');
-    enableTab('viewer');
-    enableTab('fuse');
-    enableTab('charts');
-    enableTab('flight');
-    enableTab('stl');
-
-    readFuseSections();
-    if (fuse_type === 'manual') {
-      state.geometry.fuse_type = 'manual';
-      state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
-      const flen = state.fuseSections[5].t;
-      const fmaxW = Math.max(...state.fuseSections.map(s => s.w));
-      state.geometry.fuselage_length = flen;
-      state.geometry.fuselage_max_width = fmaxW;
-      state.geometry.fuselage_max_height = fmaxW;
-    } else {
-      state.geometry.fuse_type = 'conventional';
-    }
-    switchTab('viewer');
-    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, tail_type);
-    // Set up manual fuse geometry for Gövde viewer tab (always uses keyframe preview)
-    state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
-    state.geometry.fuse_type = 'manual';
-    const fuseLen = state.fuseSections[5].t;
-    const fuseMaxW = Math.max(...state.fuseSections.map(s => s.w));
-    state.geometry.fuselage_length = fuseLen;
-    state.geometry.fuselage_max_width = fuseMaxW;
-    state.geometry.fuselage_max_height = fuseMaxW;
-    initFuseViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, tail_type);
-    hideLoading(btn);
-
     switchTab('results');
-
   } catch (err) {
-    alert('Hesaplama sırasında bir hata oluştu: ' + err.message);
-    hideLoading(btn);
+    showFormError('Hesaplama sırasında bir hata oluştu: ' + err.message);
+  } finally {
+    setBusy(btn, false);
   }
-}
-
-async function getAirfoilId(code) {
-  const data = await fetchAPI('/api/airfoils');
-  const found = data.find(a => a.code === code);
-  return found ? found.id : 1;
 }
 
 function displayResults(geom) {

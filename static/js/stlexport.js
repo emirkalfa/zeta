@@ -15,7 +15,7 @@ function checkGeom() {
 function showDownloadConfirm(files) {
   return new Promise((resolve) => {
     const list = document.getElementById('downloadFileList');
-    list.innerHTML = files.map(f => `<li>📄 ${f}</li>`).join('');
+    list.innerHTML = files.map(f => `<li>${f}</li>`).join('');
     document.getElementById('downloadModal').style.display = 'flex';
     document.getElementById('downloadConfirmBtn').onclick = () => {
       document.getElementById('downloadModal').style.display = 'none';

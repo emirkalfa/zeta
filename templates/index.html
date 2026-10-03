@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ZETA - Uçak Tasarım Aracı</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<script>
+  // Temayı ilk boyamadan önce uygula (açılışta yanıp sönmesin)
+  try {
+    const t = localStorage.getItem('zeta-theme')
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/static/css/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -14,194 +25,248 @@
 </head>
 <body>
 <div id="app">
-  <!-- Sidebar -->
   <aside id="sidebar">
-    <div class="sidebar-header">
-      <h1>ZETA</h1>
-      <button id="darkToggle" class="icon-btn" title="Karanlık / Aydınlık Mod"><i class="ph ph-moon"></i></button>
+    <div class="brand">
+      <span class="brand-mark">ZETA</span>
+      <span class="brand-sub">Uçak tasarım ve analiz aracı</span>
     </div>
-    <ul id="sidebar-nav">
-      <li><button class="sidebar-link active" data-tab="input"><span class="s-icon"><i class="ph ph-gear"></i></span> Parametreler</button></li>
-      <li><button class="sidebar-link disabled" data-tab="results"><span class="s-icon"><i class="ph ph-ruler"></i></span> Ölçüler</button></li>
-      <li><button class="sidebar-link disabled" data-tab="viewer"><span class="s-icon"><i class="ph ph-cube"></i></span> 3D Model</button></li>
-      <li><button class="sidebar-link disabled" data-tab="fuse"><span class="s-icon"><i class="ph ph-airplane-tilt"></i></span> Gövde</button></li>
-      <li><button class="sidebar-link disabled" data-tab="charts"><span class="s-icon"><i class="ph ph-chart-bar"></i></span> Analiz</button></li>
-      <li><button class="sidebar-link disabled" data-tab="flight"><span class="s-icon"><i class="ph ph-airplane-in-flight"></i></span> Uçabilirlik</button></li>
-      <li><button class="sidebar-link disabled" data-tab="stl"><span class="s-icon"><i class="ph ph-printer"></i></span> STL İndirme</button></li>
-    </ul>
+    <ol id="sidebar-nav">
+      <li><button class="sidebar-link active" data-tab="input"><span class="nav-num">01</span>Parametreler</button></li>
+      <li><button class="sidebar-link" data-tab="results" disabled><span class="nav-num">02</span>Ölçüler</button></li>
+      <li><button class="sidebar-link" data-tab="viewer" disabled><span class="nav-num">03</span>3D model</button></li>
+      <li><button class="sidebar-link" data-tab="fuse" disabled><span class="nav-num">04</span>Gövde</button></li>
+      <li><button class="sidebar-link" data-tab="charts" disabled><span class="nav-num">05</span>Analiz</button></li>
+      <li><button class="sidebar-link" data-tab="flight" disabled><span class="nav-num">06</span>Uçabilirlik</button></li>
+      <li><button class="sidebar-link" data-tab="stl" disabled><span class="nav-num">07</span>STL indirme</button></li>
+    </ol>
+    <p class="nav-hint" id="navHint">Diğer adımlar ilk hesaplamadan sonra açılır.</p>
+    <div class="sidebar-foot">
+      <span class="version num" id="appVersion"></span>
+      <button id="darkToggle" class="btn btn-icon" title="Karanlık / aydınlık tema" aria-label="Temayı değiştir"><i class="ph ph-moon"></i></button>
+    </div>
   </aside>
 
-  <!-- Main Content -->
   <main id="content">
     <!-- Tab: Input -->
-    <section class="card tab-pane active" data-tab="input">
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap">
-        <h2 style="margin:0">Uçak Parametreleri</h2>
-        <div class="mode-selector">
-          <button id="autoMode" class="mode-btn active">Otomatik</button>
-          <button id="manualMode" class="mode-btn">Manuel</button>
+    <section class="tab-pane active" data-tab="input">
+      <header class="page-head">
+        <div>
+          <h2>Uçak parametreleri</h2>
+          <p class="page-desc">Açıklık ve ağırlığı girin; geri kalan ölçüler otomatik hesaplanır. Manuel modda kanat ve kuyruk ölçülerini kendiniz belirleyebilirsiniz.</p>
         </div>
-      </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="wingspan">Kanat Açıklığı (m)</label>
-          <input type="number" id="wingspan" step="0.1" min="0.1" max="100" value="1.5">
+        <div class="segmented" role="radiogroup" aria-label="Hesaplama modu">
+          <label><input type="radio" name="mode" value="auto" checked><span>Otomatik</span></label>
+          <label><input type="radio" name="mode" value="manual"><span>Manuel</span></label>
         </div>
-        <div class="form-group">
-          <label for="weight">Ağırlık (kg)</label>
-          <input type="number" id="weight" step="0.1" min="0.1" max="10000" value="2.5">
-        </div>
-        <div class="form-group">
-          <label for="airfoil">Kanat Airfoil Profili</label>
-          <select id="airfoil"></select>
-        </div>
-        <div class="form-group">
-          <label for="htailAirfoil">Yatay Kuyruk Profili</label>
-          <select id="htailAirfoil"></select>
-        </div>
-        <div class="form-group">
-          <label for="vtailAirfoil">Dikey Kuyruk Profili</label>
-          <select id="vtailAirfoil"></select>
-        </div>
-        <div class="form-group">
-          <label>Kanat Şekli</label>
-          <div class="radio-group">
-            <label class="radio-label"><input type="radio" name="wing_shape" value="tapered" checked> ◢ Konik</label>
-            <label class="radio-label"><input type="radio" name="wing_shape" value="rectangular"> ▬ Dikdörtgen</label>
-            <label class="radio-label"><input type="radio" name="wing_shape" value="ste_tapered"> ◥ Düz Firar Kenarlı</label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Kanat Konumu</label>
-          <div class="radio-group">
-            <label class="radio-label"><input type="radio" name="wing_pos" value="low"> ⬇ Alçak</label>
-            <label class="radio-label"><input type="radio" name="wing_pos" value="mid" checked> ⬼ Orta</label>
-            <label class="radio-label"><input type="radio" name="wing_pos" value="high"> ⬆ Yüksek</label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Kuyruk Tipi</label>
-          <div class="radio-group">
-            <label class="radio-label"><input type="radio" name="tail_type" value="conventional" checked> Konvansiyonel</label>
-            <label class="radio-label"><input type="radio" name="tail_type" value="ttail"> T-tail</label>
-            <label class="radio-label"><input type="radio" name="tail_type" value="vtail"> V-tail</label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Gövde Tipi</label>
-          <div class="radio-group">
-            <label class="radio-label"><input type="radio" name="fuse_type" value="conventional" checked> Konvansiyonel</label>
-            <label class="radio-label"><input type="radio" name="fuse_type" value="manual"> Özgün (Manuel)</label>
-          </div>
-        </div>
-        <div class="form-group full-width">
-          <label for="cgSlider">CG Pozisyonu <span id="cgValue">25</span>% MAC</label>
-          <input type="range" id="cgSlider" min="10" max="50" value="25" step="1">
-          <div class="range-labels"><span>%10 (ön)</span><span>%25 (nötr)</span><span>%50 (arka)</span></div>
-        </div>
-      </div>
+      </header>
 
-      <hr style="margin:12px 0; border-color:var(--border)" id="re-separator">
-      <div id="advanced-inputs">
-        <h3 style="margin-top:0">↗ Gelişmiş Ayarlar</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="reynolds">Reynolds Sayısı (Re)</label>
-            <input type="number" id="reynolds" step="10000" min="10000" max="5000000" value="200000">
-            <small style="color:var(--muted)">Model uçak: 50k–500k</small>
+      <form id="paramForm" novalidate>
+        <div class="form-section">
+          <div class="form-section-head">
+            <h3>Temel ölçüler</h3>
+            <p>Tüm geometri bu iki değerden türetilir.</p>
           </div>
-          <div class="form-group">
-            <label for="maxAlpha">Maks. Hücum Açısı (°)</label>
-            <input type="number" id="maxAlpha" step="5" min="10" max="40" value="20">
-            <small style="color:var(--muted)">Grafik α aralığı (10°–40°)</small>
+          <div class="form-grid">
+            <div class="field">
+              <label for="wingspan">Kanat açıklığı</label>
+              <div class="input-wrap"><input type="number" id="wingspan" step="0.1" min="0.1" max="100" value="1.5"><span class="unit">m</span></div>
+            </div>
+            <div class="field">
+              <label for="weight">Ağırlık</label>
+              <div class="input-wrap"><input type="number" id="weight" step="0.1" min="0.1" max="10000" value="2.5"><span class="unit">kg</span></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div id="manual-inputs" style="display:none; margin-top:16px">
-        <hr style="margin:12px 0; border-color:var(--border)">
-        <h3>Kanat</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Kök Veter (m)</label>
-            <input type="number" id="man_root_chord" step="0.001" min="0.01" placeholder="0.20">
+        <div class="form-section">
+          <div class="form-section-head">
+            <h3>Profiller</h3>
+            <p>Kanat ve kuyruk yüzeylerinin airfoil kesitleri.</p>
           </div>
-          <div class="form-group">
-            <label>Uç Veter (m)</label>
-            <input type="number" id="man_tip_chord" step="0.001" min="0.01" placeholder="0.10">
-          </div>
-          <div class="form-group">
-            <label>Süpürme Açısı (°)</label>
-            <input type="number" id="man_sweep" step="0.5" min="0" max="60" placeholder="5.0">
-          </div>
-          <div class="form-group">
-            <label>Dihedral Açısı (°)</label>
-            <input type="number" id="man_dihedral" step="0.5" min="0" max="30" placeholder="3.0">
-          </div>
-        </div>
-        <h3>Yatay Kuyruk</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Açıklık (m)</label>
-            <input type="number" id="man_htail_span" step="0.001" min="0" placeholder="0.50">
-          </div>
-          <div class="form-group">
-            <label>Kök Veter (m)</label>
-            <input type="number" id="man_htail_root" step="0.001" min="0" placeholder="0.15">
-          </div>
-          <div class="form-group">
-            <label>Uç Veter (m)</label>
-            <input type="number" id="man_htail_tip" step="0.001" min="0" placeholder="0.08">
-          </div>
-          <div class="form-group">
-            <label>Süpürme Açısı (°)</label>
-            <input type="number" id="man_htail_sweep" step="0.5" min="0" max="60" placeholder="3.0">
+          <div class="form-grid">
+            <div class="field">
+              <label for="airfoil">Kanat</label>
+              <select id="airfoil"></select>
+            </div>
+            <div class="field">
+              <label for="htailAirfoil">Yatay kuyruk</label>
+              <select id="htailAirfoil"></select>
+            </div>
+            <div class="field">
+              <label for="vtailAirfoil">Dikey kuyruk</label>
+              <select id="vtailAirfoil"></select>
+            </div>
           </div>
         </div>
-        <h3>Dikey Kuyruk</h3>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Açıklık (m)</label>
-            <input type="number" id="man_vtail_span" step="0.001" min="0" placeholder="0.30">
-          </div>
-          <div class="form-group">
-            <label>Kök Veter (m)</label>
-            <input type="number" id="man_vtail_root" step="0.001" min="0" placeholder="0.15">
-          </div>
-          <div class="form-group">
-            <label>Uç Veter (m)</label>
-            <input type="number" id="man_vtail_tip" step="0.001" min="0" placeholder="0.06">
-          </div>
-        </div>
-      </div>
 
-      <button id="calculateBtn" class="primary-btn" style="margin-top:16px">HESAPLA</button>
+        <div class="form-section">
+          <div class="form-section-head">
+            <h3>Konfigürasyon</h3>
+            <p>Kanat, kuyruk ve gövde yerleşimi.</p>
+          </div>
+          <div class="form-grid">
+            <div class="field wide">
+              <span class="field-label" id="lblWingShape">Kanat şekli</span>
+              <div class="segmented" role="radiogroup" aria-labelledby="lblWingShape">
+                <label><input type="radio" name="wing_shape" value="tapered" checked><span>Konik</span></label>
+                <label><input type="radio" name="wing_shape" value="rectangular"><span>Dikdörtgen</span></label>
+                <label><input type="radio" name="wing_shape" value="ste_tapered"><span>Düz firar kenarlı</span></label>
+              </div>
+            </div>
+            <div class="field wide">
+              <span class="field-label" id="lblWingPos">Kanat konumu</span>
+              <div class="segmented" role="radiogroup" aria-labelledby="lblWingPos">
+                <label><input type="radio" name="wing_pos" value="low"><span>Alçak</span></label>
+                <label><input type="radio" name="wing_pos" value="mid" checked><span>Orta</span></label>
+                <label><input type="radio" name="wing_pos" value="high"><span>Yüksek</span></label>
+              </div>
+            </div>
+            <div class="field wide">
+              <span class="field-label" id="lblTailType">Kuyruk tipi</span>
+              <div class="segmented" role="radiogroup" aria-labelledby="lblTailType">
+                <label><input type="radio" name="tail_type" value="conventional" checked><span>Konvansiyonel</span></label>
+                <label><input type="radio" name="tail_type" value="ttail"><span>T-tail</span></label>
+                <label><input type="radio" name="tail_type" value="vtail"><span>V-tail</span></label>
+              </div>
+            </div>
+            <div class="field wide">
+              <span class="field-label" id="lblFuseType">Gövde tipi</span>
+              <div class="segmented" role="radiogroup" aria-labelledby="lblFuseType">
+                <label><input type="radio" name="fuse_type" value="conventional" checked><span>Konvansiyonel</span></label>
+                <label><input type="radio" name="fuse_type" value="manual"><span>Özgün (kesitlerle)</span></label>
+              </div>
+              <small class="hint">Özgün gövdenin kesitleri hesaplamadan sonra Gövde adımında düzenlenir.</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-head">
+            <h3>Ağırlık merkezi</h3>
+            <p>Ortalama aerodinamik veterin (MAC) yüzdesi olarak.</p>
+          </div>
+          <div class="field">
+            <div class="range-head">
+              <label for="cgSlider">CG pozisyonu</label>
+              <output class="num" for="cgSlider"><span id="cgValue">25</span>% MAC</output>
+            </div>
+            <input type="range" id="cgSlider" min="10" max="50" value="25" step="1">
+            <div class="range-labels"><span>%10 · önde</span><span>%50 · arkada</span></div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-head">
+            <h3>Analiz ayarları</h3>
+            <p>Aerodinamik hesabın koşulları.</p>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="reynolds">Reynolds sayısı</label>
+              <input type="number" id="reynolds" step="10000" min="10000" max="5000000" value="200000">
+              <small class="hint">Model uçaklar için 50.000–500.000</small>
+            </div>
+            <div class="field">
+              <label for="maxAlpha">Maks. hücum açısı</label>
+              <div class="input-wrap"><input type="number" id="maxAlpha" step="5" min="10" max="40" value="20"><span class="unit">°</span></div>
+              <small class="hint">Grafiklerin α aralığı (10°–40°)</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section" id="manual-inputs" hidden>
+          <div class="form-section-head">
+            <h3>Manuel ölçüler</h3>
+            <p>Boş bırakılan alanlar otomatik hesaplanır.</p>
+          </div>
+          <div>
+            <h4 class="form-subhead">Kanat</h4>
+            <div class="form-grid">
+              <div class="field">
+                <label for="man_root_chord">Kök veter</label>
+                <div class="input-wrap"><input type="number" id="man_root_chord" step="0.001" min="0.01" placeholder="0.20"><span class="unit">m</span></div>
+              </div>
+              <div class="field">
+                <label for="man_tip_chord">Uç veter</label>
+                <div class="input-wrap"><input type="number" id="man_tip_chord" step="0.001" min="0.01" placeholder="0.10"><span class="unit">m</span></div>
+              </div>
+              <div class="field">
+                <label for="man_sweep">Ok açısı</label>
+                <div class="input-wrap"><input type="number" id="man_sweep" step="0.5" min="0" max="60" placeholder="5.0"><span class="unit">°</span></div>
+              </div>
+              <div class="field">
+                <label for="man_dihedral">Dihedral açısı</label>
+                <div class="input-wrap"><input type="number" id="man_dihedral" step="0.5" min="0" max="30" placeholder="3.0"><span class="unit">°</span></div>
+              </div>
+            </div>
+            <h4 class="form-subhead">Yatay kuyruk</h4>
+            <div class="form-grid">
+              <div class="field">
+                <label for="man_htail_span">Açıklık</label>
+                <div class="input-wrap"><input type="number" id="man_htail_span" step="0.001" min="0" placeholder="0.50"><span class="unit">m</span></div>
+              </div>
+              <div class="field">
+                <label for="man_htail_root">Kök veter</label>
+                <div class="input-wrap"><input type="number" id="man_htail_root" step="0.001" min="0" placeholder="0.15"><span class="unit">m</span></div>
+              </div>
+              <div class="field">
+                <label for="man_htail_tip">Uç veter</label>
+                <div class="input-wrap"><input type="number" id="man_htail_tip" step="0.001" min="0" placeholder="0.08"><span class="unit">m</span></div>
+              </div>
+              <div class="field">
+                <label for="man_htail_sweep">Ok açısı</label>
+                <div class="input-wrap"><input type="number" id="man_htail_sweep" step="0.5" min="0" max="60" placeholder="3.0"><span class="unit">°</span></div>
+              </div>
+            </div>
+            <h4 class="form-subhead">Dikey kuyruk</h4>
+            <div class="form-grid">
+              <div class="field">
+                <label for="man_vtail_span">Açıklık</label>
+                <div class="input-wrap"><input type="number" id="man_vtail_span" step="0.001" min="0" placeholder="0.30"><span class="unit">m</span></div>
+              </div>
+              <div class="field">
+                <label for="man_vtail_root">Kök veter</label>
+                <div class="input-wrap"><input type="number" id="man_vtail_root" step="0.001" min="0" placeholder="0.15"><span class="unit">m</span></div>
+              </div>
+              <div class="field">
+                <label for="man_vtail_tip">Uç veter</label>
+                <div class="input-wrap"><input type="number" id="man_vtail_tip" step="0.001" min="0" placeholder="0.06"><span class="unit">m</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" id="calculateBtn" class="btn btn-primary">Hesapla</button>
+          <p class="form-error" id="formError" role="alert" hidden></p>
+        </div>
+      </form>
     </section>
 
     <!-- Tab: Results -->
-    <section class="card tab-pane" data-tab="results">
+    <section class="tab-pane" data-tab="results">
       <h2>Geometrik Ölçüler</h2>
       <div id="results-grid" class="results-grid"></div>
     </section>
 
     <!-- Tab: 3D Viewer -->
-    <section class="card tab-pane" data-tab="viewer">
+    <section class="tab-pane" data-tab="viewer">
       <div class="viewer-header">
         <h2>3D Model</h2>
         <div class="viewer-controls">
-          <button id="viewX" class="small-btn">X</button>
-          <button id="viewY" class="small-btn">Y</button>
-          <button id="viewZ" class="small-btn">Z</button>
-          <button id="viewAutoRotate" class="small-btn active">⟳</button>
-          <button id="viewReset" class="small-btn">↺</button>
-          <button id="toggleFuse" class="small-btn">Gövde</button>
+          <button id="viewX" class="btn">X</button>
+          <button id="viewY" class="btn">Y</button>
+          <button id="viewZ" class="btn">Z</button>
+          <button id="viewAutoRotate" class="btn active">⟳</button>
+          <button id="viewReset" class="btn">↺</button>
+          <button id="toggleFuse" class="btn">Gövde</button>
         </div>
       </div>
       <div id="three-container"></div>
     </section>
 
     <!-- Tab: Fuselage -->
-    <section class="card tab-pane" data-tab="fuse">
+    <section class="tab-pane" data-tab="fuse">
       <h2>Gövde Tasarımı</h2>
       <div class="fuse-layout">
         <div id="fuse-three-container"></div>
@@ -250,7 +315,7 @@
     </section>
 
     <!-- Tab: Charts -->
-    <section class="card tab-pane" data-tab="charts">
+    <section class="tab-pane" data-tab="charts">
       <h2>Aerodinamik Analiz</h2>
       <div class="charts-grid">
         <div class="chart-box">
@@ -282,13 +347,13 @@
     </section>
 
     <!-- Tab: Flight Test -->
-    <section class="card tab-pane" data-tab="flight">
+    <section class="tab-pane" data-tab="flight">
       <h2>Uçabilirlik Testi</h2>
       <div id="flight-results" class="flight-grid"></div>
     </section>
 
     <!-- Tab: STL -->
-    <section class="card tab-pane" data-tab="stl">
+    <section class="tab-pane" data-tab="stl">
       <h2>STL İndirme</h2>
       <p class="stl-info-code" style="margin-bottom:16px">3D modeli 3D yazıcıda basmak için aşağıdaki formatlarda indirin.</p>
 
@@ -386,7 +451,7 @@
 
     <!-- Footer -->
     <footer>
-      <p>ZETA v1.3.3 — Üniversite Projeleri İçin Uçak Tasarım Aracı &mdash; <a href="https://emirkalfa.com" target="_blank">Muhammet Emir Kalfa</a> tarafından üretilmiştir &mdash; <a href="https://github.com/memirkalfa/zeta" target="_blank">GitHub</a></p>
+      <p>ZETA — Üniversite Projeleri İçin Uçak Tasarım Aracı &mdash; <a href="https://emirkalfa.com" target="_blank">Muhammet Emir Kalfa</a> tarafından üretilmiştir &mdash; <a href="https://github.com/memirkalfa/zeta" target="_blank">GitHub</a></p>
     </footer>
   </main>
 </div>
@@ -402,8 +467,8 @@
       <ul id="downloadFileList"></ul>
     </div>
     <div class="modal-footer">
-      <button id="downloadCancelBtn" class="small-btn">İptal</button>
-      <button id="downloadConfirmBtn" class="primary-btn" style="width:auto;padding:10px 24px">İndir</button>
+      <button id="downloadCancelBtn" class="btn">İptal</button>
+      <button id="downloadConfirmBtn" class="btn btn-primary">İndir</button>
     </div>
   </div>
 </div>
