@@ -487,6 +487,73 @@ input[type="range"]::-moz-range-thumb {
   font-size: 0.8125rem;
 }
 
+/* ─── Stat row & spec tables (Ölçüler) ─── */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  margin-bottom: 32px;
+  overflow: hidden;
+}
+
+.stat {
+  padding: 16px 20px;
+  /* hücre aralarındaki çizgiler: sarma olsa da kenarda çift çizgi oluşmaz */
+  box-shadow: 1px 0 0 var(--border), 0 1px 0 var(--border);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.unit {
+  font-family: var(--font);
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.spec-grid {
+  columns: 2 320px;
+  column-gap: 48px;
+}
+
+.spec-group {
+  break-inside: avoid;
+  margin-bottom: 28px;
+}
+
+.spec-group h3 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.spec-group dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.spec-group dt { color: var(--text-secondary); }
+.spec-group dd { text-align: right; }
+
 /* ─── Footer ─── */
 footer {
   padding: 16px 40px;
@@ -548,33 +615,6 @@ footer a:hover { color: var(--text); }
 }
 
 /* ═══ Legacy (sayfa sayfa yenilenecek) ═══ */
-/* ─── Results Grid ─── */
-.results-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-}
-
-.result-item {
-  background: var(--bg);
-  border-radius: 8px;
-  padding: 12px;
-  text-align: center;
-  transition: background 0.3s;
-}
-
-.result-item .value {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--primary);
-}
-
-.result-item .label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-top: 4px;
-}
-
 /* ─── 3D Viewer ─── */
 .viewer-header {
   display: flex;

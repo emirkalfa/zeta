@@ -371,54 +371,79 @@ async function calculateAll() {
   }
 }
 
+const WING_POSITION_LABELS = { low: 'Alçak', mid: 'Orta', high: 'Yüksek' };
+const TAIL_TYPE_LABELS = { conventional: 'Konvansiyonel', ttail: 'T-tail', vtail: 'V-tail' };
+
 function displayResults(geom) {
-  const items = [
-    { label: 'Kanat Açıklığı', value: geom.wingspan + ' m', key: '' },
-    { label: 'Kök Veter', value: geom.root_chord + ' m', key: 'root_chord' },
-    { label: 'Uç Veter', value: geom.tip_chord + ' m', key: 'tip_chord' },
-    { label: 'MAC', value: geom.mac + ' m', key: 'mac' },
-    { label: 'Kanat Alanı', value: geom.wing_area + ' m²', key: 'wing_area' },
-    { label: 'Açıklık Oranı (AR)', value: geom.aspect_ratio, key: 'aspect_ratio' },
-    { label: 'Daralma Oranı', value: geom.taper_ratio, key: 'taper_ratio' },
-    { label: 'Ok Açısı', value: geom.sweep_angle + '°', key: 'sweep_angle' },
-    { label: 'Dihedral', value: geom.dihedral_angle + '°', key: 'dihedral_angle' },
-    { label: 'Kanat Konumu', value: geom.wing_position === 'low' ? 'Alçak' : geom.wing_position === 'high' ? 'Yüksek' : 'Orta', key: '' },
-    { label: 'Kanat X Pozisyonu', value: geom.wing_x_pos + ' m', key: '' },
-    { label: 'Gövde Uzunluğu', value: geom.fuselage_length + ' m', key: 'fuselage_length' },
-    { label: 'Gövde Genişliği', value: geom.fuselage_max_width + ' m', key: 'fuselage_max_width' },
-    { label: 'Gövde Yüksekliği', value: geom.fuselage_max_height + ' m', key: 'fuselage_max_height' },
-    { label: 'Yatay Kuyruk Açıklığı', value: geom.htail_span + ' m', key: 'htail_span' },
-    { label: 'Yatay Kuyruk Kök Veteri', value: geom.htail_chord + ' m', key: '' },
-    { label: 'Yatay Kuyruk Uç Veteri', value: (geom.htail_tip_chord || 0).toFixed(3) + ' m', key: '' },
-    { label: 'Yatay Kuyruk Daralması', value: geom.htail_taper, key: '' },
-    { label: 'Yatay Kuyruk Alanı', value: geom.htail_area + ' m²', key: '' },
-    { label: 'Kuyruk Kolu (Arm)', value: geom.htail_arm + ' m', key: '' },
-    { label: 'Kuyruk X Pozisyonu', value: geom.tail_x_pos + ' m', key: '' },
-    { label: 'Dikey Kuyruk Açıklığı', value: geom.vtail_span + ' m', key: 'vtail_span' },
-    { label: 'Dikey Kuyruk Kök Veteri', value: geom.vtail_chord + ' m', key: '' },
-    { label: 'Dikey Kuyruk Uç Veteri', value: (geom.vtail_tip_chord || 0).toFixed(3) + ' m', key: '' },
-    { label: 'Dikey Kuyruk Daralması', value: geom.vtail_taper, key: '' },
-    { label: 'Dikey Kuyruk Alanı', value: geom.vtail_area + ' m²', key: '' },
-    { label: 'CG Pozisyonu', value: geom.cg_position + ' m', key: 'cg_position' },
-    { label: 'Kanat Yüklemesi', value: (geom.weight / geom.wing_area).toFixed(2) + ' kg/m²', key: '' },
-    { label: 'Kuyruk Tipi', value: geom.tail_type === 'ttail' ? 'T-tail' : geom.tail_type === 'vtail' ? 'V-tail' : 'Konvansiyonel', key: '' },
+  const summary = [
+    ['Kanat alanı', geom.wing_area, 'm²'],
+    ['Açıklık oranı', geom.aspect_ratio, ''],
+    ['MAC', geom.mac, 'm'],
+    ['Kanat yüklemesi', (geom.weight / geom.wing_area).toFixed(2), 'kg/m²'],
+  ];
+
+  const groups = [
+    ['Kanat', [
+      ['Açıklık', geom.wingspan, 'm'],
+      ['Kök veter', geom.root_chord, 'm'],
+      ['Uç veter', geom.tip_chord, 'm'],
+      ['Daralma oranı', geom.taper_ratio, ''],
+      ['Ok açısı', geom.sweep_angle, '°'],
+      ['Dihedral', geom.dihedral_angle, '°'],
+      ['Konum', WING_POSITION_LABELS[geom.wing_position] || 'Orta', ''],
+      ['X pozisyonu', geom.wing_x_pos, 'm'],
+    ]],
+    ['Yatay kuyruk', [
+      ['Açıklık', geom.htail_span, 'm'],
+      ['Kök veter', geom.htail_chord, 'm'],
+      ['Uç veter', (geom.htail_tip_chord || 0).toFixed(3), 'm'],
+      ['Daralma oranı', geom.htail_taper, ''],
+      ['Alan', geom.htail_area, 'm²'],
+      ['Kuyruk kolu', geom.htail_arm, 'm'],
+      ['X pozisyonu', geom.tail_x_pos, 'm'],
+      ['Kuyruk tipi', TAIL_TYPE_LABELS[geom.tail_type] || 'Konvansiyonel', ''],
+    ]],
+    ['Gövde ve denge', [
+      ['Gövde uzunluğu', geom.fuselage_length, 'm'],
+      ['Gövde genişliği', geom.fuselage_max_width, 'm'],
+      ['Gövde yüksekliği', geom.fuselage_max_height, 'm'],
+      ['CG pozisyonu', geom.cg_position, 'm'],
+    ]],
+    ['Dikey kuyruk', [
+      ['Açıklık', geom.vtail_span, 'm'],
+      ['Kök veter', geom.vtail_chord, 'm'],
+      ['Uç veter', (geom.vtail_tip_chord || 0).toFixed(3), 'm'],
+      ['Daralma oranı', geom.vtail_taper, ''],
+      ['Alan', geom.vtail_area, 'm²'],
+    ]],
   ];
 
   const cs = geom.control_surfaces;
   if (cs) {
-    items.push(
-      { label: 'Aileron Alanı', value: cs.aileron.area + ' m²', key: '' },
-      { label: 'Flap Alanı', value: cs.flap.area + ' m²', key: '' },
-      { label: 'Elevator Alanı', value: cs.elevator.area + ' m²', key: '' },
-      { label: 'Rudder Alanı', value: cs.rudder.area + ' m²', key: '' },
-    );
+    groups.push(['Kontrol yüzeyi alanları', [
+      ['Aileron', cs.aileron.area, 'm²'],
+      ['Flap', cs.flap.area, 'm²'],
+      ['Elevator', cs.elevator.area, 'm²'],
+      ['Rudder', cs.rudder.area, 'm²'],
+    ]]);
   }
 
-  $('results-grid').innerHTML = items.map(item =>
-    `<div class="result-item">
-      <div class="value">${escapeHtml(String(item.value))}</div>
-      <div class="label">${escapeHtml(item.label)}</div>
+  const unitHtml = unit => unit ? ` <span class="unit">${escapeHtml(unit)}</span>` : '';
+
+  $('results-summary').innerHTML = summary.map(([label, value, unit]) =>
+    `<div class="stat">
+      <div class="stat-label">${escapeHtml(label)}</div>
+      <div class="stat-value num">${escapeHtml(String(value))}${unitHtml(unit)}</div>
     </div>`
+  ).join('');
+
+  $('results-grid').innerHTML = groups.map(([title, rows]) =>
+    `<section class="spec-group">
+      <h3>${escapeHtml(title)}</h3>
+      <dl>${rows.map(([label, value, unit]) =>
+        `<div><dt>${escapeHtml(label)}</dt><dd class="num">${escapeHtml(String(value))}${unitHtml(unit)}</dd></div>`
+      ).join('')}</dl>
+    </section>`
   ).join('');
 }
 
