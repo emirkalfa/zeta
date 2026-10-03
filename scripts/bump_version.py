@@ -5,7 +5,7 @@ Usage:
     python scripts/bump_version.py patch
     python scripts/bump_version.py minor
     python scripts/bump_version.py major
-    python scripts/bump_version.py 0.3.0
+    python scripts/bump_version.py 2.1.0
 """
 import datetime
 import re

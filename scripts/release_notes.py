@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bir sürümün CHANGELOG.md bölümünü yazdırır; sürüm yayına hazır değilse hata verir.
 
-    python scripts/release_notes.py v1.4.0
+    python scripts/release_notes.py v2.1.0
 
 Kontroller: etiket VERSION dosyasıyla aynı mı, CHANGELOG'da bu sürümün dolu bir bölümü var mı.
 """

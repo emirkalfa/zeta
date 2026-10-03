@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Paketlenmiş uygulamayı (ya da app.py'yi) başlatıp temel uç noktaları dener.
 
-    python scripts/smoke_test.py dist/release/ZETA-1.3.3-linux-x86_64.AppImage
+    python scripts/smoke_test.py dist/release/ZETA-*.AppImage
     python scripts/smoke_test.py            # kaynak koddan: python app.py
 
 Sunucunun açıldığını, arayüz dosyalarının pakete girdiğini, hesap uç noktalarının

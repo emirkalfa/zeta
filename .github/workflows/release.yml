@@ -58,7 +58,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           flags=""
-          # 1.4.0-rc.1 gibi ön sürümler "latest" olarak işaretlenmez
+          # 2.1.0-rc.1 gibi ön sürümler "latest" olarak işaretlenmez
           case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" release/* \
             --title "ZETA ${GITHUB_REF_NAME#v}" \
