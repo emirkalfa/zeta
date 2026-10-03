@@ -100,8 +100,11 @@ function switchTab(tabId) {
   document.querySelectorAll('.sidebar-link').forEach(link => {
     const active = link.dataset.tab === tabId;
     link.classList.toggle('active', active);
-    if (active) link.setAttribute('aria-current', 'page');
-    else link.removeAttribute('aria-current');
+    if (active) {
+      link.setAttribute('aria-current', 'page');
+      link.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    if (!active) link.removeAttribute('aria-current');
   });
   window.scrollTo(0, 0);
   // Gizliyken 0×0 ölçülen 3D sahneler görünür olunca yeniden boyutlansın

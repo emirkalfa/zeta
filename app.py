@@ -1,5 +1,4 @@
-import os, sys, sqlite3, json
-import numpy as np
+import os, sys, sqlite3
 from contextlib import contextmanager
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from flask import Flask, jsonify, request, send_from_directory
@@ -141,7 +140,6 @@ def api_airfoil_props(code):
 
 @app.route('/api/version')
 def api_version():
-    import time
     return jsonify({
         'version': APP_VERSION,
         'name': 'zeta-aircraft-designer',
@@ -157,6 +155,5 @@ def serve_static(path):
     return send_from_directory(os.path.join(BASE_DIR, 'static'), path)
 
 if __name__ == '__main__':
-    import os
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
     app.run(debug=debug, host='0.0.0.0', port=5000)

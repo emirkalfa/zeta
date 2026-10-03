@@ -4,6 +4,20 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+### Changed
+- Arayüz baştan tasarlandı: sade teknik tema (açık/koyu), numaralı adımlar, bölümlere ayrılmış parametre formu, gruplu ölçü tabloları, kriter tablolu uçabilirlik sayfası, satır tabanlı STL sayfası.
+- 3D sahnede kamera ve ızgara modelin boyutuna göre kadrajlanıyor.
+- Analiz grafikleri temaya uyuyor; sürükleme poları yalnızca stall öncesi noktaları çiziyor (`cd_vs_cl` noktalarına `stalled` alanı eklendi).
+- `/api/stability` yanıtına yapısal `checks` listesi eklendi.
+- Ayarlar çerez yerine `localStorage`'da saklanıyor.
+
+### Fixed
+- Özgün gövde kesitlerinin genişlik/yüksekliği metre yerine oran gibi yorumlanıyordu; varsayılan gövde 1 m çapında çıkıyordu.
+- Gövde sekmesi hesaplanan gövde ölçülerini eziyor, konvansiyonel gövde STL'i yanlış uzunlukla üretiliyordu.
+- Duvar kalınlığı değişikliği yeniden hesaplama yapılmadan STL'e yansımıyordu.
+- Statik marj "aşırı stabil" iken uçabilirlik kartı yeşil görünüyordu.
+- Tema değiştirildiğinde grafik renkleri güncellenmiyordu.
+
 ## [1.2.3] - 2026-06-28
 
 ### Added
