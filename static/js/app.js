@@ -213,6 +213,7 @@ async function init() {
   renderFuseControls();
   setupEventListeners();
   loadVersion();
+  setupDesktopPresence();
   try {
     await loadAirfoils();
   } catch (err) {
@@ -220,6 +221,17 @@ async function init() {
     return;
   }
   restoreProject();
+}
+
+// Masaüstü uygulamasında sunucu, bu sekme açık kaldığı sürece çalışır
+async function setupDesktopPresence() {
+  const beat = () => fetch('/api/heartbeat', { method: 'POST' }).then(r => r.json());
+  try {
+    const { desktop } = await beat();
+    if (!desktop) return;
+    setInterval(() => beat().catch(() => {}), 5000);
+    window.addEventListener('pagehide', () => navigator.sendBeacon('/api/closing'));
+  } catch (e) { /* sunucu yanıt vermiyorsa yapılacak bir şey yok */ }
 }
 
 async function loadVersion() {

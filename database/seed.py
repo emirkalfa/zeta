@@ -39,8 +39,8 @@ def naca_4_digit_coordinates(code, n=150):
 
     return coords
 
-def seed():
-    conn = sqlite3.connect(DB_PATH)
+def seed(db_path=DB_PATH):
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
 
@@ -84,7 +84,7 @@ def seed():
 
     conn.commit()
     conn.close()
-    print("✅ Veritabanı başarıyla dolduruldu!")
 
 if __name__ == '__main__':
     seed()
+    print('Veritabanı dolduruldu:', DB_PATH)
