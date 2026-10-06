@@ -325,7 +325,7 @@ function buildFuselageGroup(geom, type, wingCoords) {
       const jn = (j + 1) % nCirc;
       const a = i * nCirc + j, b = i * nCirc + jn;
       const c = (i + 1) * nCirc + j, d = (i + 1) * nCirc + jn;
-      idx.push(a, b, c, b, d, c);
+      idx.push(a, c, b, b, c, d);
     }
   }
   // Uç kapakları
@@ -333,7 +333,11 @@ function buildFuselageGroup(geom, type, wingCoords) {
     const center = sections[si].reduce((acc, p) => acc.add(new THREE.Vector3(p.x, p.y, p.z)), new THREE.Vector3()).divideScalar(nCirc);
     const ci = verts.length / 3;
     verts.push(center.x, center.y, center.z);
-    for (let j = 0; j < nCirc; j++) idx.push(si * nCirc + j, si * nCirc + (j + 1) % nCirc, ci);
+    for (let j = 0; j < nCirc; j++) {
+      const a = si * nCirc + j, b = si * nCirc + (j + 1) % nCirc;
+      if (si === 0) idx.push(a, b, ci);
+      else idx.push(b, a, ci);
+    }
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
@@ -342,6 +346,7 @@ function buildFuselageGroup(geom, type, wingCoords) {
   const body = new THREE.Mesh(geo, modelMaterial(MODEL_COLORS.fuselage));
   body.castShadow = true;
   group.add(body);
+  if (type !== 'manual') addFuselagePanel(group, sections);
 
   // Pervane: standart yerleşimde burunda (çekici), yarışma yerleşiminde gövde arkasında (itici)
   const pusher = geom.airframe === 'combat';
@@ -395,6 +400,44 @@ function buildFuselageGroup(geom, type, wingCoords) {
   }
 
   return group;
+}
+
+// A flush upper access-panel finish; the manufacturing shell remains continuous.
+function addFuselagePanel(group, sections) {
+  const first = sections[0][0].x, length = sections[sections.length - 1][0].x - first;
+  const sample = (x, theta) => {
+    let i = sections.findIndex(sec => sec[0].x >= x);
+    i = Math.max(1, i);
+    const a = sections[i - 1], b = sections[i];
+    const u = (x - a[0].x) / (b[0].x - a[0].x);
+    const f = theta / (2 * Math.PI) * a.length, j = Math.floor(f), v = f - j;
+    const at = sec => new THREE.Vector3().lerpVectors(sec[j % a.length], sec[(j + 1) % a.length], v);
+    const p = at(a).lerp(at(b), u);
+    p.y += length * .00045;
+    return p;
+  };
+  const rows = 40, cols = 20, vertices = [], indices = [], left = [], right = [];
+  for (let i = 0; i <= rows; i++) {
+    const u = i / rows, x = first + length * (.12 + .32 * u);
+    const halfAngle = .48 * (.3 + .7 * Math.sin(Math.PI * u) ** .55);
+    for (let j = 0; j <= cols; j++) {
+      const p = sample(x, Math.PI / 2 + halfAngle * (2 * j / cols - 1));
+      vertices.push(p.x, p.y, p.z);
+      if (j === 0) left.push(p);
+      if (j === cols) right.push(p);
+      if (i < rows && j < cols) {
+        const a = i * (cols + 1) + j, b = a + 1, c = a + cols + 1;
+        indices.push(a, c, b, b, c, c + 1);
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  group.add(new THREE.Mesh(geo, modelMaterial(0x34424d)));
+  const edge = new THREE.BufferGeometry().setFromPoints([...left, ...right.reverse()]);
+  group.add(new THREE.LineLoop(edge, new THREE.LineBasicMaterial({color: 0xc48554})));
 }
 
 function disposeModel(group) {

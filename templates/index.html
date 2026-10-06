@@ -131,10 +131,10 @@
             <div class="field wide">
               <span class="field-label" id="lblFuseType">Gövde tipi</span>
               <div class="segmented" role="radiogroup" aria-labelledby="lblFuseType">
-                <label><input type="radio" name="fuse_type" value="conventional" checked><span>Konvansiyonel</span></label>
+                <label><input type="radio" name="fuse_type" value="conventional" checked><span>Gövde koleksiyonu</span></label>
                 <label><input type="radio" name="fuse_type" value="manual"><span>Özgün (kesitlerle)</span></label>
               </div>
-              <small class="hint">Özgün gövdenin kesitleri hesaplamadan sonra Gövde adımında düzenlenir.</small>
+              <small class="hint">Hesaplamadan sonra Gövde adımında Atlas, Seyir veya Akın modelini seçebilirsiniz.</small>
             </div>
           </div>
         </div>
@@ -343,13 +343,38 @@
       <header class="page-head">
         <div>
           <h2>Gövde tasarımı</h2>
-          <p class="page-desc">Özgün gövdeyi altı kesitle tanımlayın. Son kesitin konumu toplam gövde uzunluğunu belirler.</p>
+          <p class="page-desc">Uçağınıza bir karakter seçin. Gövdeyi şekillendirin, sonucu anında görün.</p>
         </div>
       </header>
-      <div class="fuse-layout">
-        <div id="fuse-three-container" class="viewport"></div>
-        <div id="fuse-manual-controls"></div>
+      <div id="fuse-preset-grid" class="fuse-preset-grid" aria-label="Gövde modelleri"></div>
+      <div class="fuse-toolbar">
+        <div><span class="fuse-eyebrow">SEÇİLİ GÖVDE</span><h3 id="fuse-model-name">Atlas</h3></div>
+        <label class="fuse-isolate"><input type="checkbox" id="fuseShowAircraft"> Kanat ve kuyruğu göster</label>
+        <button type="button" class="btn" id="fuseCustomBtn">Kesitlerle düzenle</button>
       </div>
+      <div class="fuse-layout">
+        <div class="fuse-preview">
+          <div id="fuse-three-container" class="viewport"></div>
+          <p class="hint">Sürükle: döndür · Tekerlek: yakınlaştır</p>
+          <p class="hint">Üst kapak rengi görsel amaçlıdır. STL, kesintisiz gövde kabuğu olarak üretilir.</p>
+        </div>
+        <aside class="fuse-properties">
+          <h3>Gövde oranları</h3>
+          <p id="fuse-model-description" class="hint"></p>
+          <div id="fuse-preset-controls">
+            <label for="fuseWidthScale">Genişlik <output id="fuseWidthValue">%100</output></label>
+            <input type="range" id="fuseWidthScale" min="70" max="150" value="100" step="1">
+            <label for="fuseHeightScale">Yükseklik <output id="fuseHeightValue">%100</output></label>
+            <input type="range" id="fuseHeightScale" min="70" max="150" value="100" step="1">
+          </div>
+          <dl id="fuse-dimensions" class="fuse-dimensions"></dl>
+          <p class="hint">Görsel ön tasarım. Hacim değişiklikleri aerodinamik hesaplara henüz yansıtılmaz.</p>
+        </aside>
+      </div>
+      <details id="fuse-custom-details" hidden>
+        <summary>Özgün kesitler · metre</summary>
+        <div id="fuse-manual-controls"></div>
+      </details>
     </section>
 
     <!-- Tab: Charts -->
@@ -538,19 +563,19 @@
         </div>
         <div class="stl-row">
           <div class="stl-part">
-            <h3>Konvansiyonel gövde</h3>
-            <p>Hesaplanan ölçülere göre otomatik gövde.</p>
+            <h3>Koleksiyondan seçilen gövde</h3>
+            <p>Gövde adımında seçilen model ve genişlik/yükseklik ayarları.</p>
           </div>
           <button id="stlFuseConv" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
           <div class="stl-sliced">
-            <div class="input-wrap"><input type="number" id="fuseConvSliceCount" min="2" max="20" value="3" step="1" aria-label="Konvansiyonel gövde parça sayısı"><span class="unit">parça</span></div>
+            <div class="input-wrap"><input type="number" id="fuseConvSliceCount" min="2" max="20" value="3" step="1" aria-label="Seçili gövde parça sayısı"><span class="unit">parça</span></div>
             <button id="stlFuseConvSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
           </div>
         </div>
         <div class="stl-row">
           <div class="stl-part">
             <h3>Özgün gövde</h3>
-            <p>Gövde adımındaki K1–K6 kesitlerinden.</p>
+            <p>Gövde adımında düzenlediğiniz özgün kesitlerden.</p>
           </div>
           <button id="stlFuseManual" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
           <div class="stl-sliced">
@@ -583,6 +608,7 @@
 
 <div id="toast" class="toast" role="status" hidden></div>
 
+<script src="/static/js/fuselage.js"></script>
 <script src="/static/js/app.js"></script>
 <script src="/static/js/aircraftmodel.js"></script>
 <script src="/static/js/viewer3d.js"></script>

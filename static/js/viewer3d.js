@@ -129,50 +129,6 @@ function rebuildFuselage(geom, wingCoords) {
   scene.add(fuseGroup);
 }
 
-// Özgün gövde kesitleri. geom.fuse_sections metre cinsindendir:
-// t = burundan uzaklık, w = genişlik, h = yükseklik. Aradaki kesitler smoothstep ile yumuşatılır.
-function manualFuselageSections(geom, wingCoords) {
-  const nSecs = 48;
-  const nCirc = 32;
-  const keys = geom.fuse_sections.map(s => ({ ...s })).sort((a, b) => a.t - b.t);
-  const totalLen = Math.max(keys[keys.length - 1].t, 0.01);
-
-  function interpolate(x) {
-    if (x <= keys[0].t) return keys[0];
-    for (let i = 0; i < keys.length - 1; i++) {
-      const a = keys[i];
-      const b = keys[i + 1];
-      if (x <= b.t) {
-        const localT = b.t > a.t ? (x - a.t) / (b.t - a.t) : 1;
-        const smoothT = localT * localT * (3 - 2 * localT);
-        return { w: a.w + (b.w - a.w) * smoothT, h: a.h + (b.h - a.h) * smoothT };
-      }
-    }
-    return keys[keys.length - 1];
-  }
-
-  const sections = [];
-  for (let i = 0; i <= nSecs; i++) {
-    const x = (i / nSecs) * totalLen;
-    const prof = interpolate(x);
-    const sec = [];
-    for (let j = 0; j < nCirc; j++) {
-      const theta = (j / nCirc) * Math.PI * 2;
-      sec.push(new THREE.Vector3(x, prof.h / 2 * Math.sin(theta), prof.w / 2 * Math.cos(theta)));
-    }
-    sections.push(sec);
-  }
-
-  // Kanat kökü oyuğu gövdenin gerçek (özgün) en-boyuna göre açılır
-  applyWingRootCutout(sections, nCirc, {
-    ...geom,
-    fuselage_max_width: Math.max(...keys.map(k => k.w)),
-    fuselage_max_height: Math.max(...keys.map(k => k.h)),
-  }, wingCoords);
-
-  return { sections, nCirc, totalLen };
-}
-
 function applyWingRootCutout(sections, nCirc, geom, airfoilCoords) {
   if (!airfoilCoords || !airfoilCoords.length || !geom || !geom.wing_x_pos) return;
 
@@ -375,12 +331,21 @@ function buildThickWingSeg(verts, idxs, secs, innerSecs, nPts) {
 }
 
 function offsetFuselageSection(section, wallM, nCirc) {
+  const cy = section.reduce((sum, p) => sum + p.y, 0) / nCirc;
+  const radius = Math.min(...section.map(p => Math.hypot(p.y - cy, p.z)));
+  const inset = Math.min(wallM, radius * .45);
   const inner = new Array(nCirc);
   for (let i = 0; i < nCirc; i++) {
-    const p = section[i];
-    const theta = (i / nCirc) * Math.PI * 2;
-    const off = Math.min(wallM, Math.min(Math.abs(p.y), Math.abs(p.z)) * 0.99);
-    inner[i] = { x: p.x, y: p.y - off * Math.sin(theta), z: p.z - off * Math.cos(theta) };
+    const p = section[i], prev = section[(i + nCirc - 1) % nCirc], next = section[(i + 1) % nCirc];
+    const normal = (a, b) => {
+      const dy = b.y - a.y, dz = b.z - a.z, len = Math.hypot(dy, dz);
+      return { y: -dz / len, z: dy / len };
+    };
+    const a = normal(prev, p), b = normal(p, next);
+    const len = Math.hypot(a.y + b.y, a.z + b.z);
+    const ny = (a.y + b.y) / len, nz = (a.z + b.z) / len;
+    const off = inset / Math.max(.5, ny * a.y + nz * a.z);
+    inner[i] = { x: p.x, y: p.y - off * ny, z: p.z - off * nz };
   }
   return inner;
 }
@@ -388,10 +353,10 @@ function offsetFuselageSection(section, wallM, nCirc) {
 function buildThickFuselage(verts, idxs, sections, innerSections, nCirc) {
   buildTubeSkin(verts, idxs, sections, nCirc, false);
   const innerStart = buildTubeSkin(verts, idxs, innerSections, nCirc, true);
-  buildAnnulus(verts, idxs, 0, innerStart, nCirc, false);
+  buildAnnulus(verts, idxs, 0, innerStart, nCirc, true);
   const outerTip = (sections.length - 1) * nCirc;
   const innerTip = innerStart + (innerSections.length - 1) * nCirc;
-  buildAnnulus(verts, idxs, outerTip, innerTip, nCirc, true);
+  buildAnnulus(verts, idxs, outerTip, innerTip, nCirc, false);
 }
 
 function fitFuseViewerToModel() {
@@ -1028,13 +993,14 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   fuseViewerRenderer._onResize = onFuseResize;
 }
 
-// Gövde sekmesi her zaman özgün (kesitli) gövdeyi, kanat ve kuyrukla birlikte gösterir
+// Gövde sekmesi ana 3D görünüm ve STL ile aynı seçili gövdeyi gösterir.
 function buildFuseViewerFuselage(geom, wingCoords) {
   disposeModel(fuseViewerGroup);
   fuseViewerGroup.clear();
-  fuseViewerGroup.add(buildFuselageGroup(geom, 'manual', wingCoords));
-  if (fuseViewerWingGrid) fuseViewerGroup.add(buildWingGroup(geom, fuseViewerWingGrid));
-  if (fuseViewerTailCoords) {
+  const showAircraft = document.getElementById('fuseShowAircraft')?.checked;
+  fuseViewerGroup.add(buildFuselageGroup(geom, geom.fuse_type, wingCoords));
+  if (showAircraft && fuseViewerWingGrid) fuseViewerGroup.add(buildWingGroup(geom, fuseViewerWingGrid));
+  if (showAircraft && fuseViewerTailCoords) {
     fuseViewerGroup.add(buildTailGroup(geom, fuseViewerTailCoords, fuseViewerVtailCoords || fuseViewerTailCoords));
   }
 

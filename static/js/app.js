@@ -43,6 +43,10 @@ const state = {
   fuseSections: scaleFuseShape(1.2, 0.14, 0.14),
   // Kullanıcı kesitlere dokunana kadar her hesaplamada otomatik gövde ölçülerine uydurulur
   fuseSectionsEdited: false,
+  fusePreset: 'atlas',
+  fuseWidthScale: 1,
+  fuseHeightScale: 1,
+  fuseSectionExponent: 2,
 };
 
 function scaleFuseShape(length, maxWidth, maxHeight) {
@@ -133,6 +137,71 @@ function setupSidebar() {
 }
 
 /* ─── Fuselage Helpers ─── */
+function setupFuseLibrary() {
+  $('fuse-preset-grid').innerHTML = Object.entries(FUSELAGE_PRESETS).map(([id, p]) =>
+    `<button type="button" class="fuse-preset" data-preset="${id}" aria-pressed="false" aria-label="${p.name} gövdesi">
+      <span class="fuse-preset-top"><strong>${p.name}</strong><span class="fuse-preset-check" aria-hidden="true">✓</span></span>
+      ${fusePresetThumbnail(id)}<span class="fuse-preset-tag">${p.tag}</span>
+    </button>`).join('');
+  document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => {
+    state.fusePreset = button.dataset.preset;
+    setRadio('fuse_type', 'conventional');
+    if (state.geometry) state.geometry.fuse_type = 'conventional';
+    updateFuselageViews();
+  }));
+  for (const [id, prop] of [['fuseWidthScale', 'fuseWidthScale'], ['fuseHeightScale', 'fuseHeightScale']]) {
+    $(id).addEventListener('input', () => {
+      state[prop] = Number($(id).value) / 100;
+      updateFuselageViews();
+    });
+  }
+  $('fuseShowAircraft').addEventListener('change', () => {
+    if (state.geometry) {
+      updateFuseViewer(state.geometry, state.airfoilCoords);
+      fitFuseViewerToModel();
+    }
+  });
+  $('fuseCustomBtn').addEventListener('click', () => {
+    if (!state.geometry) return;
+    if (state.fusePreset !== 'custom') {
+      state.fuseSections = presetFuseKeys(state.geometry, state.fusePreset);
+      state.fuseSectionExponent = FUSELAGE_PRESETS[state.fusePreset].exponent;
+      state.fuseSectionsEdited = true;
+    }
+    state.fusePreset = 'custom';
+    state.geometry.fuse_type = 'manual';
+    setRadio('fuse_type', 'manual');
+    renderFuseControls();
+    updateFuselageViews();
+    $('fuse-custom-details').open = true;
+  });
+  syncFuseLibrary();
+}
+
+function syncFuseLibrary() {
+  const custom = state.fusePreset === 'custom';
+  const preset = FUSELAGE_PRESETS[state.fusePreset];
+  document.querySelectorAll('[data-preset]').forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.preset === state.fusePreset));
+  });
+  $('fuse-model-name').textContent = custom ? 'Özgün gövde' : preset.name;
+  $('fuse-model-description').textContent = custom ? 'Kesitleri aşağıdan değiştirin. Her düzenleme iki 3D görünüme ve gövde çıktısına yansır.' : preset.description;
+  $('fuse-preset-controls').hidden = custom;
+  $('fuse-custom-details').hidden = !custom;
+  for (const id of ['stlFuseConv', 'stlFuseConvSliced']) $(id).disabled = custom;
+  for (const id of ['stlFuseManual', 'stlFuseManualSliced']) $(id).disabled = !custom;
+  $('fuseWidthScale').value = Math.round(state.fuseWidthScale * 100);
+  $('fuseHeightScale').value = Math.round(state.fuseHeightScale * 100);
+  $('fuseWidthValue').textContent = '%' + Math.round(state.fuseWidthScale * 100);
+  $('fuseHeightValue').textContent = '%' + Math.round(state.fuseHeightScale * 100);
+  if (state.geometry) {
+    const keys = custom ? state.fuseSections : presetFuseKeys(state.geometry, state.fusePreset);
+    const dims = [['Uzunluk', Math.max(...keys.map(s => s.t)) - Math.min(...keys.map(s => s.t))],
+      ['Azami genişlik', Math.max(...keys.map(s => s.w))], ['Azami yükseklik', Math.max(...keys.map(s => s.h))]];
+    $('fuse-dimensions').innerHTML = dims.map(([label, value]) => `<div><dt>${label}</dt><dd>${Math.round(value * 1000)} <span>mm</span></dd></div>`).join('');
+  }
+}
+
 const FUSE_SECTION_NAMES = ['Burun', 'Ön', 'Orta', 'Arka', 'Arka kuyruk', 'Kuyruk ucu'];
 const FUSE_PARAMS = [
   { key: 'pos', prop: 't', label: 'Konum' },
@@ -151,7 +220,7 @@ function renderFuseControls() {
       </div>`;
     }).join('');
     return `<fieldset class="fuse-section">
-      <legend><span class="num">K${i + 1}</span> ${FUSE_SECTION_NAMES[i]}</legend>
+      <legend><span class="num">K${i + 1}</span> ${FUSE_SECTION_NAMES.length === state.fuseSections.length ? FUSE_SECTION_NAMES[i] : 'Kesit ' + (i + 1)}</legend>
       ${rows}
     </fieldset>`;
   }).join('');
@@ -164,6 +233,9 @@ function renderFuseControls() {
         if (isNaN(value) || value < 0) return;
         state.fuseSections[i][prop] = value;
         state.fuseSectionsEdited = true;
+        state.fusePreset = 'custom';
+        setRadio('fuse_type', 'manual');
+        if (state.geometry) state.geometry.fuse_type = 'manual';
         syncFuseControls();
         updateFuselageViews();
       };
@@ -198,11 +270,16 @@ function updateFuselageViews() {
   const geom = state.geometry;
   if (!geom) return;
   geom.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+  geom.fuse_preset = state.fusePreset;
+  geom.fuse_width_scale = state.fuseWidthScale;
+  geom.fuse_height_scale = state.fuseHeightScale;
+  geom.fuse_section_exponent = state.fuseSectionExponent;
   updateFuseViewer(geom, state.airfoilCoords);
-  if (geom.fuse_type === 'manual' && typeof rebuildFuselage === 'function' && fuseGroup) {
+  if (typeof rebuildFuselage === 'function' && fuseGroup) {
     rebuildFuselage(geom, state.airfoilCoords);
   }
   displayResults(geom);
+  syncFuseLibrary();
   saveProject();
 }
 
@@ -211,6 +288,7 @@ async function init() {
   setupTheme();
   setupSidebar();
   renderFuseControls();
+  setupFuseLibrary();
   setupEventListeners();
   loadVersion();
   setupDesktopPresence();
@@ -301,11 +379,17 @@ function restoreProject() {
   }
   updateMissionProfile();
 
-  if (Array.isArray(data.fuse_sections_m) && data.fuse_sections_m.length === 6) {
+  state.fusePreset = FUSELAGE_PRESETS[data.fuse_preset] ? data.fuse_preset : (data.fuse_type === 'manual' ? 'custom' : 'atlas');
+  state.fuseWidthScale = Math.max(.7, Math.min(1.5, Number(data.fuse_width_scale) || 1));
+  state.fuseHeightScale = Math.max(.7, Math.min(1.5, Number(data.fuse_height_scale) || 1));
+  state.fuseSectionExponent = Math.max(2, Math.min(3, Number(data.fuse_section_exponent) || 2));
+  if (Array.isArray(data.fuse_sections_m) && data.fuse_sections_m.length >= 2 && data.fuse_sections_m.length <= 24
+      && data.fuse_sections_m.every(s => s && [s.t, s.w, s.h].every(v => Number.isFinite(v) && v >= 0))) {
     state.fuseSections = data.fuse_sections_m;
     state.fuseSectionsEdited = true;
-    syncFuseControls();
+    renderFuseControls();
   }
+  syncFuseLibrary();
 }
 
 function saveProject() {
@@ -319,6 +403,10 @@ function saveProject() {
     wing_position: radioValue('wing_pos', 'mid'),
     tail_type: radioValue('tail_type', 'conventional'),
     fuse_type: radioValue('fuse_type', 'conventional'),
+    fuse_preset: state.fusePreset,
+    fuse_width_scale: state.fuseWidthScale,
+    fuse_height_scale: state.fuseHeightScale,
+    fuse_section_exponent: state.fuseSectionExponent,
     fuse_sections_m: state.fuseSectionsEdited ? state.fuseSections : undefined,
     reynolds: parseInt($('reynolds').value) || 200000,
     cg_percent: parseInt($('cgSlider').value) || 25,
@@ -454,7 +542,14 @@ async function calculateAll() {
       syncFuseControls();
     }
     state.geometry.fuse_type = fuse_type;
+    if (fuse_type === 'manual') state.fusePreset = 'custom';
+    else if (!FUSELAGE_PRESETS[state.fusePreset]) state.fusePreset = 'atlas';
+    state.geometry.fuse_preset = state.fusePreset;
+    state.geometry.fuse_width_scale = state.fuseWidthScale;
+    state.geometry.fuse_height_scale = state.fuseHeightScale;
+    state.geometry.fuse_section_exponent = state.fuseSectionExponent;
     state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
+    syncFuseLibrary();
     saveProject();
 
     displayResults(state.geometry);
@@ -493,7 +588,9 @@ function displayResults(geom) {
     width: Math.max(...geom.fuse_sections.map(s => s.w)),
     height: Math.max(...geom.fuse_sections.map(s => s.h)),
   } : {
-    length: geom.fuselage_length, width: geom.fuselage_max_width, height: geom.fuselage_max_height,
+    length: geom.fuselage_length,
+    width: Math.max(...presetFuseKeys(geom, geom.fuse_preset).map(s => s.w)),
+    height: Math.max(...presetFuseKeys(geom, geom.fuse_preset).map(s => s.h)),
   };
 
   const summary = [

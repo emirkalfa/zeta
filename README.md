@@ -74,13 +74,26 @@ Uygulama sekiz adımdan oluşur; ilk adımda **Hesapla**'ya basınca diğerleri 
 | **01 Parametreler** | Açıklık, ağırlık, profiller, kanat şekli/konumu, kuyruk ve gövde tipi, ağırlık merkezi, güç sistemi ve görev profili. Manuel modda kanat ve kuyruk ölçüleri elle girilebilir. |
 | **02 Ölçüler** | Hesaplanan kanat, kuyruk, gövde ve kontrol yüzeyi ölçüleri. |
 | **03 3D model** | Kontrol yüzeyleri işaretli, döndürülebilir uçak modeli. |
-| **04 Gövde** | Özgün gövdeyi altı kesitle (konum, genişlik, yükseklik) biçimlendirme. |
+| **04 Gövde** | Atlas, Seyir ve Akın gövde modelleri; canlı genişlik/yükseklik ayarı ve özgün kesit düzenleme. |
 | **05 Analiz** | Kaldırma eğrisi, sürükleme poları, moment, verim ve açıklık boyunca kaldırma dağılımı. |
 | **06 Uçabilirlik** | Stall hızı, tırmanma ve statik kararlılık kriterleriyle uçabilir/uçamaz kararı. |
 | **07 Görev** | Azami hız, havada kalış, menzil ve dönüş performansı; yarışma hedefleriyle karşılaştırma. |
 | **08 STL indirme** | Kanat, kuyruk ve gövdeyi tek parça ya da dilimli olarak indirme. |
 
 Girilen değerler tarayıcıda saklanır ve sayfa yeniden açıldığında geri yüklenir. Açık ve koyu tema vardır.
+
+### Gövde koleksiyonu
+
+Gövde adımındaki **Atlas**, **Seyir** ve **Akın** kartları özgün, parametrik ZETA modelleridir.
+Atlas geniş ekipman hacmi, Seyir ince oval hatlar, Akın ise belirgin üst omuz çizgisi sunar.
+Genişlik ve yükseklik %70–%150 arasında ayarlanabilir; seçim ve oranlar tarayıcıda saklanır.
+**Kanat ve kuyruğu göster** ile gövdeyi tek başına veya uçak üzerinde inceleyebilirsiniz.
+**Kesitlerle düzenle**, seçili modeli dokuz düzenlenebilir kesite dönüştürür; eski altı kesitli projeler de açılır.
+
+Ana 3D görünüm, gövde önizlemesi ve STL aynı gövde yüzeyini kullanır. Üst kapak rengi yalnızca görsel bir ayrıntıdır;
+STL kesintisiz bir kabuktur, sökülebilir kapak veya bağlantı elemanı içermez.
+Gövde oranları bu sürümde aerodinamik, kütle merkezi ve görev hesaplarını yeniden modellemez.
+Bu modeller üretim ve uçuş doğrulaması yapılmış uçaklar değil, düzenlenebilir ön tasarımlardır.
 
 ## Yarışma İHA'ları (Savaşan İHA vb.)
 
@@ -158,6 +171,7 @@ Sonuçlar ön tasarım içindir; ayrıntılı tasarım ve uçuş güvenliği iç
 pip install -e ".[dev]"
 pytest                          # 160+ test
 python scripts/smoke_test.py    # uygulamayı başlatıp uç noktaları dener
+node --test tests/test_fuselage.cjs  # gövde ölçüleri, yüzey eşleşmesi ve kapalı STL ağları
 FLASK_DEBUG=1 python app.py     # otomatik yeniden yüklemeli geliştirme sunucusu
 ```
 

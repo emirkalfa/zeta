@@ -220,64 +220,8 @@ async function exportSTL(part) {
 }
 
 function buildFuselageSections(geom, type, airfoilCoords) {
-  if (type === 'conventional') {
-    const L = geom.fuselage_length || 1.2;
-    const maxW = (geom.fuselage_max_width || 0.14) / 2;
-    const maxH = (geom.fuselage_max_height || 0.14) / 2;
-    const nSecs = 64;
-    const nCirc = 40;
-
-    function smoothstep(a, b, x) {
-      const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
-      return t * t * (3 - 2 * t);
-    }
-    function widthProfile(x) {
-      const t = x / L;
-      const bR = 1.0, tR = 0.35;
-      if (t < 0.30) { const u = t / 0.30; return bR * Math.sqrt(u); }
-      else if (t < 0.75) return bR;
-      else { const u = (t - 0.75) / 0.25; return bR - (bR - tR) * Math.sin(u * Math.PI / 2); }
-    }
-    function heightProfile(x) {
-      const t = x / L;
-      const bR = 1.0, tR = 0.30;
-      if (t < 0.32) { const u = t / 0.32; return bR * Math.sqrt(u); }
-      else if (t < 0.72) return bR;
-      else { const u = (t - 0.72) / 0.28; return bR - (bR - tR) * Math.sin(u * Math.PI / 2); }
-    }
-    function upperShape(x) { const t = x / L; return 0.82 - 0.08 * Math.exp(-Math.pow((t - 0.55) / 0.20, 2)); }
-    function lowerShape(x) { const t = x / L; return 1.12 + 0.10 * Math.exp(-Math.pow((t - 0.50) / 0.25, 2)); }
-    function ventralPod(x) {
-      const t = x / L, center = 0.45, width = 0.20, peak = 0.25;
-      return peak * Math.exp(-Math.pow((t - center) / width, 2) * 4);
-    }
-    function superellipse(theta, n) {
-      const ct = Math.cos(theta), st = Math.sin(theta), ex = 2 / n;
-      return { x: Math.sign(ct) * Math.pow(Math.abs(ct), ex), y: Math.sign(st) * Math.pow(Math.abs(st), ex) };
-    }
-
-    const sections = [];
-    for (let i = 0; i <= nSecs; i++) {
-      const t = i / nSecs, x = t * L;
-      const w = maxW * widthProfile(x), h = maxH * heightProfile(x);
-      const up = upperShape(x), low = lowerShape(x), vent = ventralPod(x);
-      const sec = [];
-      for (let j = 0; j < nCirc; j++) {
-        const theta = (j / nCirc) * Math.PI * 2;
-        const sp = superellipse(theta, 2.4 + 0.8 * Math.sin(t * Math.PI));
-        let y = sp.y * h;
-        let z = sp.x * w;
-        if (y > 0) y *= up;
-        else y = y * low - h * vent * (1 - Math.pow(Math.abs(sp.x), 0.6));
-        sec.push({ x, y, z });
-      }
-      sections.push(sec);
-    }
-    if (airfoilCoords) applyWingRootCutout(sections, nCirc, geom, airfoilCoords);
-    return { sections, nCirc };
-  }
-
-  return manualFuselageSections(geom, airfoilCoords);
+  // One generator for the two viewers and every fuselage STL export.
+  return type === 'manual' ? loftFuselage(geom.fuse_sections || [], geom.fuse_section_exponent || 2) : libraryFuselageSections(geom);
 }
 
 function meshFromSections(sections, nCirc) {
@@ -313,7 +257,8 @@ function meshFromSections(sections, nCirc) {
     verts.push(cx.x, cx.y, cx.z);
     for (let j = 0; j < nCirc; j++) {
       const jn = (j + 1) % nCirc;
-      idxs.push(start + j, start + jn, ci);
+      if (secIdx === 0) idxs.push(start + j, start + jn, ci);
+      else idxs.push(start + jn, start + j, ci);
     }
   }
 
@@ -344,7 +289,7 @@ async function exportFuselageSTL(type) {
   if (!checkGeom()) return;
   if (type !== 'conventional' && type !== 'manual') return;
 
-  const fileName = type === 'conventional' ? 'zeta_fuselage_conventional.stl' : 'zeta_fuselage_manual.stl';
+  const fileName = `zeta_fuselage_${type === 'conventional' ? (state.geometry.fuse_preset || 'atlas') : 'custom'}.stl`;
   const confirmed = await showDownloadConfirm([fileName]);
   if (!confirmed) return;
 
@@ -365,7 +310,7 @@ async function exportSlicedFuselage(type) {
   const n = getNumSegments(type === 'conventional' ? 'fuseConvSliceCount' : 'fuseManualSliceCount');
   if (n <= 1) { notify('Parça sayısı en az 2 olmalıdır.'); return; }
 
-  const ext = type === 'conventional' ? 'conv' : 'manual';
+  const ext = type === 'conventional' ? (state.geometry.fuse_preset || 'atlas') : 'custom';
   const filenames = Array.from({length: n}, (_, i) => `zeta_fuselage_${ext}_${i+1}of${n}.stl`);
   const confirmed = await showDownloadConfirm(filenames);
   if (!confirmed) return;
@@ -376,7 +321,7 @@ async function exportSlicedFuselage(type) {
   if (!sections.length) { notify('Gövde modeli oluşturulamadı.'); return; }
 
   const totalSecs = sections.length;
-  const segSize = totalSecs / n;
+  const segSize = (totalSecs - 1) / n;
 
   for (let seg = 0; seg < n; seg++) {
     const iStart = Math.round(seg * segSize);
