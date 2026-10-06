@@ -6,6 +6,8 @@ __pycache__/
 venv/
 .venv/
 *.db
+*.db-shm
+*.db-wal
 *.stl
 node_modules/
 .DS_Store
