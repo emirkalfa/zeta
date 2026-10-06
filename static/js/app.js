@@ -584,7 +584,7 @@ const TAIL_TYPE_LABELS = { conventional: 'Konvansiyonel', ttail: 'T-tail', vtail
 function displayResults(geom) {
   const manualFuse = geom.fuse_type === 'manual' && geom.fuse_sections;
   const fuse = manualFuse ? {
-    length: Math.max(...geom.fuse_sections.map(s => s.t)),
+    length: Math.max(...geom.fuse_sections.map(s => s.t)) - Math.min(...geom.fuse_sections.map(s => s.t)),
     width: Math.max(...geom.fuse_sections.map(s => s.w)),
     height: Math.max(...geom.fuse_sections.map(s => s.h)),
   } : {
@@ -622,9 +622,9 @@ function displayResults(geom) {
       ['Kuyruk tipi', TAIL_TYPE_LABELS[geom.tail_type] || 'Konvansiyonel', ''],
     ]],
     [manualFuse ? 'Gövde (özgün) ve denge' : 'Gövde ve denge', [
-      ['Gövde uzunluğu', fuse.length, 'm'],
-      ['Gövde genişliği', fuse.width, 'm'],
-      ['Gövde yüksekliği', fuse.height, 'm'],
+      ['Gövde uzunluğu', Number(fuse.length.toFixed(3)), 'm'],
+      ['Gövde genişliği', Number(fuse.width.toFixed(3)), 'm'],
+      ['Gövde yüksekliği', Number(fuse.height.toFixed(3)), 'm'],
       ['CG pozisyonu', geom.cg_position, 'm'],
     ]],
     [geom.vtail_count === 2 ? 'Dikey kuyruk (ikiz, her biri)' : 'Dikey kuyruk', [
