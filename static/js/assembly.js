@@ -77,7 +77,7 @@ function invalidateManufacturingPreview() {
 }
 
 async function runManufacturing(mode='preview',filter='all') {
-  const status=$('manufacturingStatus'), buttons=[$('manufacturingPreview'),$('manufacturingDownload')];
+  const status=$('manufacturingStatus'), buttons=Array.from(document.querySelectorAll('#manufacturingPreview, #manufacturingDownload, .stl-list button'));
   buttons.forEach(b=>b.disabled=true);
   status.textContent='Parçalar oluşturuluyor; delikler, bağlantılar ve kapalı yüzeyler kontrol ediliyor…';
   try {
@@ -90,7 +90,7 @@ async function runManufacturing(mode='preview',filter='all') {
       status.textContent=manufacturingResult.summary;
     } else {
       downloadBlob(await res.blob(),`zeta_${filter}_montajli_stl.zip`);
-      status.textContent='STL paketi indirildi. İçindeki MONTAJ.txt ve manifest.json dosyalarını okuyun; önce tolerans denemesini basın.';
+      status.textContent='Parçalı STL paketi indirildi. ZIP dosyasını açın: her baskı parçası ayrı bir STL dosyasıdır. Önce küçük geçme deneme parçalarını basın.';
     }
   } catch(e) {status.textContent=e.message;notify(e.message);}
   finally {buttons.forEach(b=>b.disabled=false);}

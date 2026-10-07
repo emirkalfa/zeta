@@ -549,17 +549,19 @@
           <div class="field"><label for="mountNutFlat">Somun karşılıklı yüz mesafesi</label><div class="input-wrap"><input id="mountNutFlat" type="number" value="5.5" min="4" max="10" step="0.1"><span class="unit">mm</span></div></div>
           <div class="field"><label for="mountNutHeight">Somun kalınlığı</label><div class="input-wrap"><input id="mountNutHeight" type="number" value="2.4" min="1.5" max="5" step="0.1"><span class="unit">mm</span></div></div>
         </div>
-        <div class="form-actions"><button id="manufacturingPreview" class="btn">Üretim önizlemesi</button><button id="manufacturingDownload" class="btn btn-primary">Montajlı STL paketini indir</button></div>
+        <div class="form-actions"><button id="manufacturingPreview" class="btn">Üretim önizlemesi</button><button id="manufacturingDownload" class="btn btn-primary">Tüm parçaları STL olarak indir (ZIP)</button></div>
         <p class="hint">Kanat ve kuyruk köklerindeki geçme parçaları, gövdedeki pah girişli yuvalara oturur. Eşleşen vida delikleri ve somun cepleri STL paketine dahildir. T kuyrukta yatay yüzeyin yuvası dikey kuyruktadır.</p>
         <p id="manufacturingStatus" class="hint" role="status">Önce küçük tolerans parçalarını basın. Dosya kontrolü fiziksel uyum ve uçuş dayanımı onayı değildir.</p>
       </div>
+      <h3>Parçalı STL indirme</h3>
+      <p class="hint">Her ZIP içinde baskı parçaları ayrı STL dosyalarıdır. Parçaların boyutunu yukarıdaki yazıcı ölçüleri belirler; bağlantı yuvaları ve vida delikleri korunur.</p>
       <div class="stl-list">
         <div class="stl-row">
           <div class="stl-part">
             <h3>Kanat</h3>
-            <p>Parça sayısı her kanat yarısı için geçerlidir.</p>
+            <p>Sağ ve sol kanat, yazıcı ölçülerine göre numaralı ayrı STL dosyalarına bölünür.</p>
           </div>
-          <button id="stlWing" class="btn"><i class="ph ph-download-simple"></i> Montajlı paket</button>
+          <button id="stlWing" class="btn"><i class="ph ph-download-simple"></i> Parçalı STL indir (ZIP)</button>
           <div class="stl-sliced" hidden>
             <div class="input-wrap"><input type="number" id="sliceCount" min="2" max="20" value="3" step="1" aria-label="Kanat parça sayısı"><span class="unit">parça</span></div>
             <button id="stlWingSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
@@ -568,9 +570,9 @@
         <div class="stl-row">
           <div class="stl-part">
             <h3>Kuyruk</h3>
-            <p>Yatay ve dikey kuyruk birlikte.</p>
+            <p>Seçili kuyruk tipinin yüzeyleri, ayrı ve numaralı STL dosyaları olarak indirilir.</p>
           </div>
-          <button id="stlTail" class="btn"><i class="ph ph-download-simple"></i> Montajlı paket</button>
+          <button id="stlTail" class="btn"><i class="ph ph-download-simple"></i> Parçalı STL indir (ZIP)</button>
           <div class="stl-sliced" hidden>
             <div class="input-wrap"><input type="number" id="tailSliceCount" min="2" max="20" value="2" step="1" aria-label="Kuyruk parça sayısı"><span class="unit">parça</span></div>
             <button id="stlTailSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
@@ -581,7 +583,7 @@
             <h3>Seçili gövde ve ayrı kapak</h3>
             <p>Vida delikli ayrı kapak, karşı somun yuvaları ve iç hizalama bilezikleri.</p>
           </div>
-          <button id="stlFuseConv" class="btn"><i class="ph ph-download-simple"></i> Montajlı paket</button>
+          <button id="stlFuseConv" class="btn"><i class="ph ph-download-simple"></i> Parçalı STL indir (ZIP)</button>
           <div class="stl-sliced" hidden>
             <div class="input-wrap"><input type="number" id="fuseConvSliceCount" min="2" max="20" value="3" step="1" aria-label="Seçili gövde parça sayısı"><span class="unit">parça</span></div>
             <button id="stlFuseConvSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
@@ -592,14 +594,14 @@
             <h3>Özgün gövde</h3>
             <p>Gövde adımında düzenlediğiniz özgün kesitlerden.</p>
           </div>
-          <button id="stlFuseManual" class="btn"><i class="ph ph-download-simple"></i> Montajlı paket</button>
+          <button id="stlFuseManual" class="btn"><i class="ph ph-download-simple"></i> Parçalı STL indir (ZIP)</button>
           <div class="stl-sliced" hidden>
             <div class="input-wrap"><input type="number" id="fuseManualSliceCount" min="2" max="20" value="3" step="1" aria-label="Özgün gövde parça sayısı"><span class="unit">parça</span></div>
             <button id="stlFuseManualSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
           </div>
         </div>
       </div>
-      <p class="stl-note">Dilimli parçalar <code>z_wing_right_1of3.stl</code> biçiminde adlandırılır; 1 kök tarafı, son parça uç tarafıdır. Parçalar yapıştırılarak birleştirilir.</p>
+      <p class="stl-note">ZIP dosyasını açıp içindeki STL dosyalarını ayrı ayrı dilimleyiciye aktarın. Örneğin <code>wing_right_01of04.stl</code> dört sağ kanat parçasının ilkidir. Gövdede numaralar burundan kuyruğa, kanatta kökten uca ilerler. Ayrı kapak da pakettedir. Parça ek yerleri yapıştırılır; kanat ve kuyruk kökleri yuvalarına takılarak vidalanır.</p>
     </section>
 
     <!-- Footer -->
