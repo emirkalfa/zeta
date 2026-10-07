@@ -188,7 +188,7 @@
                 </div>
               </div>
               <div class="field">
-                <label for="motorPower">Motor gücü</label>
+                <label for="motorPower">Motorların toplam elektrik gücü</label>
                 <div class="input-wrap"><input type="number" id="motorPower" min="1" step="10" value="400"><span class="unit">W</span></div>
                 <small class="hint">Motorun azami elektrik gücü</small>
               </div>
@@ -552,9 +552,29 @@
           <div class="field"><label for="mountNutFlat">Somun karşılıklı yüz mesafesi</label><div class="input-wrap"><input id="mountNutFlat" type="number" value="5.5" min="4" max="10" step="0.1"><span class="unit">mm</span></div></div>
           <div class="field"><label for="mountNutHeight">Somun kalınlığı</label><div class="input-wrap"><input id="mountNutHeight" type="number" value="2.4" min="1.5" max="5" step="0.1"><span class="unit">mm</span></div></div>
         </div>
-        <div class="form-actions"><button id="manufacturingPreview" class="btn">Üretim önizlemesi</button><button id="manufacturingDownload" class="btn btn-primary">Tüm parçaları STL olarak indir (ZIP)</button></div>
         <p class="hint">Kanat ve kuyruk köklerindeki geçme parçaları, gövdedeki pah girişli yuvalara oturur. Eşleşen vida delikleri ve somun cepleri STL paketine dahildir. T kuyrukta yatay yüzeyin yuvası dikey kuyruktadır.</p>
-        <p id="manufacturingStatus" class="hint" role="status">Önce küçük tolerans parçalarını basın. Dosya kontrolü fiziksel uyum ve uçuş dayanımı onayı değildir.</p>
+      </div>
+      <div class="form-section">
+        <div class="form-section-head"><h3>BLDC motor ve pervane montajı</h3><p>Ölçüler örnektir; satın alacağınız motorun arka bağlantı ölçülerini girin. Kanat açıklığı değişse de motor ve vida ölçüleri korunur.</p></div>
+        <div class="form-grid">
+          <div class="field"><label for="motorLayout">Motor yerleşimi</label><select id="motorLayout"><option value="none">Montaj ekleme</option><option value="single">Tek motor — gövde burnu</option><option value="twin">Çift motor — sağ ve sol kanat</option></select></div>
+          <div class="field"><label for="motorPattern">Dört vida düzeni</label><select id="motorPattern"><option value="cross">Çapraz: iki karşılıklı çift</option><option value="rectangle">Dikdörtgen: dört köşe</option></select></div>
+          <div class="field"><label for="motorDiameter">Motor dış çapı</label><div class="input-wrap"><input id="motorDiameter" type="number" value="28" min="10" max="100" step="0.1"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="motorLength">Montaj yüzünden motorun önüne uzunluk</label><div class="input-wrap"><input id="motorLength" type="number" value="30" min="8" max="150" step="0.1"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="motorSpacingY">Dikey vida aralığı</label><div class="input-wrap"><input id="motorSpacingY" type="number" value="16" min="4" max="100" step="0.1"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="motorSpacingZ">Yatay vida aralığı</label><div class="input-wrap"><input id="motorSpacingZ" type="number" value="19" min="4" max="100" step="0.1"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="motorScrew">Motor vidası çapı</label><div class="input-wrap"><input id="motorScrew" type="number" value="3" min="2" max="6" step="0.1"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="motorBore">Arka mil/çıkıntı için orta delik</label><div class="input-wrap"><input id="motorBore" type="number" value="8" min="3" max="50" step="0.1"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="motorPlate">Motor bağlantı plakası kalınlığı</label><div class="input-wrap"><input id="motorPlate" type="number" value="5" min="3" max="12" step="0.5"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="motorWire">Motor kablo geçiş çapı</label><div class="input-wrap"><input id="motorWire" type="number" value="6" min="3" max="15" step="0.5"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="propDiameter">Pervane uçtan uca çapı</label><div class="input-wrap"><input id="propDiameter" type="number" value="152" min="60" max="800" step="1"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="propOffset">Motor önünden pervane düzlemine mesafe</label><div class="input-wrap"><input id="propOffset" type="number" value="8" min="0" max="100" step="0.5"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="motorStation">Kanattaki konum: kökten uca</label><div class="input-wrap"><input id="motorStation" type="number" value="40" min="20" max="70" step="1"><span class="unit">%</span></div></div>
+        </div>
+        <label class="toggle-row"><input id="motorHardwareView" type="checkbox" checked>Motor ve pervane ölçü referansını göster</label>
+        <p class="hint">Çapraz düzende aralıklar karşılıklı deliklerin merkezleri arasındadır; dikdörtgen düzende köşe deliklerinin dikey/yatay aralıklarıdır. Üretim önizlemesi gerçek delikleri gösterir. Motor ve pervane görüntüleri STL'ye eklenmez; taşıyıcılar gövde/kanat STL'sine dahildir. Güç hesabına tüm motorların toplam elektrik gücünü girin.</p>
+        <div class="form-actions"><button id="manufacturingPreview" class="btn">Üretim önizlemesi</button><button id="manufacturingDownload" class="btn btn-primary">Tüm parçaları STL olarak indir (ZIP)</button></div>
+        <p id="manufacturingStatus" class="hint" role="status">Önce küçük tolerans parçalarını basın. Motor taşıyıcısının yük, titreşim ve ısı dayanımı ayrıca doğrulanmalıdır.</p>
       </div>
       <h3>Parçalı STL indirme</h3>
       <p class="hint">Her ZIP içinde baskı parçaları ayrı STL dosyalarıdır. Parçaların boyutunu yukarıdaki yazıcı ölçüleri belirler; bağlantı yuvaları ve vida delikleri korunur.</p>

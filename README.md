@@ -216,6 +216,21 @@ Sürüm notları [CHANGELOG.md](CHANGELOG.md), sürüm çıkarma adımları [REL
 
 ## Hesap doğrulamasının sınırı
 
+### BLDC bağlantıları
+
+08 STL adımında tek motor için burun bağlantı plakası, çift motor için kanat
+taşıyıcıları seçilebilir. Motor dış çapı/uzunluğu, dört vida düzeni ve aralıkları,
+vida çapı, orta mil deliği, pervane çapı ve mesafesi ayrı mm ölçüleridir. Kanat
+açıklığı değiştiğinde bu ölçüler ölçeklenmez; çift motor konumu yarı açıklığın
+yüzdesiyle takip edilir. Motor plakalarında ayrı kablo deliği, kanat taşıyıcılarında
+ayrıca arka kablo çıkışı vardır. Gerçek delikler
+üretim önizlemesinde ve gövde/kanat STL paketinde bulunur; motor/pervane referans
+görüntüleri basılacak parçalar değildir. Varsayılan değerler satın alınacak motorun
+verisi sayılmaz. Motor vidalarının boyu, sargı mesafesi, ısı/titreşim/yük dayanımı
+fiziksel olarak doğrulanmalıdır. Pervane/airframe çakışmaları reddedilir; iniş
+takımı ve zemin mesafesi modellenmez. Görev modeline motorların toplam elektrik
+gücü girilir; nacelle sürüklemesi ve tek motor arızasının yaw etkisi çözülmez.
+
 Uçuş sonuçları ön değerlendirmedir; uçuşa uygunluk onayı değildir. Profil CD0,
 CLmaks ve stall sonrası davranış ölçülmüş polarlara kalibre edilmemiş yaklaşık
 modellerdir. Aerodinamik grafikler yalnız kanadı kapsar. Görev hesabında gövde,

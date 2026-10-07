@@ -40,10 +40,28 @@ function aircraftPanelSpecs(g, wingCoords, hCoords, vCoords) {
 
 let manufacturingResult = null;
 let manufacturingOverlay = null;
+const MOTOR_FIELDS=['motorLayout','motorPattern','motorDiameter','motorLength','motorSpacingY','motorSpacingZ','motorBore','motorScrew','motorPlate','motorWire','propDiameter','propOffset','motorStation'];
+function motorMountSettings() {
+  return Object.fromEntries(MOTOR_FIELDS.map(id=>[id,['motorLayout','motorPattern'].includes(id)?$(id).value:Number($(id).value)]));
+}
+function motorPreviewSpecs(g,settings,sections) {
+  if(!settings || settings.motorLayout==='none')return [];
+  const radius=Math.max(settings.motorDiameter/2+3,
+    (settings.motorPattern==='rectangle'?Math.hypot(settings.motorSpacingY/2,settings.motorSpacingZ/2):Math.max(settings.motorSpacingY,settings.motorSpacingZ)/2)+(settings.motorScrew+.3)/2+3,
+    ((settings.motorBore??8)+.3)/2+(settings.motorWire??6)+4);
+  let faces=[];
+  if(settings.motorLayout==='single')faces=[{parent:'body',face_mm:[sections[0][0].x*1000,sections[0].reduce((n,p)=>n+p.y,0)/sections[0].length*1000,0]}];
+  else for(const p of aircraftPanelSpecs(g,[],[],[]).filter(p=>p.kind==='wing')) {
+    const s=settings.motorStation/100,le=p.root.map((v,i)=>(v+(p.tip[i]-v)*s)*1000);
+    faces.push({parent:p.name,face_mm:[le[0]-20,le[1]-settings.motorDiameter*.35,le[2]]});
+  }
+  return faces.map(p=>({...p,motor_diameter_mm:settings.motorDiameter,motor_length_mm:settings.motorLength,prop_diameter_mm:settings.propDiameter,prop_plane_x_mm:p.face_mm[0]-settings.motorLength-(settings.propOffset??8),plate_radius_mm:radius,plate_thickness_mm:settings.motorPlate}));
+}
 function manufacturingPayload() {
   if (!checkGeom()) throw new Error('Önce Hesapla düğmesine basın.');
   const g=state.geometry;
   const options={};
+  Object.assign(options,motorMountSettings());
   for (const [key,id] of Object.entries({bedX:'printBedX',bedY:'printBedY',bedZ:'printBedZ',wall:'wallThickness',clearance:'fitClearance',screw:'mountScrew',nutFlat:'mountNutFlat',nutHeight:'mountNutHeight',sparMain:'sparMainDia',sparRear:'sparRearDia',ribSpacing:'ribSpacing',ribThickness:'ribThickness'})) options[key]=Number($(id).value);
   return {geometry:g, options, fuselage:buildFuselageSections(g,g.fuse_type,state.airfoilCoords).sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000])), panels:aircraftPanelSpecs(g,state.airfoilCoords,state.tailCoords,state.vtailCoords||state.tailCoords)};
 }
@@ -60,6 +78,7 @@ function showManufacturingPreview(data) {
     const mesh=new THREE.Mesh(geo,modelMaterial(color));mesh.userData.partName=part.name;
     manufacturingOverlay.add(mesh);
   }
+  addMotorHardware(manufacturingOverlay,data.manifest.motors||[]);
   wingGroup.visible=false;tailGroup.visible=false;fuseGroup.visible=false;
   scene.add(manufacturingOverlay);
   switchTab('viewer');
@@ -102,11 +121,22 @@ function setupManufacturing() {
   $('manufacturingPreview').addEventListener('click',()=>runManufacturing('preview'));
   $('manufacturingDownload').addEventListener('click',()=>runManufacturing('zip'));
   let saved=null;try {saved=JSON.parse(store.get('zeta-manufacturing')||'null');} catch(e) { /* damaged local settings */ }
-  const ids=['printBedX','printBedY','printBedZ','fitClearance','mountScrew','mountNutFlat','mountNutHeight'];
+  const ids=['printBedX','printBedY','printBedZ','fitClearance','mountScrew','mountNutFlat','mountNutHeight',...MOTOR_FIELDS];
+  const read=id=>['motorLayout','motorPattern'].includes(id)?$(id).value:Number($(id).value);
   for (const id of ids) {
-    if(saved && Number.isFinite(saved[id])) $(id).value=saved[id];
-    $(id).addEventListener('change',()=>{invalidateManufacturingPreview();store.set('zeta-manufacturing',JSON.stringify(Object.fromEntries(ids.map(k=>[k,Number($(k).value)]))));});
+    if(saved && (Number.isFinite(saved[id]) || (['motorLayout','motorPattern'].includes(id) && Array.from($(id).options).some(o=>o.value===saved[id])))) $(id).value=saved[id];
+    $(id).addEventListener('change',()=>{
+      invalidateManufacturingPreview();store.set('zeta-manufacturing',JSON.stringify(Object.fromEntries(ids.map(k=>[k,read(k)]))));
+      if(state.geometry && MOTOR_FIELDS.includes(id)) {
+        state.geometry.motor_mount=motorMountSettings();
+        if(scene && fuseGroup) {scene.remove(fuseGroup);disposeModel(fuseGroup);fuseGroup=buildFuselageGroup(state.geometry,state.geometry.fuse_type,state.airfoilCoords);scene.add(fuseGroup);}
+        if(scene && wingGroup) {scene.remove(wingGroup);disposeModel(wingGroup);wingGroup=buildWingGroup(state.geometry,state.airfoilCoords);scene.add(wingGroup);}
+      }
+    });
   }
+  $('motorHardwareView').addEventListener('change',()=>{
+    for(const root of [fuseGroup,wingGroup,manufacturingOverlay]) if(root)root.traverse(o=>{if(o.userData.motorHardware)o.visible=$('motorHardwareView').checked;});
+  });
   for(const id of ['wallThickness','sparMainDia','sparRearDia','ribSpacing','ribThickness']) $(id).addEventListener('change',invalidateManufacturingPreview);
 }
 window.addEventListener('DOMContentLoaded',setupManufacturing);

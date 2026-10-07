@@ -274,6 +274,7 @@ def generate(data):
         panel=panel-drill
         world_sleeve=local_transform(sleeve,mat);world_female=local_transform(female,mat)
         world_drill=local_transform(drill,mat);world_nut=local_transform(nut,mat)
+        cuts.setdefault(name,[]).append(world_drill)
         # The fixed center saddle completes the tail outline between removable roots.
         # Leave the same half-clearance at its edge as at the mating-envelope cut.
         saddle=md.Manifold()
@@ -335,12 +336,16 @@ def generate(data):
                 world_panel=world_panel-panel_cut
                 body=body-panel_cut
                 cuts['body'].append(panel_cut)
+                cuts.setdefault(name,[]).append(panel_cut)
                 spar_channels.append({'part':name,'chord_position':pos,'hole_diameter_mm':dia,'reach_from_center_mm':reach,'wing_insertion_length_mm':reach-trim})
         if parent=='body': body=body-local_transform(mating_envelope,mat)
         elif parent in assemblies: assemblies[parent]=assemblies[parent]-local_transform(mating_envelope,mat)
         assemblies[name]=world_panel;frames[name]=(mat,trim,spec['kind'])
         interfaces.append({'part':name,'parent':parent,'key_mm':[keyw,keyh,depth], 'bolt_axis':mat[:,1].tolist(),'bolt_point_mm':(mat[:,:3]@np.array([cx,0,screw_z])+mat[:,3]).tolist(),'diametral_clearance_mm':gap,'entry_lead_mm':lead,'entry_flare_per_side_mm':.6})
-    # Adding the next socket/rib must never fill the previous socket or bore.
+    from backend.motor_mounts import install_motor_mounts
+    body,motor_obstacles,motor_cuts,motors=install_motor_mounts(body,lid,assemblies,data,outer,wall,gap)
+    body_obstacles.extend(motor_obstacles);cuts['body'].extend(motor_cuts)
+    # Adding the next socket/rib or motor pod must never fill existing bores.
     for owner,tools in cuts.items():
         if owner=='body':
             for tool in tools:body=body-tool
@@ -360,7 +365,8 @@ def generate(data):
               'Kapak ve yüzey dilimleri kesit boyunca yapıştırılarak birleştirilir. Kanatta boru kanalları hizalamayı sağlar.',
               'Kontrol yüzeyleri bu pakette bütünleşik kabuktur; servo/menteşe mekanizması ayrıca tasarlanmalıdır.',
               'Bu kontrol uçuşa elverişlilik veya malzeme dayanımı onayı değildir.']
-    return parts,{'bed_mm':bed,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'hatch_bolts_mm':hatch_holes,'interfaces':interfaces,'spar_channels':spar_channels,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'obstacles':body_obstacles}
+    if motors:notes+=['Motorlar ve pervaneler satın alınır; STL yalnız bağlantı taşıyıcılarını içerir. Vida boyunu motor üreticisine göre seçin; sargılara değmemelidir. Girilen ölçüleri gerçek motorla doğrulayın. Motor vidaları motorun metal dişlerine girer; plastik plakada geçme delikleri vardır.']
+    return parts,{'bed_mm':bed,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'hatch_bolts_mm':hatch_holes,'interfaces':interfaces,'spar_channels':spar_channels,'motors':motors,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'obstacles':body_obstacles}
 
 
 def orthogonal_print(solid,bed):
@@ -472,6 +478,7 @@ def package(parts,manifest,rings,filter='all'):
     if not selected: raise ManufacturingError('İstenen parça bulunamadı.')
     printed=printable_parts(selected,manifest,rings)
     manifest=dict(manifest)
+    manifest['motors']=[m for m in manifest.get('motors',[]) if m['parent'] in {p.name for p in selected}]
     manifest['parts']=[]
     buf=io.BytesIO()
     with zipfile.ZipFile(buf,'w',zipfile.ZIP_DEFLATED) as z:
@@ -486,6 +493,10 @@ def package(parts,manifest,rings,filter='all'):
         z.writestr('fit_test_socket.stl',binary_stl(orthogonal_print(socket,manifest['bed_mm'])))
         z.writestr('manifest.json',json.dumps(manifest,ensure_ascii=False,indent=2))
         text='ZETA MONTAJ VE BASKI\n\n'+ '\n'.join(manifest['notes'])+'\n\n'
+        for motor in manifest['motors']:
+            label={'body':'Gövde burnu','wing_right':'Sağ kanat','wing_left':'Sol kanat'}.get(motor['parent'],motor['parent'])
+            text+=f"{label} motor montajı: motor Ø{motor['motor_diameter_mm']:g} × {motor['motor_length_mm']:g} mm; plaka {motor['plate_thickness_mm']:g} mm; vida geçme deliği Ø{motor['hole_diameter_mm']:g} mm; orta delik Ø{motor['center_bore_mm']:g} mm.\n"
+            text+='Motor vidalarını plakanın arka tarafından takın. Burun motorunu gövde dilimlerini yapıştırmadan önce monte edin. Ayrı kablo deliğinden kabloları geçirin; motor metal dişine giren vida boyunu üretici ölçüsüyle kontrol edin.\n'
         text+='1. fit_test_key ve fit_test_socket dosyalarını basın. Sıkı/geçmeyen veya gevşek sonuçta uygulamadaki geçme boşluğunu değiştirin.\n2. STL dosyaları mm birimindedir; her parça Z=0 tabanına yerleştirilmiştir. Destek, brim ve katman ayarlarını dilimleyicide kontrol edin.\n3. Gövde numaraları burundan kuyruğa ilerler. İç bilezikler sonraki parçada hizalama sağlar; bu birleşimleri yapıştırın.\n4. Kapakta dört vida deliği vardır; karşı somunlar gövde içinden erişilir.\n5. Kanat/kuyruk anahtarlarını karşı soketlerine takın. Aynı eksendeki vida deliklerinden bağlantı yapın. Somun ceplerine seçtiğiniz somunu yerleştirin.\n6. Menteşe, servo montajı, motor yatağı ve yapısal yük doğrulaması tamamlanmadan uçuşa geçmeyin.\n'
         z.writestr('MONTAJ.txt',text)
     return buf.getvalue()

@@ -171,6 +171,7 @@ function buildWingGroup(geom, coords) {
   for (const p of aircraftPanelSpecs(geom,coords,coords,coords).filter(p=>p.kind==='wing')) {
     buildSurface(group,{rootLE:new THREE.Vector3(...p.root),tipLE:new THREE.Vector3(...p.tip),rootChord:p.chord,tipChord:p.tipChord,up:new THREE.Vector3(...p.up),coords:p.coords,controls});
   }
+  if(geom.motor_mount?.motorLayout==='twin') addMotorHardware(group,motorPreviewSpecs(geom,geom.motor_mount,[]));
   return group;
 }
 
@@ -228,6 +229,10 @@ function buildFuselageGroup(geom, type, wingCoords) {
   body.castShadow = true;
   group.add(body);
   if (type !== 'manual') addFuselagePanel(group, sections);
+  if (geom.motor_mount && geom.motor_mount.motorLayout !== 'none') {
+    if(geom.motor_mount.motorLayout==='single') addMotorHardware(group,motorPreviewSpecs(geom,geom.motor_mount,sections));
+    return group;
+  }
 
   // Pervane: standart yerleşimde burunda (çekici), yarışma yerleşiminde gövde arkasında (itici)
   const pusher = geom.airframe === 'combat';
@@ -319,6 +324,23 @@ function addFuselagePanel(group, sections) {
   group.add(new THREE.Mesh(geo, modelMaterial(0x34424d)));
   const edge = new THREE.BufferGeometry().setFromPoints([...left, ...right.reverse()]);
   group.add(new THREE.LineLoop(edge, new THREE.LineBasicMaterial({color: 0xc48554})));
+}
+
+function addMotorHardware(group,motors) {
+  const references=new THREE.Group();references.userData.motorHardware=true;
+  references.visible=typeof $==='function' && $('motorHardwareView') ? $('motorHardwareView').checked : true;
+  for(const m of motors) {
+    const [x,y,z]=m.face_mm.map(v=>v/1000),r=m.motor_diameter_mm/2000,l=m.motor_length_mm/1000;
+    const material=new THREE.MeshStandardMaterial({color:0xef9353,transparent:true,opacity:.65,roughness:.5});
+    const motor=new THREE.Mesh(new THREE.CylinderGeometry(r,r,l,32),material);
+    motor.rotation.z=-Math.PI/2;motor.position.set(x-l/2,y,z);references.add(motor);
+    const propRadius=m.prop_diameter_mm/2000;
+    const prop=new THREE.Mesh(new THREE.BoxGeometry(.002,m.prop_diameter_mm/1000,.012),modelMaterial(0x34424d));
+    prop.position.set(m.prop_plane_x_mm/1000,y,z);prop.rotation.x=.6;references.add(prop);
+    const circle=new THREE.Mesh(new THREE.RingGeometry(propRadius-.0008,propRadius,64),new THREE.MeshBasicMaterial({color:0xef9353,side:THREE.DoubleSide,transparent:true,opacity:.5}));
+    circle.rotation.y=Math.PI/2;circle.position.copy(prop.position);references.add(circle);
+  }
+  group.add(references);
 }
 
 function disposeModel(group) {

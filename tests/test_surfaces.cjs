@@ -63,3 +63,16 @@ for(const shape of ['rectangular','tapered','ste_tapered']) test(`${shape}: wing
     assert(Math.abs(p.tip[0]+p.tipChord-p.root[0]-p.chord)<1e-10,'straight trailing edge');
   } else assert(p.tip[0]>p.root[0] && p.tipChord<p.chord);
 });
+
+test('motor references follow span changes but retain physical motor dimensions',()=>{
+  ctx.settings={motorLayout:'twin',motorDiameter:28,motorLength:30,motorPattern:'cross',motorSpacingY:16,motorSpacingZ:19,motorScrew:3,motorPlate:5,propDiameter:152,propOffset:12,motorStation:40};
+  const result=[];
+  for(const span of [1.2,1.8]) {
+    ctx.g={...base,wingspan:span};result.push(run('motorPreviewSpecs(g,settings,[])'));
+  }
+  for(let i=0;i<2;i++) {
+    assert.equal(result[0][i].motor_diameter_mm,28);assert.equal(result[1][i].motor_diameter_mm,28);
+    assert(Math.abs(result[1][i].face_mm[2]/result[0][i].face_mm[2]-1.5)<1e-12);
+    assert.equal(result[1][i].face_mm[0]-result[1][i].prop_plane_x_mm,42);
+  }
+});

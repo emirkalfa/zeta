@@ -553,6 +553,7 @@ async function calculateAll() {
     state.geometry.fuse_section_exponent = state.fuseSectionExponent;
     state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
     syncFuseLibrary();
+    state.geometry.motor_mount=motorMountSettings();
     saveProject();
 
     displayResults(state.geometry);
