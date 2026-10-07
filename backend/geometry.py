@@ -226,14 +226,15 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                       vtail_effective_area=round(vtail_area,6),
                       vtail_sizing='manual' if manual_v else 'equivalent_tail_volume')
     if combat:
-        boom_y = htail_span / 2
+        boom_y = vtail_span * np.cos(np.radians(35)) / 2 if tail_type=='vtail' else htail_span / 2
         chord_at_boom = root_chord * (1 - (boom_y / (wingspan / 2)) * (1 - taper_ratio))
+        leading_at_boom=wing_x_pos+(root_chord-chord_at_boom if wing_shape=='ste_tapered' else boom_y*np.tan(np.radians(sweep_angle)))
         result['vtail_count'] = 1 if tail_type == 'vtail' else 2
         result['tail_booms'] = {
             'y': round(boom_y, 3),
-            'x_start': round(wing_x_pos + 0.25 * chord_at_boom, 3),
+            'x_start': round(leading_at_boom + 0.85 * chord_at_boom, 3),
             'x_end': round(tail_x_pos + htail_root_chord, 3),
-            'length': round(tail_x_pos + htail_root_chord - wing_x_pos - 0.25 * chord_at_boom, 3),
+            'length': round(tail_x_pos + htail_root_chord - leading_at_boom - .85*chord_at_boom, 3),
             'diameter': round(max(0.012 * wingspan, 0.008), 3),
         }
 

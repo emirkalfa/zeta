@@ -333,7 +333,7 @@ function addMotorHardware(group,motors) {
     const [x,y,z]=m.face_mm.map(v=>v/1000),r=m.motor_diameter_mm/2000,l=m.motor_length_mm/1000;
     const material=new THREE.MeshStandardMaterial({color:0xef9353,transparent:true,opacity:.65,roughness:.5});
     const motor=new THREE.Mesh(new THREE.CylinderGeometry(r,r,l,32),material);
-    motor.rotation.z=-Math.PI/2;motor.position.set(x-l/2,y,z);references.add(motor);
+    motor.rotation.z=-Math.PI/2;motor.position.set(x-(m.axis?.[0]??1)*l/2,y,z);references.add(motor);
     const propRadius=m.prop_diameter_mm/2000;
     const prop=new THREE.Mesh(new THREE.BoxGeometry(.002,m.prop_diameter_mm/1000,.012),modelMaterial(0x34424d));
     prop.position.set(m.prop_plane_x_mm/1000,y,z);prop.rotation.x=.6;references.add(prop);

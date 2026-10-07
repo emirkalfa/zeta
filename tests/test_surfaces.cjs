@@ -76,3 +76,25 @@ test('motor references follow span changes but retain physical motor dimensions'
     assert.equal(result[1][i].face_mm[0]-result[1][i].prop_plane_x_mm,42);
   }
 });
+
+test('combat T-tail roots mount on each actual fin quarter chord',()=>{
+  ctx.g={...base,tail_type:'ttail',tail_booms:{y:.27}};
+  const panels=run('aircraftPanelSpecs(g,coords,coords,coords)');
+  for(const side of ['right','left']) {
+    const fin=panels.find(p=>p.name==='tail_vertical_'+side),h=panels.find(p=>p.name==='tail_horizontal_'+side);
+    assert.equal(h.parent,fin.name);
+    assert.ok(Math.abs(h.root[0]+.25*h.chord-fin.tip[0]-.25*fin.tipChord)<1e-12);
+    assert.equal(h.root[1],fin.tip[1]);assert.equal(h.root[2],fin.tip[2]);
+    assert.equal(h.tip[2],0);
+  }
+});
+test('combat V-tail retains requested physical surface span',()=>{
+  ctx.g={...base,tail_type:'vtail',tail_booms:{y:base.vtail_span*Math.cos(35*Math.PI/180)/2}};
+  const panels=run('aircraftPanelSpecs(g,coords,coords,coords)').filter(p=>p.kind==='tail');
+  for(const p of panels)assert.ok(Math.abs(Math.hypot(p.tip[1]-p.root[1],p.tip[2]-p.root[2])-base.vtail_span/2)<1e-12);
+});
+test('combat single motor preview sits behind the rear firewall',()=>{
+  ctx.g={...base,tail_booms:{y:.27}};ctx.settings={motorLayout:'single',motorDiameter:28,motorLength:30,motorPattern:'cross',motorSpacingY:16,motorSpacingZ:19,motorScrew:3,motorPlate:5,propDiameter:152,propOffset:8};
+  const m=run('motorPreviewSpecs(g,settings,[[new THREE.Vector3(0,0,0)],[new THREE.Vector3(.75,0,0)]])[0]');
+  assert.equal(m.axis[0],-1);assert.equal(m.face_mm[0],750);assert.equal(m.prop_plane_x_mm,788);
+});

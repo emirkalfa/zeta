@@ -143,10 +143,20 @@ function setupFuseLibrary() {
       <span class="fuse-preset-top"><strong>${p.name}</strong><span class="fuse-preset-check" aria-hidden="true">✓</span></span>
       ${fusePresetThumbnail(id)}<span class="fuse-preset-tag">${p.tag}</span>
     </button>`).join('');
-  document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => {
+  document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', async () => {
+    if($('calculateBtn').disabled)return;
+    const previous=state.fusePreset;
     state.fusePreset = button.dataset.preset;
     setRadio('fuse_type', 'conventional');
     if (state.geometry) state.geometry.fuse_type = 'conventional';
+    if(state.fusePreset==='combat' || previous==='combat') {
+      setRadio('mission_profile',state.fusePreset==='combat'?'competition':'general');
+      updateMissionProfile();
+      if(state.fusePreset==='combat' && $('motorLayout').value==='none') {
+        $('motorLayout').value='single';$('motorLayout').dispatchEvent(new Event('change'));
+      }
+      if(state.geometry) {await calculateAll();switchTab('fuse');return;}
+    }
     updateFuselageViews();
   }));
   for (const [id, prop] of [['fuseWidthScale', 'fuseWidthScale'], ['fuseHeightScale', 'fuseHeightScale']]) {
@@ -418,6 +428,7 @@ function saveProject() {
 }
 
 function updateMissionProfile() {
+  if(radioValue('mission_profile','general')==='general' && state.fusePreset==='combat')state.fusePreset='atlas';
   $('competition-inputs').hidden = radioValue('mission_profile', 'general') !== 'competition';
 }
 
@@ -492,7 +503,8 @@ async function calculateAll() {
     showFormError('Motor gücü ve batarya enerjisi sıfırdan büyük olmalı.');
     return;
   }
-  const competition = radioValue('mission_profile', 'general') === 'competition';
+  const competition = radioValue('mission_profile', 'general') === 'competition' || state.fusePreset==='combat';
+  if(competition && fuse_type!=='manual')state.fusePreset='combat';
 
   const body = {
     wingspan, weight, airfoil_code, tail_type, fuse_type, manual_mode,

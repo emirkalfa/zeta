@@ -112,10 +112,10 @@ def test_manufacturing_http_api(coords):
     assert any(n.startswith('hatch') and n.endswith('.stl') for n in archive.namelist())
 
 
-def test_boom_layout_is_explicitly_rejected(coords):
-    data=request_data(coords,combat=True)
-    with pytest.raises(ManufacturingError,match='Çift bomlu'):
-        generate(data)
+def test_boom_layout_has_printable_connected_parts(coords):
+    parts,report,_=generate(request_data(coords,combat=True,preset='combat'))
+    assert {'boom_right','boom_left','tail_bridge'}<={p.name for p in parts}
+    assert len(report['booms'])==2
 
 @pytest.mark.parametrize('shape',['tapered','ste_tapered'])
 def test_vtail_and_tapered_wings_fit_default_bed_without_degenerate_faces(coords,shape):

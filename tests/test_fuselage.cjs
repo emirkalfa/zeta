@@ -37,7 +37,7 @@ function checkClosed(mesh) {
   return volume;
 }
 
-for (const id of ['atlas','seyir','akin']) test(`${id}: dimensions, preview/export match and closed meshes`, () => {
+for (const id of ['atlas','seyir','akin','combat']) test(`${id}: dimensions, preview/export match and closed meshes`, () => {
   ctx.geom = {...base, fuse_preset:id, fuse_type:'conventional'};
   const loft = run("buildFuselageSections(geom, 'conventional')");
   const keys = run('presetFuseKeys(geom, geom.fuse_preset)');

@@ -20,12 +20,15 @@ function aircraftPanelSpecs(g, wingCoords, hCoords, vCoords) {
   if (g.tail_booms) {
     const b=g.tail_booms, y=wy+b.y*Math.sin(rad(g.dihedral_angle)), a=rad(35);
     if (g.tail_type==='vtail') {
-      for (const s of [1,-1]) add(`tail_v_${s>0?'right':'left'}`, 'tail', [tx,y,s*b.y], [tx+b.y*vd,y+b.y*Math.tan(a),0], g.vtail_chord,vt,[0,Math.cos(a),s*Math.sin(a)],hCoords,'boom');
+      for (const s of [1,-1]) add(`tail_v_${s>0?'right':'left'}`, 'tail', [tx,y,s*b.y], [tx+b.y*vd,y+b.y*Math.tan(a),0], g.vtail_chord,vt,[0,Math.cos(a),s*Math.sin(a)],hCoords,`boom_${s>0?'right':'left'}`);
     } else {
       const fx=tx+g.htail_chord-g.vtail_chord;
-      for (const s of [1,-1]) add(`tail_vertical_${s>0?'right':'left'}`, 'tail', [fx,y,s*b.y], [fx+vs*vd,y+vs,s*b.y],g.vtail_chord,vt,[0,0,1],vCoords,'boom');
+      for (const s of [1,-1]) add(`tail_vertical_${s>0?'right':'left'}`, 'tail', [fx,y,s*b.y], [fx+vs*vd,y+vs,s*b.y],g.vtail_chord,vt,[0,0,1],vCoords,`boom_${s>0?'right':'left'}`);
       const top=g.tail_type==='ttail';
-      horizontal(top?fx+vs*vd+vt-g.htail_chord:tx,top?y+vs:y,b.y,g.htail_chord,g.htail_chord,top?'fin':'boom');
+      if(top)for(const s of [1,-1])add(`tail_horizontal_${s>0?'right':'left'}`,'tail',
+        [fx+vs*vd+.25*(vt-g.htail_chord),y+vs,s*b.y],
+        [fx+vs*vd+.25*(vt-g.htail_chord)+b.y*hd,y+vs,0],g.htail_chord,g.htail_chord,[0,1,0],hCoords,`tail_vertical_${s>0?'right':'left'}`);
+      else horizontal(tx,y,b.y,g.htail_chord,g.htail_chord,'tail_bridge');
     }
   } else if (g.tail_type==='vtail') {
     const a=rad(35), span=vs/2;
@@ -71,12 +74,15 @@ function motorPreviewSpecs(g,settings,sections) {
     (settings.motorPattern==='rectangle'?Math.hypot(settings.motorSpacingY/2,settings.motorSpacingZ/2):Math.max(settings.motorSpacingY,settings.motorSpacingZ)/2)+(settings.motorScrew+.3)/2+3,
     ((settings.motorBore??8)+.3)/2+(settings.motorWire??6)+4);
   let faces=[];
-  if(settings.motorLayout==='single')faces=[{parent:'body',face_mm:[sections[0][0].x*1000,sections[0].reduce((n,p)=>n+p.y,0)/sections[0].length*1000,0]}];
+  if(settings.motorLayout==='single') {
+    const ring=g.tail_booms?sections[sections.length-1]:sections[0];
+    faces=[{parent:'body',axis:g.tail_booms?[-1,0,0]:[1,0,0],face_mm:[ring[0].x*1000,ring.reduce((n,p)=>n+p.y,0)/ring.length*1000,0]}];
+  }
   else for(const p of aircraftPanelSpecs(g,[],[],[]).filter(p=>p.kind==='wing')) {
     const s=settings.motorStation/100,le=p.root.map((v,i)=>(v+(p.tip[i]-v)*s)*1000);
     faces.push({parent:p.name,face_mm:[le[0]-20,le[1]-settings.motorDiameter*.35,le[2]]});
   }
-  return faces.map(p=>({...p,motor_diameter_mm:settings.motorDiameter,motor_length_mm:settings.motorLength,prop_diameter_mm:settings.propDiameter,prop_plane_x_mm:p.face_mm[0]-settings.motorLength-(settings.propOffset??8),plate_radius_mm:radius,plate_thickness_mm:settings.motorPlate}));
+  return faces.map(p=>({...p,motor_diameter_mm:settings.motorDiameter,motor_length_mm:settings.motorLength,prop_diameter_mm:settings.propDiameter,prop_plane_x_mm:p.face_mm[0]-(p.axis?.[0]??1)*(settings.motorLength+(settings.propOffset??8)),plate_radius_mm:radius,plate_thickness_mm:settings.motorPlate}));
 }
 function manufacturingPayload() {
   if (!checkGeom()) throw new Error('Önce Hesapla düğmesine basın.');

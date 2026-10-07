@@ -97,12 +97,21 @@ Bu modeller üretim ve uçuş doğrulaması yapılmış uçaklar değil, düzenl
 
 ## Yarışma İHA'ları (Savaşan İHA vb.)
 
-Parametreler adımında görev profilini **Yarışma İHA'sı** yapınca uçak, klasik model uçaktan farklı bir yerleşimle boyutlandırılır:
+Gövde modellerinden **Savaşan İHA** seçilebilir. Bu seçim yarışma yerleşimini
+yeniden hesaplar; tek motor seçildiğinde bağlantı plakası gövdenin arkasındadır.
+Parametreler adımındaki **Yarışma İHA'sı** profili de bu modeli seçer:
 
 - **İtici pervane ve boş burun:** motor kısa gövdenin arkasındadır; burun, hedef takibi kamerası için ayrılır.
-- **Çift bom:** kuyruk, kanada bağlı iki karbon boruyla taşınır. Bom uzunluğu ve çapı Ölçüler adımında verilir.
+- **Çift bom:** kanat soketlerine vida/somunla takılan iki içi boş, parçalı baskı bomu. Bom uzunluğu ve çapı Ölçüler adımında verilir; dilimler iç geçmelerle hizalanıp yapıştırılır.
 - **Kuyruk:** bomlar arasında dikdörtgen yatay kuyruk ve ikiz dikey kuyruk. Kuyruk tipi V seçilirse bomları birleştiren ters V kuyruk kullanılır.
 - **Manevra için boyutlandırma:** daha düşük açıklık oranı (6) ve daha büyük kanatçıklar.
+
+Gövde üst kapağı, kanat–gövde anahtar/soketleri, kanat–bom bağlantıları,
+üç kuyruk türünün taşıyıcıları ve vida/somun yuvaları gerçek 3D önizleme ile STL
+ZIP'ine dahildir. T kuyruk iki finin ucuna, V kuyruk doğrudan bom yuvalarına
+takılır. Çift kanat motoru seçilirse sökülebilir motor servis kapakları da eklenir.
+Motor, pervane, vidalar ve somunlar satın alınır. Baskı bomlarının yük/dayanım
+kontrolü fiziksel olarak yapılmalıdır; yarışma yerleşimi bir uçuş onayı değildir.
 
 ![Yarışma İHA'sı yerleşimi](docs/screenshot-iha.png)
 

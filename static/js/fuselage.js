@@ -1,5 +1,12 @@
 /* ZETA original fuselage families. Dimensions are normalized, never imported meshes. */
 const FUSELAGE_PRESETS = {
+  combat: {
+    name: 'Savaşan İHA', tag: 'Çift bom · arkadan itici motor',
+    description: 'Kısa ekipman gövdesi, geniş arka motor plakası ve iki kuyruk bomu.',
+    exponent: 2.5, width: 1.3, height: 1.4,
+    stations: [[0,.20,.25,0],[.08,.52,.56,.02],[.22,.88,.92,.04],
+      [.38,1,1,.03],[.56,.95,.88,0],[.72,.78,.72,0],[.87,.57,.59,0],[1,.45,.50,0]],
+  },
   atlas: {
     name: 'Atlas', tag: 'Geniş ekipman gövdesi',
     description: 'Dolgun ön hacim, yuvarlatılmış omuzlar ve ince kuyruk geçişi.',

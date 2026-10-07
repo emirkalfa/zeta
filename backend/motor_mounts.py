@@ -32,9 +32,11 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
             wire_center=candidate.tolist();break
     if wire_center is None:raise ManufacturingError('Kablo deliği ile motor vidaları için yeterli alan yok. Motor/plaka ve delik ölçülerini kontrol edin.')
     rings=np.asarray(data['fuselage']);poses=[];obstacles=[];body_cuts=[]
+    pusher=bool(data['geometry'].get('tail_booms'))
     if layout=='single':
-        x=float(rings[0,:,0].mean());y=float(rings[0,:,1].mean())
-        poses.append(('motor_nose','body',[x,y,0],x+thickness))
+        ring=rings[-1] if pusher else rings[0]
+        x=float(ring[:,0].mean());y=float(ring[:,1].mean())
+        poses.append(('motor_rear' if pusher else 'motor_nose','body',[x,y,0],x-thickness if pusher else x+thickness))
     else:
         for panel in data['panels']:
             if panel['kind']!='wing':continue
@@ -47,13 +49,15 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
     report=[];prop_disks=[];motor_envelopes=[]
     for name,parent,face,back in poses:
         x,y,z=face
-        drills=[cylinder((screw+gap)/2,thickness+2,[x-1,y+hy,z+hz],[1,0,0]) for hy,hz in holes]
-        center=cylinder((bore+gap)/2,thickness+2,[x-1,y,z],[1,0,0])
-        front_wire=cylinder(wire/2,thickness+2,[x-1,y+wire_center[0],z+wire_center[1]],[1,0,0])
+        direction=-1 if parent=='body' and pusher else 1
+        axis=[direction,0,0]
+        drills=[cylinder((screw+gap)/2,thickness+2,[x-direction,y+hy,z+hz],axis) for hy,hz in holes]
+        center=cylinder((bore+gap)/2,thickness+2,[x-direction,y,z],axis)
+        front_wire=cylinder(wire/2,thickness+2,[x-direction,y+wire_center[0],z+wire_center[1]],axis)
         if parent=='body':
             # Fill the true nose cross-section so a small motor plate cannot float
             # inside a wider hollow fuselage.
-            firewall=(outer^box([x-1,-10000,-10000],[x+thickness,10000,10000]))+cylinder(radius,thickness,face,[1,0,0])
+            firewall=(outer^box([min(x-direction,back),-10000,-10000],[max(x-direction,back),10000,10000]))+cylinder(radius,thickness,face,axis)
             obstacles.append(firewall);body=body+firewall
             for cut in drills+[center,front_wire]:body=body-cut;body_cuts.append(cut)
         else:
@@ -85,10 +89,10 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
                 fasteners.append([bx,bz])
             assemblies[parent]=combined
             if service_parts is not None:service_parts.append(Part(name+'_service_cover',cover,0,family='wing'))
-        prop_x=x-length-prop_offset
+        prop_x=x-direction*(length+prop_offset)
         prop_disks.append(cylinder(prop/2,2,[prop_x-1,y,z],[1,0,0]))
-        motor_envelopes.append(cylinder(diameter/2,length,[x-length,y,z],[1,0,0]))
-        report.append({'name':name,'parent':parent,'face_mm':face,'axis':[1,0,0],
+        motor_envelopes.append(cylinder(diameter/2,length,[x-direction*length,y,z],axis))
+        report.append({'name':name,'parent':parent,'face_mm':face,'axis':axis,
                        'motor_diameter_mm':diameter,'motor_length_mm':length,
                        'plate_thickness_mm':thickness,'plate_radius_mm':radius,
                        'hole_centers_yz_mm':holes,'hole_diameter_mm':screw+gap,
