@@ -98,3 +98,20 @@ test('combat single motor preview sits behind the rear firewall',()=>{
   const m=run('motorPreviewSpecs(g,settings,[[new THREE.Vector3(0,0,0)],[new THREE.Vector3(.75,0,0)]])[0]');
   assert.equal(m.axis[0],-1);assert.equal(m.face_mm[0],750);assert.equal(m.prop_plane_x_mm,788);
 });
+for(const tail of ['conventional','ttail'])test(`combat ${tail}: manual tip chord and actual tail area agree`,()=>{
+  ctx.g={...base,tail_type:tail,htail_chord:.2,htail_tip_chord:.08,htail_span:.6,tail_booms:{y:.3}};
+  const panels=run('aircraftPanelSpecs(g,coords,coords,coords)');
+  const horizontal=panels.filter(p=>p.name.startsWith('tail_horizontal_'));
+  assert.equal(horizontal.length,2);
+  let area=0;
+  for(const p of horizontal) {
+    assert.equal(p.tipChord,.08);
+    area+=(p.chord+p.tipChord)/2*Math.abs(p.tip[2]-p.root[2]);
+  }
+  assert.ok(Math.abs(area-(.2+.08)/2*.6)<1e-12);
+  if(tail==='conventional') {
+    const fin=panels.find(p=>p.name==='tail_vertical_right');
+    const h=horizontal.find(p=>p.name==='tail_horizontal_right');
+    assert.ok(Math.abs(fin.root[0]+fin.chord-h.tip[0]-h.tipChord)<1e-12);
+  }
+});

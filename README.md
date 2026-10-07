@@ -110,6 +110,13 @@ Gövde üst kapağı, kanat–gövde anahtar/soketleri, kanat–bom bağlantıla
 üç kuyruk türünün taşıyıcıları ve vida/somun yuvaları gerçek 3D önizleme ile STL
 ZIP'ine dahildir. T kuyruk iki finin ucuna, V kuyruk doğrudan bom yuvalarına
 takılır. Çift kanat motoru seçilirse sökülebilir motor servis kapakları da eklenir.
+Çift bomlu yerleşimler arayüzde H, üst köprülü Π ve ters V olarak belirtilir.
+Π ve ters V yüzeyleri ortada ayrı `tail_center_joint` parçasına iki geçme
+anahtarı ve vida/somunla takılır. Ters V tepesinde yüzeyler orta düzlemde
+birleşir; eğik uç kapakları birbirine çakışmaz. Manuel uç veterleri korunur,
+bom boruları son montaj yuvasında biter.
+H yerleşiminde dikey finler yatay kuyruğun uçlarındaki yuvalara takılır;
+bom boruları ve kelepçeleri için ayrılan boşluklar parçaların çakışmasını önler.
 Motor, pervane, vidalar ve somunlar satın alınır. Baskı bomlarının yük/dayanım
 kontrolü fiziksel olarak yapılmalıdır; yarışma yerleşimi bir uçuş onayı değildir.
 

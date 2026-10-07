@@ -429,7 +429,11 @@ function saveProject() {
 
 function updateMissionProfile() {
   if(radioValue('mission_profile','general')==='general' && state.fusePreset==='combat')state.fusePreset='atlas';
-  $('competition-inputs').hidden = radioValue('mission_profile', 'general') !== 'competition';
+  const combat=radioValue('mission_profile','general')==='competition';
+  $('competition-inputs').hidden = !combat;
+  const labels=combat?{conventional:'H kuyruk (ikiz fin)',ttail:'Π kuyruk (üst köprü)',vtail:'Ters V kuyruk'}:TAIL_TYPE_LABELS;
+  for(const input of document.querySelectorAll('input[name="tail_type"]'))if(input.nextElementSibling)input.nextElementSibling.textContent=labels[input.value];
+  $('tailLayoutHint').textContent=combat?'Çift bomlu modelde H, üst köprülü Π ve ters V yerleşimleri kullanılır. Π ve ters V ortasında ayrı vidalı bağlantı vardır.':'Klasik gövdede konvansiyonel, T ve V kuyruk yerleşimleri kullanılır.';
 }
 
 // Tipik bir yarışma İHA'sı için başlangıç değerleri (6S 10 Ah ≈ 222 Wh)
@@ -637,7 +641,7 @@ function displayResults(geom) {
       ['Alan', geom.htail_area, 'm²'],
       ['Kuyruk kolu', geom.htail_arm, 'm'],
       ['X pozisyonu', geom.tail_x_pos, 'm'],
-      ['Kuyruk tipi', TAIL_TYPE_LABELS[geom.tail_type] || 'Konvansiyonel', ''],
+      ['Kuyruk tipi', (geom.tail_booms?{conventional:'H kuyruk (ikiz fin)',ttail:'Π kuyruk (üst köprü)',vtail:'Ters V kuyruk'}:TAIL_TYPE_LABELS)[geom.tail_type] || 'Konvansiyonel', ''],
     ]],
     [manualFuse ? 'Gövde (özgün) ve denge' : 'Gövde ve denge', [
       ['Gövde uzunluğu', Number(fuse.length.toFixed(3)), 'm'],

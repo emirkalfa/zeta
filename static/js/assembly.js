@@ -22,13 +22,13 @@ function aircraftPanelSpecs(g, wingCoords, hCoords, vCoords) {
     if (g.tail_type==='vtail') {
       for (const s of [1,-1]) add(`tail_v_${s>0?'right':'left'}`, 'tail', [tx,y,s*b.y], [tx+b.y*vd,y+b.y*Math.tan(a),0], g.vtail_chord,vt,[0,Math.cos(a),s*Math.sin(a)],hCoords,`boom_${s>0?'right':'left'}`);
     } else {
-      const fx=tx+g.htail_chord-g.vtail_chord;
-      for (const s of [1,-1]) add(`tail_vertical_${s>0?'right':'left'}`, 'tail', [fx,y,s*b.y], [fx+vs*vd,y+vs,s*b.y],g.vtail_chord,vt,[0,0,1],vCoords,`boom_${s>0?'right':'left'}`);
+      const fx=g.tail_type==='ttail'?tx+g.htail_chord-g.vtail_chord:tx+b.y*hd+ht-g.vtail_chord;
+      for (const s of [1,-1]) add(`tail_vertical_${s>0?'right':'left'}`, 'tail', [fx,y,s*b.y], [fx+vs*vd,y+vs,s*b.y],g.vtail_chord,vt,[0,0,1],vCoords,`${g.tail_type==='ttail'?'boom':'tail_horizontal'}_${s>0?'right':'left'}`);
       const top=g.tail_type==='ttail';
       if(top)for(const s of [1,-1])add(`tail_horizontal_${s>0?'right':'left'}`,'tail',
         [fx+vs*vd+.25*(vt-g.htail_chord),y+vs,s*b.y],
-        [fx+vs*vd+.25*(vt-g.htail_chord)+b.y*hd,y+vs,0],g.htail_chord,g.htail_chord,[0,1,0],hCoords,`tail_vertical_${s>0?'right':'left'}`);
-      else horizontal(tx,y,b.y,g.htail_chord,g.htail_chord,'tail_bridge');
+        [fx+vs*vd+.25*(vt-g.htail_chord)+b.y*hd,y+vs,0],g.htail_chord,ht,[0,1,0],hCoords,`tail_vertical_${s>0?'right':'left'}`);
+      else horizontal(tx,y,b.y,g.htail_chord,ht,'tail_bridge');
     }
   } else if (g.tail_type==='vtail') {
     const a=rad(35), span=vs/2;
@@ -101,7 +101,7 @@ function showManufacturingPreview(data,focus=true) {
     const geo=new THREE.BufferGeometry();
     geo.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices.map(v=>v/1000),3));
     geo.setIndex(part.faces);geo.computeVertexNormals();
-    const color=part.name.includes('_service_cover')?0xef9353:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
+    const color=part.name.includes('tail_center_joint')?0x2a9d8f:part.name.includes('_service_cover')?0xef9353:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
     const mesh=new THREE.Mesh(geo,modelMaterial(color));mesh.userData.partName=part.name;
     if(part.name.includes('_service_cover'))mesh.visible=$('motorCoverView').checked;
     manufacturingOverlay.add(mesh);

@@ -24,8 +24,8 @@ def coords():
     return get('2412'),get('0012')
 
 
-def request_data(coords,tail='conventional',preset='atlas',combat=False,wing_shape='rectangular'):
-    g=calculate_geometry(1.5,1.2,'2412',tail_type=tail,wing_shape=wing_shape,wing_position='high',airframe='combat' if combat else 'standard')
+def request_data(coords,tail='conventional',preset='atlas',combat=False,wing_shape='rectangular',geometry=None):
+    g=geometry or calculate_geometry(1.5,1.2,'2412',tail_type=tail,wing_shape=wing_shape,wing_position='high',airframe='combat' if combat else 'standard')
     g.update(fuse_preset=preset,fuse_width_scale=1.,fuse_height_scale=1.)
     script='''const fs=require('fs'),vm=require('vm');const c=vm.createContext({THREE:require('./static/vendor/three.min.js'),window:{addEventListener(){}}});for(const f of ['fuselage.js','assembly.js'])vm.runInContext(fs.readFileSync('./static/js/'+f,'utf8'),c);const d=JSON.parse(fs.readFileSync(0,'utf8'));Object.assign(c,d);console.log(JSON.stringify(vm.runInContext('({geometry:g,panels:aircraftPanelSpecs(g,w,h,h),fuselage:libraryFuselageSections(g).sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000]))})',c)));'''
     out=subprocess.run(['node','-e',script],input=json.dumps({'g':g,'w':coords[0],'h':coords[1]}),text=True,capture_output=True,cwd=ROOT,check=True)

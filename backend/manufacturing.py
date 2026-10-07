@@ -225,6 +225,11 @@ def generate(data):
         booms=prepare_booms(g,assemblies,frames,cuts,wall,gap,screw,nf,nh)
     # Vertical fins first: T-tail horizontal sockets are fused to their parent fin.
     specs=sorted(specs,key=lambda p: ('horizontal' in p['name'],p['kind']!='wing'))
+    pending=specs.copy();specs=[];available={'body',*assemblies.keys()}
+    while pending:
+        ready=[p for p in pending if p.get('parent','body') in available]
+        if not ready:raise ManufacturingError('Kuyruk bağlantı sırası geçersiz; taşıyıcı bulunamadı.')
+        for p in ready:specs.append(p);available.add(p['name']);pending.remove(p)
     for spec in specs:
         name=spec['name']
         if not name.replace('_','').isalnum() or len(name)>50: raise ManufacturingError('Parça adı geçersiz.')
@@ -244,6 +249,7 @@ def generate(data):
             # A short central tail saddle prevents the two insertion tabs colliding.
             trim=20
         elif parent.startswith('boom_'):trim=float(g['tail_booms']['diameter'])*500+3
+        elif parent.startswith('tail_horizontal_'):trim=max(float(g['tail_booms']['diameter'])*500+10+gap,float(g['htail_tip_chord'])*80+3)
         if trim:
             panel=panel.trim_by_plane([0,0,1],trim)
         mating_envelope=section.offset(gap/2,circular_segments=24).extrude(length,scale_top=[tip/chord]*2)
@@ -304,7 +310,14 @@ def generate(data):
             body_obstacles.append(bridge+local_transform(support,mat)+world_sleeve+saddle)
         elif parent in assemblies:
             support=box([cx-keyw/2-3,-keyh/2-3,0],[cx+keyw/2+3,keyh/2+3,root]) if trim else sleeve
-            assemblies[parent]=(assemblies[parent]+local_transform(support,mat)+world_sleeve+saddle)-world_female-world_drill-world_nut
+            fixed=local_transform(support,mat)
+            if parent.startswith('tail_horizontal_'):
+                radius=float(g['tail_booms']['diameter'])*500;side=1 if mat[2,3]>0 else -1
+                x=float(mat[0,3]+cx);y=float(mat[1,3]);z=float(mat[2,3])
+                offsets=sorted([-side*(radius+3),-side*(radius+gap)])
+                fixed=fixed+box([x-keyw/2-3,y,z+offsets[0]],[x+keyw/2+3,y+root,z+offsets[1]])
+                fixed=fixed+box([x-keyw/2-3,y+radius+gap,z-radius-3],[x+keyw/2+3,y+root,z+radius+3])
+            assemblies[parent]=(assemblies[parent]+fixed+world_sleeve+saddle)-world_female-world_drill-world_nut
         elif parent=='boom' or parent=='fin':
             # Dedicated carrier rails for twin-boom arrangements.
             carrier=world_sleeve
@@ -351,6 +364,18 @@ def generate(data):
     if booms:
         from backend.twin_boom import install_boom_sockets
         install_boom_sockets(assemblies,cuts,booms,gap,screw,nf,nh)
+        if g['tail_type']=='conventional':
+            for boom in booms:
+                x,y,z=boom['center_mm'];radius=boom['outer_diameter_mm']/2
+                clearance=cylinder(radius+gap/2,boom['end_x_mm']-x+1,[x-.5,y,z],[1,0,0])
+                collar=assemblies['tail_bridge']^box([x,-10000,z-radius-5],[boom['end_x_mm']+20,10000,z+radius+5])
+                for name in assemblies:
+                    if not name.startswith(('tail_horizontal_','tail_vertical_')):continue
+                    assemblies[name]=assemblies[name]-clearance-collar
+                    for offset in [[gap/2,0,0],[-gap/2,0,0],[0,gap/2,0],[0,-gap/2,0],[0,0,gap/2],[0,0,-gap/2]]:
+                        assemblies[name]=assemblies[name]-collar.translate(offset)
+    from backend.tail_joints import install_tail_center_joint
+    center_parts=install_tail_center_joint(g,specs,assemblies,cuts,interfaces,gap,screw,nf,nh)
     motor_service_parts=[]
     body,motor_obstacles,motor_cuts,motors=install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,motor_service_parts)
     body_obstacles.extend(motor_obstacles);cuts['body'].extend(motor_cuts)
@@ -360,7 +385,7 @@ def generate(data):
             for tool in tools:body=body-tool
         elif owner in assemblies:
             for tool in tools:assemblies[owner]=assemblies[owner]-tool
-    parts=[Part('body',body,0,family='body'),Part('hatch',lid,0,family='hatch')]+motor_service_parts
+    parts=[Part('body',body,0,family='body'),Part('hatch',lid,0,family='hatch')]+motor_service_parts+center_parts
     for name,solid in assemblies.items():
         mat,trim,kind=frames[name]
         parts.append(Part(name,solid,0 if name.startswith('boom_') else 2,mat,kind))
@@ -377,6 +402,7 @@ def generate(data):
               'Bu kontrol uçuşa elverişlilik veya malzeme dayanımı onayı değildir.']
     if motors:notes+=['Motorlar ve pervaneler satın alınır; STL yalnız bağlantı taşıyıcılarını içerir. Vida boyunu motor üreticisine göre seçin; sargılara değmemelidir. Girilen ölçüleri gerçek motorla doğrulayın. Motor vidaları motorun metal dişlerine girer; plastik plakada geçme delikleri vardır.']
     if booms:notes+=['Savaşan İHA: bom kökleri kanat soketlerine girer ve enine vida/somunla tutulur. Bom dilimlerinin iç geçmelerini hizalayıp yapıştırın. Ayrı kuyruk köklerini yuvalarına takıp vidalayın. Yatay kuyruk köprüsünü iki bom üzerindeki vida/somunla sabitleyin. İtici motor arka gövde plakası üzerinden monte edilir; gövde dilimlerini yapıştırmadan önce vidalarını içeriden takın.']
+    if center_parts:notes+=['Kuyruk orta birleştirme parçası tail_center_joint ayrı STL olarak verilir. İki kuyruk ucunun anahtarlarını bu parçaya geçirin; iki vida ve somunla sabitleyin. Ters V tepesindeki yüzeyler orta düzleme göre birleşir; serbest uçlar birbirine yapıştırılarak bağlantısız bırakılmaz.']
     return parts,{'bed_mm':bed,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'hatch_bolts_mm':hatch_holes,'interfaces':interfaces,'spar_channels':spar_channels,'motors':motors,'booms':booms,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'part_cuts':cuts,'obstacles':body_obstacles}
 
 

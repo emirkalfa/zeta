@@ -229,12 +229,21 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         boom_y = vtail_span * np.cos(np.radians(35)) / 2 if tail_type=='vtail' else htail_span / 2
         chord_at_boom = root_chord * (1 - (boom_y / (wingspan / 2)) * (1 - taper_ratio))
         leading_at_boom=wing_x_pos+(root_chord-chord_at_boom if wing_shape=='ste_tapered' else boom_y*np.tan(np.radians(sweep_angle)))
+        # End at the actual last mounting saddle, rather than carrying unused
+        # tube all the way to the trailing edge of a broad V-tail root.
+        if tail_type=='vtail':
+            last_mount=tail_x_pos+.4*vtail_root_chord+min(.22*vtail_root_chord,.032)/2+.005
+        else:
+            fin_lead=tail_x_pos+htail_root_chord-vtail_root_chord if tail_type=='ttail' else tail_x_pos+boom_y*np.tan(np.radians(htail_sweep))+htail_tip_chord-vtail_root_chord
+            fin_mount=fin_lead+.4*vtail_root_chord+min(.22*vtail_root_chord,.032)/2+.005
+            bridge_mount=tail_x_pos+.4*htail_root_chord+.010
+            last_mount=bridge_mount if tail_type=='conventional' else fin_mount
         result['vtail_count'] = 1 if tail_type == 'vtail' else 2
         result['tail_booms'] = {
             'y': round(boom_y, 3),
             'x_start': round(leading_at_boom + 0.85 * chord_at_boom, 3),
-            'x_end': round(tail_x_pos + htail_root_chord, 3),
-            'length': round(tail_x_pos + htail_root_chord - leading_at_boom - .85*chord_at_boom, 3),
+            'x_end': round(last_mount, 3),
+            'length': round(last_mount - leading_at_boom - .85*chord_at_boom, 3),
             'diameter': round(max(0.012 * wingspan, 0.008), 3),
         }
 
