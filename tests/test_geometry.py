@@ -230,6 +230,29 @@ class TestControlSurfaces:
 
 
 class TestConfigPassthrough:
+    @pytest.mark.parametrize('wing_shape',['rectangular','tapered','ste_tapered'])
+    @pytest.mark.parametrize('airframe',['standard','combat'])
+    def test_vtail_meets_both_equivalent_area_targets(self,wing_shape,airframe):
+        g=calculate_geometry(1.5,2.5,'2412',tail_type='vtail',wing_shape=wing_shape,airframe=airframe)
+        physical=(g['vtail_chord']+g['vtail_tip_chord'])*g['vtail_span']/2
+        assert physical == pytest.approx(g['vtail_surface_area'],abs=1e-6)
+        assert g['htail_effective_area'] == pytest.approx(g['vtail_surface_area']*np.cos(np.radians(35))**2,abs=1e-6)
+        assert g['vtail_effective_area'] == pytest.approx(g['vtail_surface_area']*np.sin(np.radians(35))**2,abs=1e-6)
+        vh=g['htail_effective_area']*g['htail_arm']/(g['wing_area']*g['mac'])
+        vv=g['vtail_effective_area']*g['htail_arm']/(g['wing_area']*g['wingspan'])
+        assert vh >= .70*.995
+        assert vv >= .045*.995
+        assert g['vtail_panel_area']*2 == pytest.approx(g['vtail_surface_area'],abs=1e-6)
+
+    def test_manual_vtail_preserves_physical_panel_dimensions(self):
+        g=calculate_geometry(1.5,2.5,'2412',tail_type='vtail',manual_mode=True,
+                             man_vtail_span=.72,man_vtail_root=.25,man_vtail_tip=.13)
+        assert g['vtail_span']==.72
+        assert g['vtail_chord']==.25
+        assert g['vtail_tip_chord']==.13
+        assert g['vtail_surface_area']==pytest.approx(.1368)
+        assert g['vtail_sizing']=='manual'
+
     def test_manual_zero_angles_are_preserved(self):
         g = calculate_geometry(1.5, 2.5, '2412', manual_mode=True,
                                man_sweep=0, man_dihedral=0, man_htail_sweep=0)

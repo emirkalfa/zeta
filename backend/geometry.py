@@ -114,20 +114,41 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
             vtail_root_chord = 2 * vtail_area / (vtail_span * (1 + vtail_taper))
             vtail_tip_chord = vtail_root_chord * vtail_taper
 
-    # V-tail override: replaces both horizontal and vertical
+    # V-tail replaces both surfaces. At fixed 35 degrees meet both equivalent
+    # tail-volume targets, rather than assigning an arbitrary wing-area fraction.
     if tail_type == 'vtail':
         vgamma = np.radians(35)
         cos2 = np.cos(vgamma) ** 2
         sin2 = np.sin(vgamma) ** 2
-        vtail_span = 0.40 * wingspan
-        vtail_taper = 0.6
-        vtail_area = 0.20 * wing_area
-        vtail_root_chord = 2 * vtail_area / (vtail_span * (1 + vtail_taper))
-        vtail_tip_chord = vtail_root_chord * vtail_taper
+        target_h = .70 * wing_area * mac / max(htail_arm, .01)
+        target_v = .045 * wing_area * wingspan / max(htail_arm, .01)
+        manual_v = manual_mode and all(v is not None and float(v)>0 for v in
+                                       [man_vtail_span,man_vtail_root,man_vtail_tip])
+        if manual_v:
+            # Manual span means the combined span of both inclined panels.
+            vtail_span = float(man_vtail_span)
+            vtail_root_chord = float(man_vtail_root)
+            vtail_tip_chord = float(man_vtail_tip)
+            vtail_taper = vtail_tip_chord / vtail_root_chord
+            vtail_surface_area = (vtail_root_chord+vtail_tip_chord)*vtail_span/2
+        else:
+            vtail_span = round(0.40 * wingspan,3)
+            vtail_taper = 0.6
+            vtail_surface_area = max(target_h/cos2,target_v/sin2)
+            vtail_root_chord = np.ceil(2 * vtail_surface_area / (vtail_span * (1 + vtail_taper))*1000)/1000
+            vtail_tip_chord = np.ceil(vtail_root_chord * vtail_taper*1000)/1000
+        # Report areas from the same millimeter dimensions used by preview/STL.
+        vtail_span=round(vtail_span,3)
+        vtail_root_chord=round(vtail_root_chord,3)
+        vtail_tip_chord=round(vtail_tip_chord,3)
+        vtail_taper=vtail_tip_chord/vtail_root_chord
+        vtail_surface_area=(vtail_root_chord+vtail_tip_chord)*vtail_span/2
         htail_span = vtail_span * np.cos(vgamma)
-        htail_area = vtail_area * cos2
-        htail_root_chord = 2 * htail_area / (max(htail_span, 0.001) * (1 + vtail_taper))
-        htail_tip_chord = htail_root_chord * vtail_taper
+        htail_area = vtail_surface_area * cos2
+        vtail_area = vtail_surface_area * sin2
+        htail_root_chord = vtail_root_chord
+        htail_tip_chord = vtail_tip_chord
+        htail_taper = vtail_taper
 
     cg_position = 0.25 * mac
     span_efficiency = 0.85
@@ -197,6 +218,13 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     }
 
     result['airframe'] = 'combat' if combat else 'standard'
+    if tail_type == 'vtail':
+        result.update(vtail_angle=35.0,
+                      vtail_surface_area=round(vtail_surface_area,6),
+                      vtail_panel_area=round(vtail_surface_area/2,6),
+                      htail_effective_area=round(htail_area,6),
+                      vtail_effective_area=round(vtail_area,6),
+                      vtail_sizing='manual' if manual_v else 'equivalent_tail_volume')
     if combat:
         boom_y = htail_span / 2
         chord_at_boom = root_chord * (1 - (boom_y / (wingspan / 2)) * (1 - taper_ratio))
@@ -213,6 +241,8 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         wingspan, wing_area, root_chord, taper_ratio, htail_area, vtail_area,
         wing_shape, combat=combat,
     )
+    if tail_type == 'vtail':
+        result['control_surfaces']['ruddervator'] = {'area':round(vtail_surface_area*.30,4),'chord_ratio':.30}
     return result
 
 

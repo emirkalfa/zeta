@@ -9,7 +9,7 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
     S = geom['wing_area']
     AR = geom['aspect_ratio']
     mac = geom['mac']
-    htail_area = geom['htail_area']
+    htail_area = geom.get('htail_effective_area',geom['htail_area'])
     htail_arm = geom['htail_arm']
     cg = geom['cg_position']
 

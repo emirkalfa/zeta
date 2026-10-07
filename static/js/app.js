@@ -639,6 +639,22 @@ function displayResults(geom) {
     ]],
   ];
 
+  if (geom.tail_type === 'vtail') {
+    groups.splice(3,1);
+    groups[1] = ['V kuyruk (iki eğik yüzey)', [
+      ['Toplam eğik açıklık',geom.vtail_span,'m'],
+      ['Yatay izdüşüm açıklığı',geom.htail_span,'m'],
+      ['Eğim açısı',geom.vtail_angle ?? 35,'°'],
+      ['Kök veter',geom.vtail_chord,'m'],
+      ['Uç veter',geom.vtail_tip_chord,'m'],
+      ['Toplam fiziksel alan',geom.vtail_surface_area,'m²'],
+      ['Her bir yüzeyin alanı',geom.vtail_panel_area,'m²'],
+      ['Yatay etkin alan',geom.htail_effective_area,'m²'],
+      ['Dikey etkin alan',geom.vtail_effective_area,'m²'],
+      ['Kuyruk kolu',geom.htail_arm,'m'],
+    ]];
+  }
+
   if (geom.tail_booms) {
     groups.push(['Kuyruk bomları (karbon boru, 2 adet)', [
       ['Uzunluk', geom.tail_booms.length, 'm'],
@@ -652,8 +668,9 @@ function displayResults(geom) {
     groups.push(['Kontrol yüzeyi alanları', [
       ['Aileron', cs.aileron.area, 'm²'],
       ['Flap', cs.flap.area, 'm²'],
-      ['Elevator', cs.elevator.area, 'm²'],
-      ['Rudder', cs.rudder.area, 'm²'],
+      ...(geom.tail_type === 'vtail'
+        ? [['Ruddervator (iki yüzey toplam)',cs.ruddervator?.area ?? geom.vtail_surface_area*.3,'m²']]
+        : [['Elevator',cs.elevator.area,'m²'],['Rudder',cs.rudder.area,'m²']]),
     ]]);
   }
 

@@ -371,7 +371,9 @@ def printable_parts(parts,manifest,rings):
                 # Follow the actual cavity taper: a straight cylindrical lip can
                 # collide with the next slice on the narrowing aft fuselage.
                 lip_outer=[];lip_inner=[]
-                for x in [hi,hi+2,hi+4,hi+6]:
+                # A small overlap avoids float32 rounding separating the lip
+                # from the flange when a slice lands at a fractional millimeter.
+                for x in [hi-.25,hi+2,hi+4,hi+6]:
                     j=max(1,min(len(cavity_rings)-1,int(np.searchsorted(cavity_rings[:,0,0],x))))
                     a,b=cavity_rings[j-1],cavity_rings[j]
                     ring=a+(b-a)*((x-a[0,0])/(b[0,0]-a[0,0]));ring[:,0]=x
