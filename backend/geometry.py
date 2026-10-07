@@ -18,6 +18,18 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     burun kameraya ayrılır, kısa gövde (pod) kanada bağlanır, kuyruk iki bomla taşınır."""
     combat = airframe == "combat"
     if manual_mode:
+        defaults=calculate_geometry(wingspan,weight,airfoil_code,wing_position,tail_type,
+                                    wing_shape=wing_shape,airframe=airframe)
+        # Missing manual dimensions inherit the auto design rather than zero-area tails.
+        man_root_chord=defaults['root_chord'] if man_root_chord is None else man_root_chord
+        man_tip_chord=defaults['tip_chord'] if man_tip_chord is None else man_tip_chord
+        man_htail_span=defaults['htail_span'] if man_htail_span is None else man_htail_span
+        man_htail_root=defaults['htail_chord'] if man_htail_root is None else man_htail_root
+        man_htail_tip=defaults['htail_tip_chord'] if man_htail_tip is None else man_htail_tip
+        man_vtail_span=defaults['vtail_span'] if man_vtail_span is None else man_vtail_span
+        man_vtail_root=defaults['vtail_chord'] if man_vtail_root is None else man_vtail_root
+        man_vtail_tip=defaults['vtail_tip_chord'] if man_vtail_tip is None else man_vtail_tip
+    if manual_mode:
         root_chord = float(man_root_chord or 0.2)
         tip_chord = float(man_tip_chord or 0.1)
         sweep_angle = float(5.0 if man_sweep is None else man_sweep)
@@ -166,7 +178,10 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         fuse_diameter = 0.09 * wingspan
     nose_length = 2.0 * fuse_diameter
     tailcone_length = 3.5 * fuse_diameter
-    cylindrical_length = fuse_length - nose_length - tailcone_length
+    if nose_length+tailcone_length>fuse_length:
+        ratio=fuse_length/(nose_length+tailcone_length)
+        nose_length*=ratio;tailcone_length*=ratio
+    cylindrical_length = max(0.,fuse_length - nose_length - tailcone_length)
     fuse_max_width = fuse_diameter
     fuse_max_height = fuse_diameter
 
@@ -246,6 +261,26 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
             'length': round(last_mount - leading_at_boom - .85*chord_at_boom, 3),
             'diameter': round(max(0.012 * wingspan, 0.008), 3),
         }
+
+    def mean_chord(root,tip,span):
+        taper=tip/root
+        return (2/3)*root*(1+taper+taper*taper)/(1+taper), span/6*(1+2*taper)/(1+taper)
+    wing_mac,wing_y=mean_chord(result['root_chord'],result['tip_chord'],result['wingspan'])
+    wing_dx=(result['root_chord']-result['tip_chord'])*wing_y/(result['wingspan']/2) if result['straight_te'] else wing_y*np.tan(np.radians(result['sweep_angle']))
+    wing_ac=result['wing_x_pos']+wing_dx+.25*wing_mac
+    if tail_type=='vtail':
+        tail_mac,tail_y=mean_chord(result['vtail_chord'],result['vtail_tip_chord'],result['vtail_span'])
+        tail_ac=result['tail_x_pos']+tail_y*(np.cos(np.radians(35)) if combat else 1)*np.tan(np.radians(result['vtail_sweep']))+.25*tail_mac
+    else:
+        tail_mac,tail_y=mean_chord(result['htail_chord'],result['htail_tip_chord'],result['htail_span'])
+        tail_le=result['tail_x_pos']
+        if tail_type=='ttail':
+            if combat:tail_le+=result['htail_chord']-result['vtail_chord']
+            tail_le+=result['vtail_span']*np.tan(np.radians(result['vtail_sweep']))+.25*(result['vtail_tip_chord']-result['htail_chord'])
+        tail_ac=tail_le+tail_y*np.tan(np.radians(result['htail_sweep']))+.25*tail_mac
+    result['wing_ac_x']=round(float(wing_ac),6)
+    result['htail_ac_x']=round(float(tail_ac),6)
+    result['effective_tail_arm']=round(float(tail_ac-wing_ac),6)
 
     result['control_surfaces'] = calculate_control_surfaces(
         wingspan, wing_area, root_chord, taper_ratio, htail_area, vtail_area,

@@ -30,7 +30,7 @@ def request(path, payload=None):
     data = None if payload is None else json.dumps(payload).encode()
     req = urllib.request.Request(BASE + path, data=data, method="POST" if payload is not None else "GET",
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=10) as res:
+    with urllib.request.urlopen(req, timeout=120) as res:
         return res.status, res.read()
 
 
@@ -62,17 +62,35 @@ def main():
         assert version == expected, f"sürüm {version}, beklenen {expected}"
 
         for path in ["/", "/static/js/app.js", "/static/css/style.css",
+                     "/static/css/studio.css", "/static/js/help.js", "/static/references.html", "/static/zeta.ico",
                      "/static/vendor/three.min.js", "/static/vendor/fonts.css", "/static/favicon.svg"]:
             status, body = request(path)
             assert status == 200 and body, path
 
-        assert len(json.loads(request("/api/airfoils")[1])) >= 8, "profil veritabanı boş"
+        profiles=json.loads(request("/api/airfoils")[1])
+        assert {'0012','0015','2412','2415','4412','4415','6412'} <= {p['code'] for p in profiles}, "desteklenen NACA profilleri eksik"
         geom = json.loads(request("/api/calculate", {"wingspan": 2.0, "weight": 5.0, "airframe": "combat"})[1])
         assert geom["tail_booms"]["length"] > 0
         polars = json.loads(request("/api/analyze", {"geometry": geom})[1])
         assert polars["cl_vs_alpha"]
         mission = json.loads(request("/api/mission", {"geometry": geom, "motor_power": 1200, "battery_wh": 222})[1])
         assert mission["can_fly"]
+
+        # Optional production request captured by check_studio_ui.py verifies
+        # the real manufacturing extension and DLLs inside the frozen package.
+        if len(sys.argv) > 2:
+            import io, zipfile
+            payload=json.loads(Path(sys.argv[2]).read_text(encoding='utf-8'))
+            status, body=request('/api/manufacturing?mode=zip',payload)
+            archive=zipfile.ZipFile(io.BytesIO(body))
+            report=json.loads(archive.read('manifest.json'))
+            assert status==200 and report['parts']
+            for part in report['parts']:
+                assert all(size <= bed+.001 for size,bed in zip(part['size_mm'],report['bed_mm']))
+                content=archive.read(part['file'])
+                count=int.from_bytes(content[80:84],'little')
+                assert len(content)==84+count*50
+            print(f"Paketlenmiş üretim motoru: {len(report['parts'])} baskı parçası doğrulandı.",flush=True)
 
         # Masaüstü modu: sayfa kapandı bildirimi gelince süreç kendini sonlandırmalı
         assert json.loads(request("/api/heartbeat", {})[1])["desktop"] is True

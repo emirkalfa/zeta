@@ -24,7 +24,7 @@ const FUSE_DEFAULT_SHAPE = [
 ];
 const RESULT_TABS = ['results', 'viewer', 'fuse', 'charts', 'flight', 'mission', 'stl'];
 // Değeri olduğu gibi saklanıp geri yüklenen görev/güç alanları
-const MISSION_FIELDS = ['motorPower', 'batteryWh', 'avionicsPower', 'nLimit', 'targetEndurance', 'targetTurnRate', 'targetStall'];
+const MISSION_FIELDS = ['propEfficiency', 'motorPower', 'batteryWh', 'avionicsPower', 'nLimit', 'targetEndurance', 'targetTurnRate', 'targetStall'];
 // Bataryadan itkiye toplam verim (ESC · motor · pervane) için tipik değer
 const PROP_EFFICIENCY = 0.6;
 let wingPlacementRequest=0;
@@ -199,8 +199,6 @@ function syncFuseLibrary() {
   $('fuse-model-description').textContent = custom ? 'Kesitleri aşağıdan değiştirin. Her düzenleme iki 3D görünüme ve gövde çıktısına yansır.' : preset.description;
   $('fuse-preset-controls').hidden = custom;
   $('fuse-custom-details').hidden = !custom;
-  for (const id of ['stlFuseConv', 'stlFuseConvSliced']) $(id).disabled = custom;
-  for (const id of ['stlFuseManual', 'stlFuseManualSliced']) $(id).disabled = !custom;
   $('fuseWidthScale').value = Math.round(state.fuseWidthScale * 100);
   $('fuseHeightScale').value = Math.round(state.fuseHeightScale * 100);
   $('fuseWidthValue').textContent = '%' + Math.round(state.fuseWidthScale * 100);
@@ -483,11 +481,6 @@ function setupEventListeners() {
   $('stlWing').addEventListener('click', () => exportSTL('wing'));
   $('stlTail').addEventListener('click', () => exportSTL('tail'));
   $('stlFuseConv').addEventListener('click', () => exportFuselageSTL('conventional'));
-  $('stlFuseManual').addEventListener('click', () => exportFuselageSTL('manual'));
-  $('stlFuseConvSliced').addEventListener('click', () => exportSlicedFuselage('conventional'));
-  $('stlFuseManualSliced').addEventListener('click', () => exportSlicedFuselage('manual'));
-  $('stlWingSliced').addEventListener('click', exportSlicedWing);
-  $('stlTailSliced').addEventListener('click', exportSlicedTail);
   $('wallThickness').addEventListener('input', () => {
     state.wallThickness = parseFloat($('wallThickness').value) || 0;
   });
@@ -500,6 +493,11 @@ async function calculateAll() {
   const btn = $('calculateBtn');
   showFormError('');
 
+  if ($('paramForm').checkValidity && !$('paramForm').checkValidity()) {
+    const invalid=$('paramForm').querySelector(':invalid');
+    invalid?.closest('details')?.setAttribute('open','');
+    $('paramForm').reportValidity();return;
+  }
   const wingspan = parseFloat($('wingspan').value);
   const weight = parseFloat($('weight').value);
   if (!(wingspan > 0) || !(weight > 0)) {
@@ -515,6 +513,7 @@ async function calculateAll() {
   const manual_mode = radioValue('mode', 'auto') === 'manual';
   const reynolds_number = parseInt($('reynolds').value) || 200000;
   const motor_power = parseFloat($('motorPower').value);
+  const prop_efficiency = parseFloat($('propEfficiency')?.value ?? '60')/100;
   const battery_wh = parseFloat($('batteryWh').value);
   if (!(motor_power > 0) || !(battery_wh > 0)) {
     showFormError('Motor gücü ve batarya enerjisi sıfırdan büyük olmalı.');
@@ -554,11 +553,11 @@ async function calculateAll() {
       }),
       fetchAPI('/api/stability', {
         geometry: state.geometry, airfoil_code, tail_airfoil_code: htail_airfoil, reynolds_number,
-        motor_power, prop_efficiency: PROP_EFFICIENCY,
+        motor_power, prop_efficiency,
       }),
       fetchAPI('/api/mission', {
         geometry: state.geometry, airfoil_code, reynolds_number,
-        motor_power, battery_wh, prop_efficiency: PROP_EFFICIENCY,
+        motor_power, battery_wh, prop_efficiency,
         avionics_power: parseFloat($('avionicsPower').value) || 0,
         n_limit: parseFloat($('nLimit').value) || 4,
         targets: competition ? {
@@ -733,9 +732,9 @@ const STATUS = {
 };
 // Sınırlar backend/stability.py ile aynı olmalı
 const FLIGHT_CHECKS = {
-  stall_speed: { label: 'Stall hızı', unit: 'm/s', limit: '< 15 m/s' },
+  stall_speed: { label: 'Stall hızı', unit: 'm/s', limit: '15 m/s üzeri dikkat' },
   climb_rate: { label: 'Tırmanma oranı', unit: 'm/s', limit: '> 0 m/s' },
-  static_margin: { label: 'Statik marj', unit: '% MAC', limit: '%5 – %20 arası ideal' },
+  static_margin: { label: 'Statik marj', unit: '% MAC', limit: '%5–20 tasarım hedefi' },
 };
 
 function displayFlightTest(stab) {
@@ -822,7 +821,7 @@ function displayMission(m) {
       <p>Bu motor gücüyle uçak düz uçuşu sürdüremiyor. Motor gücünü artırın ya da ağırlığı azaltın.</p>
     </div></div>`;
   } else if (m.checks) {
-    const failed = m.checks.filter(c => c.status === 'fail').length;
+    const failed = m.checks.filter(c => c.status !== 'pass').length;
     const rows = m.checks.map(c => {
       const def = MISSION_TARGETS[c.key];
       const st = STATUS[c.status];

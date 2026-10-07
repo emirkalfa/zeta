@@ -11,7 +11,7 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
     AR = geom['aspect_ratio']
     mac = geom['mac']
     htail_area = geom.get('htail_effective_area',geom['htail_area'])
-    htail_arm = geom['htail_arm']
+    htail_arm = geom.get('effective_tail_arm',geom['htail_arm'])
     cg = geom['cg_position']
 
     # Cl_max
@@ -76,6 +76,9 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
     elif static_margin > 0.20:
         stability_status = "Aşırı stabil (manevra kabiliyeti düşük)"
         stability_level = 'warn'
+    elif static_margin > 0:
+        stability_status = "Pozitif marj, düşük kararlılık payı"
+        stability_level = 'warn'
     else:
         stability_status = "Kararsız"
         stability_level = 'fail'
@@ -88,7 +91,7 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
     elif V_stall < 15:
         stall = ('warn', "Stall hızı biraz yüksek")
     else:
-        stall = ('fail', "Stall hızı çok yüksek")
+        stall = ('warn', "Stall hızı yüksek; kalkış ve iniş hedefiyle karşılaştırın")
 
     if climb_rate > 5:
         climb = ('pass', "Tırmanma performansı mükemmel")
@@ -113,6 +116,7 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
 
     return {
         'validation_status': 'preliminary_unvalidated',
+        'effective_tail_arm': round(htail_arm,6),
         'tail_aspect_ratio': round(tail_ar,3),
         'tail_lift_curve_slope': round(a_t,4),
         'assumptions': ['CG is an input, not derived from component masses',

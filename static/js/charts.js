@@ -6,7 +6,7 @@ const CHART_DEFS = [
     id: 'ClAlpha', title: 'Kaldırma eğrisi', x: 'α (°)', y: 'CL',
     build(p) {
       const peak = maxBy(p.cl_vs_alpha, d => d.y);
-      return { points: p.cl_vs_alpha, note: `CL maks ${fmt(peak.y)} · α = ${fmt(peak.x)}°` };
+      return { points: p.cl_vs_alpha, note: `Görüntülenen tepe CL ${fmt(peak.y)} · α = ${fmt(peak.x)}°` };
     },
   },
   {

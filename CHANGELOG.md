@@ -4,6 +4,26 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-08
+
+### Added
+- Parametrelerin yanında açıklama ve NASA, MIT, UIUC kaynaklarını açan bilgi düğmeleri; uygulama içinde yöntem/varsayım sayfası.
+- Sadeleştirilmiş açık/koyu arayüz, katlanabilir gelişmiş ayarlar, mobil düzen ve özgün ZETA simgesi.
+- Windows paketinde Chrome/Edge uygulama penceresi; bulunamazsa varsayılan tarayıcı.
+- UIUC koordinatlarıyla yedi NACA profilinin geometrik karşılaştırması ve ek hesap doğrulama testleri.
+
+### Fixed
+- Azami hız hesabındaki sabit tarama tavanı kaldırıldı; güç eşitliğinin kökü çözülüyor.
+- Menzil için en uygun hız hesabına aviyonik tüketimi eklendi; erişilemeyen seyir hızları kullanılmıyor.
+- Kararlılıkta görüntülenen kanat/kuyruğun aerodinamik merkezleri arasındaki gerçek kol kullanılıyor.
+- Boş manuel kuyruk alanları otomatik ölçüleri devralıyor; kısa gövdede negatif silindir uzunluğu oluşmuyor.
+- Hedefe %10 yakın sonuç artık hedef karşılandı sayılmıyor. Düşük pozitif statik marj ve yüksek stall hızı tek başına uçuş imkânsızlığı diye sunulmuyor.
+- Geçersiz sayısal API girdileri anlaşılır hatayla reddediliyor. 1 g dönüş yarıçapında sonsuz JSON değeri üretilmiyor.
+- Kullanılmayan eski dilimleme düğmeleri ve tekrarlanan indirme onayı kaldırıldı.
+
+### Scope
+- Grafikler ve performans sonuçları teorik ön değerlendirmedir. Şekle özel deneysel polar, yapısal dayanım ve gerçek uçuş doğrulaması içermez.
+
 ## [2.0.0] - 2026-10-03
 
 ### Added

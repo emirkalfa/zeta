@@ -33,7 +33,8 @@ def test_endurance_scales_with_battery(default_geom, airfoil_props_2412):
 def test_avionics_load_shortens_endurance(default_geom, airfoil_props_2412):
     bare = mission_performance(default_geom, airfoil_props_2412, 600, 100)
     loaded = mission_performance(default_geom, airfoil_props_2412, 600, 100, avionics_power=30)
-    assert loaded['cruise_power'] == pytest.approx(bare['cruise_power'] + 30, abs=0.2)
+    assert loaded['cruise_speed'] >= bare['cruise_speed']
+    assert loaded['cruise_power'] >= bare['cruise_power'] + 30 - .2
     assert loaded['endurance_min'] < bare['endurance_min']
 
 

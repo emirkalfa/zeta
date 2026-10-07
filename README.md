@@ -28,7 +28,9 @@ Kurulum gerektirmeyen paketler [Releases](https://github.com/emirkalfa/zeta/rele
 | Linux (x86_64) | `ZETA-<sürüm>-linux-x86_64.AppImage` | `chmod +x ZETA-*.AppImage` sonra çift tıklayın ya da terminalden çalıştırın |
 | macOS (Apple Silicon) | `ZETA-<sürüm>-macos-arm64.zip` | Zip'i açın, `ZETA.app`'i Uygulamalar'a taşıyın |
 
-Uygulama varsayılan tarayıcınızda açılır; sekmeyi kapattığınızda kendiliğinden kapanır. Yeniden çift tıklarsanız çalışan kopya açılır.
+Windows'ta uygulama Chrome/Edge ile ayrı bir uygulama penceresinde açılır; bu tarayıcılar yoksa varsayılan tarayıcı kullanılır. Pencereyi kapattığınızda kendiliğinden kapanır. Yeniden çift tıklarsanız çalışan kopya açılır.
+
+2.1 sürümünde parametrelerin yanındaki küçük **i** düğmeleri açıklamaları, birimleri ve kaynakları açar. Gelişmiş ayarlar katlanabilir. [Yöntemler ve varsayımlar](static/references.html) hesapların kapsamını açıklar. Grafikler ve performans sonuçları teorik ön değerlendirmedir; gerçek uçuş onayı değildir.
 
 Paketler imzasız olduğu için ilk açılışta işletim sistemi uyarı gösterir:
 
@@ -73,12 +75,12 @@ Uygulama sekiz adımdan oluşur; ilk adımda **Hesapla**'ya basınca diğerleri 
 |------|----------|
 | **01 Parametreler** | Açıklık, ağırlık, profiller, kanat şekli/konumu, kuyruk ve gövde tipi, ağırlık merkezi, güç sistemi ve görev profili. Manuel modda kanat ve kuyruk ölçüleri elle girilebilir. |
 | **02 Ölçüler** | Hesaplanan kanat, kuyruk, gövde ve kontrol yüzeyi ölçüleri. |
-| **03 3D model** | Kontrol yüzeyleri işaretli, döndürülebilir uçak modeli. |
-| **04 Gövde** | Atlas, Seyir ve Akın gövde modelleri; canlı genişlik/yükseklik ayarı ve özgün kesit düzenleme. |
+| **03 3D model** | STL üretim motorunun ürettiği montajlı parçalar ve motor/pervane ölçü referansları. |
+| **04 Gövde** | Atlas, Seyir, Akın ve Savaşan İHA gövde modelleri; canlı genişlik/yükseklik ayarı ve özgün kesit düzenleme. |
 | **05 Analiz** | Kaldırma eğrisi, sürükleme poları, moment, verim ve açıklık boyunca kaldırma dağılımı. |
-| **06 Uçabilirlik** | Stall hızı, tırmanma ve statik kararlılık kriterleriyle uçabilir/uçamaz kararı. |
+| **06 Ön değerlendirme** | Stall hızı, tırmanma ve boylamsal statik kararlılığın yaklaşık denetimi; varsayımlarıyla birlikte yorumlanır. |
 | **07 Görev** | Azami hız, havada kalış, menzil ve dönüş performansı; yarışma hedefleriyle karşılaştırma. |
-| **08 STL indirme** | Kanat, kuyruk ve gövdeyi tek parça ya da dilimli olarak indirme. |
+| **08 STL indirme** | Montaj parçalarını ayrı STL dosyaları içeren ZIP olarak indirme; büyük parçaları girilen yazıcı hacmine göre otomatik bölme. |
 
 Girilen değerler tarayıcıda saklanır ve sayfa yeniden açıldığında geri yüklenir. Açık ve koyu tema vardır.
 

@@ -23,8 +23,19 @@ from backend.analysis import calculate_polars
 from backend.stability import flight_test
 from backend.mission import mission_performance
 
+from backend.validation import InputError, validate_request
+
 APP_NAME = 'zeta-aircraft-designer'
 app = Flask(__name__, static_url_path='')
+
+@app.errorhandler(InputError)
+def input_error(error):
+    return jsonify(error=str(error)),400
+
+@app.before_request
+def validate_inputs():
+    if request.endpoint in {'api_calculate','api_analyze','api_stability','api_mission'} and request.method=='POST':
+        validate_request(request.get_json(silent=True),request.endpoint)
 
 @app.errorhandler(UnsupportedAirfoilError)
 def unsupported_airfoil(error):
@@ -299,6 +310,20 @@ def _running_instance(host, port):
     return None
 
 
+def open_app_window(url):
+    import webbrowser,subprocess
+    if sys.platform=='win32' and DESKTOP_MODE:
+        candidates=[]
+        for base in [os.environ.get('PROGRAMFILES',''),os.environ.get('PROGRAMFILES(X86)',''),os.environ.get('LOCALAPPDATA','')]:
+            candidates += [os.path.join(base,'Google','Chrome','Application','chrome.exe'),
+                           os.path.join(base,'Microsoft','Edge','Application','msedge.exe')]
+        for browser in candidates:
+            if os.path.isfile(browser):
+                subprocess.Popen([browser,'--app='+url,'--window-size=1440,960'],creationflags=0x08000000)
+                return
+    webbrowser.open(url)
+
+
 def main():
     global DESKTOP_MODE
     import argparse
@@ -314,6 +339,7 @@ def main():
     parser.add_argument('--version', action='version', version=f'ZETA {APP_VERSION}')
     args = parser.parse_args()
 
+    DESKTOP_MODE = args.desktop
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
     # Debug modunda reloader süreci yeniden başlatır; port ve tarayıcı yalnızca ilk süreçte seçilir
     reloader_child = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
@@ -324,7 +350,7 @@ def main():
         existing = _running_instance(probe_host, args.port)
         if existing:
             if not args.no_browser:
-                webbrowser.open(existing)
+                open_app_window(existing)
             return
 
     port = args.port if reloader_child else _free_port(probe_host, args.port)
@@ -333,7 +359,7 @@ def main():
     if not reloader_child:
         print(f'ZETA v{APP_VERSION} çalışıyor: {url}  (durdurmak için Ctrl+C)')
         if not args.no_browser:
-            threading.Timer(1.0, webbrowser.open, args=(url,)).start()
+            threading.Timer(1.0, open_app_window, args=(url,)).start()
     if args.desktop:
         DESKTOP_MODE = True
         threading.Thread(target=_watchdog, daemon=True).start()
