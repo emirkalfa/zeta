@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from backend.geometry import calculate_geometry
-from backend.manufacturing import generate, package, printable_parts, ManufacturingError
+from backend.manufacturing import generate, package, printable_parts, panel_frame, ManufacturingError
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -55,6 +55,13 @@ def test_tail_assembly_and_package(coords,tail):
     assert (body^lid).volume()<1e-5
     # Part-to-parent interference is not allowed at assembled positions.
     named={p.name:p.solid for p in parts}
+    # Removable roots must not leave a missing center strip in the tail outline.
+    import manifold3d as md
+    for spec in data['panels']:
+        mat,_=panel_frame(spec)
+        if spec['kind']=='tail' and abs(mat[2,2])>.5:
+            probe=md.Manifold.cube([1,1,1],center=True).translate([spec['chord']*700,0,8]).transform(mat.tolist())
+            assert (named[spec.get('parent','body')]^probe).volume()>.9, 'fixed saddle completes tail center'
     for joint in manifest['interfaces']:
         parent=named.get(joint['parent'])
         if parent is not None:

@@ -66,7 +66,7 @@ jobs:
           done
 
       - name: Gövde geometrisi ve STL bütünlüğü
-        run: node --test tests/test_fuselage.cjs
+        run: node --test tests/test_fuselage.cjs tests/test_surfaces.cjs
 
   package:
     name: Paketleme

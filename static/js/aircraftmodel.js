@@ -45,7 +45,7 @@ function profileFunctions(coords) {
  * Tek bir taşıyıcı yüzey paneli (kanat yarısı, stabilize, dikey kuyruk…).
  * def: { rootLE, tipLE, rootChord, tipChord, up, coords, controls: [{ etaStart, etaEnd, chordRatio, color }] }
  * Veter +x yönündedir; `up` profil kalınlığının yönüdür. Kontrol yüzeyleri firar kenarında
- * ayrı renkli paneller olarak, ucu da yuvarlatılmış olarak üretilir.
+ * ayrı renkli paneller olarak üretilir; kök ve uç kesitlerinin düz kapakları vardır.
  */
 function buildSurface(group, def) {
   const prof = profileFunctions(def.coords);
@@ -111,11 +111,12 @@ function buildSurface(group, def) {
   // Flat, closed tips match the manufactured panel. Mirrored left panels need
   // reversed winding; otherwise their normals point inward despite DoubleSide.
   const caps = THREE.ShapeUtils.triangulateShape(loop.map(p => new THREE.Vector2(p.x,p.y)), []);
-  const main = partFor(-1);
+  // Caps use separate vertices so smoothing cannot bend the flat end visually.
+  const rootCap = partFor(-2), tipCap = partFor(-3);
   for (const tri of caps) {
-    main.idx.push(vertex(main,0,tri[2]),vertex(main,0,tri[1]),vertex(main,0,tri[0]));
+    rootCap.idx.push(vertex(rootCap,0,tri[2]),vertex(rootCap,0,tri[1]),vertex(rootCap,0,tri[0]));
     const end=stations.length-1;
-    main.idx.push(vertex(main,end,tri[0]),vertex(main,end,tri[1]),vertex(main,end,tri[2]));
+    tipCap.idx.push(vertex(tipCap,end,tri[0]),vertex(tipCap,end,tri[1]),vertex(tipCap,end,tri[2]));
   }
   const orientation = new THREE.Vector3(1,0,0).cross(def.up).dot(spanDir);
   if (orientation < 0) for (const p of parts.values()) {
@@ -126,7 +127,8 @@ function buildSurface(group, def) {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(part.verts, 3));
     geo.setIndex(part.idx);
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, modelMaterial(key === -1 ? MODEL_COLORS.airframe : controls[key].color));
+    const mesh = new THREE.Mesh(geo, modelMaterial(key < 0 ? MODEL_COLORS.airframe : controls[key].color));
+    mesh.userData.surfacePart = key === -2 ? 'root_cap' : key === -3 ? 'tip_cap' : 'skin';
     mesh.castShadow = true;
     group.add(mesh);
   }

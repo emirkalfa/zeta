@@ -15,6 +15,7 @@ function aircraftPanelSpecs(g, wingCoords, hCoords, vCoords) {
   const ht = g.htail_tip_chord ?? g.htail_chord * g.htail_taper;
   const horizontal = (x,y,span,rootChord,tipChord,parent) => {
     for (const s of [1,-1]) add(`tail_horizontal_${s>0?'right':'left'}`, 'tail', [x,y,0], [x+span*hd,y,s*span], rootChord,tipChord,[0,1,0],hCoords,parent);
+    if (parent === 'tail_vertical') for (const p of specs.slice(-2)) p.mountChordFraction=.25;
   };
   if (g.tail_booms) {
     const b=g.tail_booms, y=wy+b.y*Math.sin(rad(g.dihedral_angle)), a=rad(35);
@@ -31,7 +32,8 @@ function aircraftPanelSpecs(g, wingCoords, hCoords, vCoords) {
     for (const s of [1,-1]) add(`tail_v_${s>0?'right':'left'}`, 'tail', [tx,0,0], [tx+span*vd,span*Math.sin(a),s*span*Math.cos(a)],g.vtail_chord,vt,[0,Math.cos(a),-s*Math.sin(a)],hCoords);
   } else {
     add('tail_vertical','tail',[tx,0,0],[tx+vs*vd,vs,0],g.vtail_chord,vt,[0,0,1],vCoords);
-    horizontal(g.tail_type==='ttail'?tx+vs*vd+vt-g.htail_chord:tx,g.tail_type==='ttail'?vs:0,hs,g.htail_chord,ht,g.tail_type==='ttail'?'tail_vertical':'body');
+    // Align the quarter-chord of the stabilizer with the fin's tip quarter-chord.
+    horizontal(g.tail_type==='ttail'?tx+vs*vd+.25*(vt-g.htail_chord):tx,g.tail_type==='ttail'?vs:0,hs,g.htail_chord,ht,g.tail_type==='ttail'?'tail_vertical':'body');
   }
   return specs;
 }

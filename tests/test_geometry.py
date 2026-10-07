@@ -230,6 +230,13 @@ class TestControlSurfaces:
 
 
 class TestConfigPassthrough:
+    def test_manual_zero_angles_are_preserved(self):
+        g = calculate_geometry(1.5, 2.5, '2412', manual_mode=True,
+                               man_sweep=0, man_dihedral=0, man_htail_sweep=0)
+        assert g['sweep_angle'] == 0
+        assert g['dihedral_angle'] == 0
+        assert g['htail_sweep'] == 0
+
     @pytest.mark.parametrize("pos", ["low", "mid", "high"])
     def test_wing_position(self, pos):
         g = calculate_geometry(1.5, 2.5, "2412", wing_position=pos)

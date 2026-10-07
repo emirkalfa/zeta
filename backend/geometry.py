@@ -20,8 +20,8 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     if manual_mode:
         root_chord = float(man_root_chord or 0.2)
         tip_chord = float(man_tip_chord or 0.1)
-        sweep_angle = float(man_sweep or 5.0)
-        dihedral_angle = float(man_dihedral or 3.0)
+        sweep_angle = float(5.0 if man_sweep is None else man_sweep)
+        dihedral_angle = float(3.0 if man_dihedral is None else man_dihedral)
         taper_ratio = tip_chord / root_chord if root_chord > 0 else 0.5
         wing_area = (root_chord + tip_chord) / 2 * wingspan
         aspect_ratio = wingspan**2 / wing_area if wing_area > 0 else 7.0
@@ -75,7 +75,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         htail_span = float(man_htail_span or 0)
         htail_root_chord = float(man_htail_root or 0)
         htail_tip_chord = float(man_htail_tip or 0)
-        htail_sweep = float(man_htail_sweep or 3.0)
+        htail_sweep = float(3.0 if man_htail_sweep is None else man_htail_sweep)
         htail_taper = htail_tip_chord / htail_root_chord if htail_root_chord > 0 else 0.5
         htail_area = (htail_root_chord + htail_tip_chord) / 2 * htail_span if htail_span > 0 else 0
 

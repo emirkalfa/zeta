@@ -503,7 +503,8 @@ async function calculateAll() {
   };
   if (manual_mode) {
     for (const f of MANUAL_FIELDS) {
-      body['man_' + f] = parseFloat($('man_' + f).value) || undefined;
+      const manualValue = parseFloat($('man_' + f).value);
+      body['man_' + f] = Number.isFinite(manualValue) ? manualValue : undefined;
     }
   }
 

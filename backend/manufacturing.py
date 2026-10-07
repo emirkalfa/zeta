@@ -222,7 +222,7 @@ def generate(data):
                 shell=shell+(panel^box([-10000,-10000,z], [10000,10000,min(z+rt,length)]))
             panel=shell
         # Root beam carries a rectangular male key; socket/nut holder belong to the parent.
-        cx=chord*(.85 if parent=='tail_vertical' else .4)
+        cx=chord*float(spec.get('mountChordFraction',.85 if parent=='tail_vertical' else .4))
         keyw=min(chord*(.13 if parent=='tail_vertical' else .22),20 if parent=='tail_vertical' else 32)
         keyh=max(6,screw+3)
         depth=14 if spec['kind']=='wing' else 10
@@ -244,6 +244,13 @@ def generate(data):
         panel=panel-drill
         world_sleeve=local_transform(sleeve,mat);world_female=local_transform(female,mat)
         world_drill=local_transform(drill,mat);world_nut=local_transform(nut,mat)
+        # The fixed center saddle completes the tail outline between removable roots.
+        # Leave the same half-clearance at its edge as at the mating-envelope cut.
+        saddle=md.Manifold()
+        if spec['kind']=='tail' and trim and parent in ['body','tail_vertical']:
+            saddle_length=trim-gap/2
+            saddle_scale=1+(tip/chord-1)*saddle_length/length
+            saddle=local_transform(section.extrude(saddle_length,scale_top=[saddle_scale]*2),mat)
         cuts.setdefault(parent,[]).extend([world_female,world_drill,world_nut,local_transform(mating_envelope,mat)])
         world_panel=local_transform(panel,mat)
         if parent=='body':
@@ -257,10 +264,10 @@ def generate(data):
             yc=float(nearest[:,1].mean());half_h=float(np.ptp(nearest[:,1]))*.32;half_w=float(np.ptp(nearest[:,2]))*.32
             if spec['kind']=='wing':
                 bridge=bridge-box([center_x-3,yc-half_h,-half_w],[center_x+3,yc+half_h,half_w])
-            body=(body+bridge+local_transform(support,mat)+world_sleeve)-world_female-world_drill-world_nut
+            body=(body+bridge+local_transform(support,mat)+world_sleeve+saddle)-world_female-world_drill-world_nut
         elif parent in assemblies:
             support=box([cx-keyw/2-3,-keyh/2-3,0],[cx+keyw/2+3,keyh/2+3,root]) if trim else sleeve
-            assemblies[parent]=(assemblies[parent]+local_transform(support,mat)+world_sleeve)-world_female-world_drill-world_nut
+            assemblies[parent]=(assemblies[parent]+local_transform(support,mat)+world_sleeve+saddle)-world_female-world_drill-world_nut
         elif parent=='boom' or parent=='fin':
             # Dedicated carrier rails for twin-boom arrangements.
             carrier=world_sleeve
@@ -374,6 +381,11 @@ def printable_parts(parts,manifest,rings):
                     inside=ring.copy();inside[:,1:]-=direction*(gap/2+2.04)
                     lip_outer.append(outside);lip_inner.append(inside)
                 sleeve=mesh_solid(lip_outer,lip_outer[0][:,[1,2]])-mesh_solid(lip_inner,lip_inner[0][:,[1,2]])
+                # Saddles and internal brackets occupy some of the original cavity.
+                # Reserve their real material in the receiving slice as well.
+                sleeve=sleeve-local
+                for direction in ([0,gap/2,0],[0,-gap/2,0],[0,0,gap/2],[0,0,-gap/2]):
+                    sleeve=sleeve-local.translate(direction)
                 flange=(cs-cs.offset(-wall-2,circular_segments=32)).extrude(4).transform([[0,0,1,hi-4],[1,0,0,0],[0,1,0,0]])
                 # Entire flange/sleeve is one solid with the outgoing body slice.
                 piece=piece+flange+ sleeve
