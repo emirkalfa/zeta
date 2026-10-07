@@ -22,15 +22,15 @@ Herhangi bir adım başarısız olursa Release oluşturulmaz.
 
 Sürümün tek kaynağı `VERSION` dosyasıdır. `pyproject.toml`, `app.py` (`/api/version`), paket dosya adları ve arayüzdeki sürüm etiketi buradan okur.
 
-`2.1.0-rc.1` gibi tire içeren sürümler GitHub'da ön sürüm olarak işaretlenir.
+`3.0.0-rc.1` gibi tire içeren sürümler GitHub'da ön sürüm olarak işaretlenir.
 
 ## Adımlar
 
 ```bash
 # 1. Ana dal güncel ve temiz olsun
-git checkout main && git pull
+git checkout master && git pull --ff-only
 
-# 2. Sürümü yükselt: patch, minor, major ya da açık bir sürüm (ör. 2.1.0-rc.1)
+# 2. Sürümü yükselt: patch, minor, major ya da açık bir sürüm (ör. 3.0.0-rc.1)
 python scripts/bump_version.py minor
 ```
 
@@ -38,12 +38,12 @@ Betik `VERSION` dosyasını günceller, `CHANGELOG.md` içindeki `[Unreleased]` 
 
 ```bash
 # 3. CHANGELOG'daki yeni bölümü gözden geçir, yayın notlarını önizle
-python scripts/release_notes.py v2.1.0
+python scripts/release_notes.py v3.0.0
 
 # 4. Commit, etiket, push
-git commit -am "release: v2.1.0"
-git tag -a v2.1.0 -m "Release v2.1.0"
-git push origin HEAD v2.1.0
+git commit -am "release: v3.0.0"
+git tag -a v3.0.0 -m "Release v3.0.0"
+git push origin HEAD v3.0.0
 ```
 
 Etiket itildikten sonra Actions sekmesinde **Release** iş akışı çalışır. Bittiğinde Releases sayfasında şunlar bulunmalıdır:
@@ -70,15 +70,15 @@ python scripts/smoke_test.py dist/release/ZETA-*.AppImage
 **"etiket vX, VERSION dosyası Y" hatası:** etiket `VERSION` ile eşleşmiyor. Etiketi silin, sürümü düzeltin, yeniden etiketleyin:
 
 ```bash
-git tag -d v2.1.0
-git push origin :refs/tags/v2.1.0
-python scripts/bump_version.py 2.1.0
-git commit -am "release: v2.1.0"
-git tag -a v2.1.0 -m "Release v2.1.0"
-git push origin HEAD v2.1.0
+git tag -d v3.0.0
+git push origin :refs/tags/v3.0.0
+python scripts/bump_version.py 3.0.0
+git commit -am "release: v3.0.0"
+git tag -a v3.0.0 -m "Release v3.0.0"
+git push origin HEAD v3.0.0
 ```
 
-**"CHANGELOG.md içinde bölüm yok ya da boş" hatası:** başlık tam olarak `## [2.1.0] - YYYY-AA-GG` biçiminde olmalı ve altında en az bir satır bulunmalıdır.
+**"CHANGELOG.md içinde bölüm yok ya da boş" hatası:** başlık tam olarak `## [3.0.0] - YYYY-AA-GG` biçiminde olmalı ve altında en az bir satır bulunmalıdır.
 
 **Release oluşturulamıyor (403):** depo ayarlarında Settings → Actions → General → Workflow permissions altında yazma izni kapalı olabilir. `release.yml` yalnızca yayın işinde `contents: write` ister.
 

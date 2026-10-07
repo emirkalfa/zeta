@@ -4,6 +4,20 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-08
+
+### ZETA Studio
+- Yeni logolu, açık/koyu temalı sade arayüz; parametrelerin yanında birim, açıklama ve gerçek kaynakları açan bilgi düğmeleri.
+- Atlas, Seyir, Akın ve Savaşan İHA gövdeleri; kanat/kuyruk bağlantıları, ayrı gövde kapağı, ölçüye göre tek/çift BLDC motor montajları ve servis kapakları.
+- STL ile aynı üretim geometrisini gösteren 3D önizleme; yazıcı hacmine göre otomatik bölünen, ayrı STL dosyaları içeren montaj ZIP'i.
+- Kuyruk kolu, güç dengesi, azami hız ve menzil hesabı düzeltmeleri; girdi doğrulaması ve varsayımları açık teorik ön değerlendirme.
+- README güncel uygulama görüntüleri, doğrudan paket indirme bağlantıları ve ilk kullanım adımlarıyla yenilendi.
+- Windows, Linux ve macOS için indirilebilir paketleri ve SHA256 dosyasını üreten yayın hattı korundu.
+
+### Doğrulama ve kapsam
+- 312 Python ve 28 JavaScript testiyle geometri, montaj, hesap ve çıktı denetimleri; yedi NACA profilinin yayınlanmış UIUC koordinatlarıyla karşılaştırması.
+- Gerçek uçuş, baskı dayanımı veya ölçülmüş aerodinamik polar onayı değildir. Hareketli kontrol yüzeyleri/servo mekanizmaları bu sürümde tamamlanmamıştır.
+
 ## [2.1.0] - 2026-10-08
 
 ### Added
@@ -131,7 +145,8 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - MIT lisansı.
 - Karanlık mod, favicon, profil README.
 
-[Unreleased]: https://github.com/emirkalfa/zeta/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/emirkalfa/zeta/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/emirkalfa/zeta/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/emirkalfa/zeta/compare/v1.3.3...v2.0.0
 [1.2.3]: https://github.com/emirkalfa/zeta/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/emirkalfa/zeta/compare/v1.0.2...v1.2.2
