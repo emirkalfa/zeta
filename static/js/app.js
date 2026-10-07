@@ -744,7 +744,7 @@ function displayFlightTest(stab) {
     `<div class="verdict ${passed ? 'pass' : 'fail'}">
       <i class="ph ${passed ? 'ph-check-circle' : 'ph-x-circle'}"></i>
       <div>
-        <strong>${passed ? 'Uçabilir' : 'Uçamaz'}</strong>
+        <strong>${passed ? 'Ön hesap kriterleri karşılanıyor' : 'Ön hesap kriterleri karşılanmıyor'}</strong>
         <p>${summary}</p>
       </div>
     </div>

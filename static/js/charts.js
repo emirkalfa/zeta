@@ -18,8 +18,8 @@ const CHART_DEFS = [
     },
   },
   {
-    id: 'CmAlpha', title: 'Yunuslama momenti', x: 'α (°)', y: 'Cm',
-    build(p) { return { points: p.cm_vs_alpha, note: 'Ağırlık merkezi etrafında' }; },
+    id: 'CmAlpha', title: 'Kanat yunuslama momenti', x: 'α (°)', y: 'Cm',
+    build(p) { return { points: p.cm_vs_alpha, note: 'Yalnız kanat; kuyruk ve gövde momentleri dahil değil' }; },
   },
   {
     id: 'Eff', title: 'Aerodinamik verim', x: 'α (°)', y: 'CL/CD',
@@ -33,7 +33,7 @@ const CHART_DEFS = [
     build(p) {
       return {
         points: p.lift_distribution.map(d => ({ x: d.y, y: d.cl_local, z: d.chord })),
-        note: 'Yerel kaldırma katsayısı, α = 5°',
+        note: `Yerel kaldırma katsayısı, α = ${p.lift_distribution_alpha ?? 5}° · teorik`,
       };
     },
   },

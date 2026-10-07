@@ -1,4 +1,5 @@
 import numpy as np
+from backend.mission import mission_performance, PARASITE_CD0
 
 _GRADE_ICONS = {'pass': "✅", 'warn': "⚠️", 'fail': "❌"}
 
@@ -28,7 +29,7 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
     V_stall = np.sqrt(2 * W / (rho * S * cl_max))
 
     # Optimum Cl for max range (Cl_opt = sqrt(CD_0 * pi * AR * e))
-    cd_0 = airfoil_props['cd_0']
+    cd_0 = airfoil_props['cd_0'] + PARASITE_CD0
     e = 0.85
     cl_opt = np.sqrt(cd_0 * np.pi * AR * e)
 
@@ -43,8 +44,13 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
     # Mevcut güç: güç sistemi verilmişse ondan, yoksa 150 W/kg varsayımından
     power_avail = power_available if power_available is not None else geom['weight'] * 150
     power_req = D_cruise * V_cruise
-    excess_power = power_avail - power_req
-    climb_rate = excess_power / W if excess_power > 0 else 0
+    performance=mission_performance(geom,airfoil_props,power_avail,0,prop_efficiency=1,rho=rho)
+    V_cruise=performance['cruise_speed']
+    cl_opt=2*W/(rho*V_cruise**2*S)
+    cd_cruise=cd_0+cl_opt**2/(np.pi*AR*e)
+    D_cruise=.5*rho*V_cruise**2*S*cd_cruise
+    power_req=D_cruise*V_cruise
+    climb_rate=performance['climb_rate']
 
     # Static stability
     # Downwash gradient from lifting-line theory (Anderson Eq. 6.27):
@@ -52,7 +58,11 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
     # For typical AR=5-10, this gives 0.40-0.50, not 0.5 flat.
     v_h = (htail_area * htail_arm) / (S * mac)
     d_epsilon_d_alpha = 2.0 * cl_alpha_3d / (np.pi * AR)
-    a_t = tail_props['cl_alpha']
+    tail_area=geom.get('vtail_surface_area',htail_area)
+    tail_span=geom['vtail_span'] if geom.get('tail_type')=='vtail' else geom['htail_span']
+    tail_ar=tail_span**2/max(tail_area,.000001)
+    a_t_2d=tail_props['cl_alpha']
+    a_t=a_t_2d/(1+a_t_2d/(np.pi*max(tail_ar,.01)))
     np_position = 0.25 + v_h * (a_t / cl_alpha_3d) * (1 - d_epsilon_d_alpha)
 
     # CG at 25% MAC
@@ -102,6 +112,13 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
     ]
 
     return {
+        'validation_status': 'preliminary_unvalidated',
+        'tail_aspect_ratio': round(tail_ar,3),
+        'tail_lift_curve_slope': round(a_t,4),
+        'assumptions': ['CG is an input, not derived from component masses',
+                        'generic fuselage/interference drag allowance',
+                        'no structural or control-system validation',
+                        'no configuration-specific downwash or yaw/dynamic stability'],
         'stall_speed': round(V_stall, 2),
         'cruise_speed': round(V_cruise, 2),
         'climb_rate': round(climb_rate, 2),

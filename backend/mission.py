@@ -56,6 +56,12 @@ def mission_performance(geom, airfoil_props, motor_power, battery_wh,
     flyable = p_req <= P_avail
     can_fly = bool(flyable.any())
     v_max = float(speeds[flyable][-1]) if can_fly else 0.0
+    cruise_feasible = can_fly and float(power_required(v_best_range)) <= P_avail
+    if can_fly and not cruise_feasible:
+        # Report an attainable cruise point, not a speed outside the power envelope.
+        v_best_range=float(speeds[flyable][np.argmin(abs(speeds[flyable]-v_best_range))])
+    if can_fly:
+        v_min_power=float(speeds[flyable][np.argmin(abs(speeds[flyable]-v_min_power))])
     climb_rate = float(np.max(P_avail - p_req) / W) if can_fly else 0.0
 
     usable_wh = battery_wh * USABLE_BATTERY
@@ -100,6 +106,8 @@ def mission_performance(geom, airfoil_props, motor_power, battery_wh,
     ]
 
     result = {
+        'validation_status': 'preliminary_unvalidated',
+        'cruise_stall_margin_met': bool(can_fly and v_best_range >= 1.3*v_stall),
         'can_fly': can_fly,
         'stall_speed': round(v_stall, 2),
         'max_speed': round(v_max, 2),

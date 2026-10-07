@@ -1,6 +1,14 @@
 import numpy as np
 
+class UnsupportedAirfoilError(ValueError):
+    pass
+
+def validate_four_digit(code):
+    if not isinstance(code,str) or len(code)!=4 or not code.isdigit() or int(code[2:])==0:
+        raise UnsupportedAirfoilError('Yalnız dört haneli NACA profilleri destekleniyor. NACA 23012 için beş haneli profil modeli henüz doğrulanmadı.')
+
 def naca_4_digit_coordinates(code, n=150):
+    validate_four_digit(code)
     m = int(code[0]) / 100.0
     p = int(code[1]) / 10.0
     t = int(code[2:4]) / 100.0
@@ -35,8 +43,8 @@ def naca_4_digit_coordinates(code, n=150):
 def _cd_0_at_re(Re, t, m):
     """Profile drag at design Re using flat-plate skin friction analogy.
 
-    Reference formula calibrated at Re_ref = 3e6 (Abbott & von Doenhoff).
-    Scales with Re^(−0.3) for mixed boundary layer (Schlichting, Hoerner).
+    Heuristic reference at Re_ref = 3e6; not a fit to measured profile polars.
+    The Re^(−0.3) scaling is an approximation, not experimental validation.
     """
     Re = max(Re, 10000)
     Re_ref = 3000000
@@ -54,6 +62,7 @@ def _cl_max_at_re(Re, cl_max_base, t):
 
 
 def get_airfoil_properties(code, Re=200000):
+    validate_four_digit(code)
     m = int(code[0]) / 100.0
     p = int(code[1]) / 10.0
     t = int(code[2:4]) / 100.0
@@ -91,7 +100,7 @@ def get_airfoil_properties(code, Re=200000):
         cm_ac = 0.0
 
     # Empirical CL_max for NACA 4-digit at Re ~ 1e6 (smooth surface).
-    # Fits Abbott & von Doenhoff data within +/- 5%:
+    # This heuristic has not been calibrated to measured polars at the requested Re.
     #   thicker -> slightly lower, more camber -> higher.
     cl_max_base = 1.50 + 4.0 * m - 1.0 * max(t - 0.12, 0.0)
     cl_max = _cl_max_at_re(Re, cl_max_base, t)
@@ -105,6 +114,8 @@ def get_airfoil_properties(code, Re=200000):
     alpha_stall = alpha_stall_base * (1.0 - 0.2 * max(0, 1 - Re / 1000000))
 
     return {
+        'data_source': 'thin_airfoil_theory_and_uncalibrated_heuristics',
+        'experimental_validation': False,
         'max_camber': m,
         'camber_position': p,
         'max_thickness': t,

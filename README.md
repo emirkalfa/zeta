@@ -214,6 +214,26 @@ zeta/
 
 Sürüm notları [CHANGELOG.md](CHANGELOG.md), sürüm çıkarma adımları [RELEASING.md](RELEASING.md) dosyasındadır.
 
+## Hesap doğrulamasının sınırı
+
+Uçuş sonuçları ön değerlendirmedir; uçuşa uygunluk onayı değildir. Profil CD0,
+CLmaks ve stall sonrası davranış ölçülmüş polarlara kalibre edilmemiş yaklaşık
+modellerdir. Aerodinamik grafikler yalnız kanadı kapsar. Görev hesabında gövde,
+kuyruk ve girişim için genel bir sürükleme payı kullanılır; farklı gövde aileleri
+gerçek sürükleme açısından karşılaştırılamaz. Gerçek baskı ağırlığı, CG, tahrik,
+kumanda sistemi, trim, yaw/dinamik stabilite ve yapısal dayanım ayrıca doğrulanmalıdır.
+NACA 23012 beş haneli olduğundan dört haneli modelle kullanılmaz.
+
+Geliştirici bağımlılıkları ve Node.js ile standart model matrisi yeniden taranabilir:
+
+```sh
+python scripts/audit_aircraft.py --output audit-results
+```
+
+Bu tarama 1,5 m açıklıkta 3 gövde × 3 kanat × 3 kuyruk × 3 kanat konumunu,
+63 polar tutarlılık koşulunu ve 729 varsayımsal ağırlık/güç koşulunu kapsar.
+Serbest elle düzenlenen ölçülerin veya çift bomlu yarışma STL'sinin onayı değildir.
+
 ## Lisans
 
 [MIT](LICENSE)

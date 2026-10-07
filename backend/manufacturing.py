@@ -72,6 +72,36 @@ def mesh_solid(rings, planar):
     return out
 
 
+def printable_precision(solid,name):
+    """Weld sub-micron CSG slivers that collapse in float32 STL coordinates."""
+    mesh=solid.to_mesh();v=np.asarray(mesh.vert_properties)[:,:3];f=np.asarray(mesh.tri_verts)
+    t=v[f];area=np.linalg.norm(np.cross(t[:,1]-t[:,0],t[:,2]-t[:,0]),axis=1)
+    if np.min(area)>=1e-10:return solid
+    # One micron is well below the declared 0.02 mm mesh tolerance.
+    vertices,inverse=np.unique(np.round(v.astype(float),3),axis=0,return_inverse=True)
+    faces=inverse[f];t=vertices[faces]
+    area=np.linalg.norm(np.cross(t[:,1]-t[:,0],t[:,2]-t[:,0]),axis=1)
+    collapsed=faces[area<1e-10];faces=faces[area>=1e-10].tolist()
+    for tri in collapsed:
+        if len(set(tri))<3:continue
+        # A zero-width triangle may leave a T-junction on a neighboring edge.
+        # Split that neighboring face at the existing middle vertex.
+        a,b=max(((int(tri[i]),int(tri[(i+1)%3])) for i in range(3)),
+                key=lambda pair:np.linalg.norm(vertices[pair[0]]-vertices[pair[1]]))
+        middle=next(int(v) for v in tri if v not in [a,b])
+        matches=[i for i,face in enumerate(faces) if a in face and b in face]
+        if len(matches)!=1:raise ManufacturingError(f'{name}: çöken yüzeyin komşuluğu doğrulanamadı.')
+        index=matches[0];face=faces[index]
+        k=next(k for k in range(3) if {face[k],face[(k+1)%3]}=={a,b})
+        first,last,third=face[k],face[(k+1)%3],face[(k+2)%3]
+        faces[index]=[first,middle,third];faces.append([middle,last,third])
+    fixed=md.Manifold(md.Mesh(vertices.astype(np.float32),np.array(faces,dtype=np.uint32)))
+    if fixed.status()!=md.Error.NoError or abs(fixed.volume()-solid.volume())>max(.1,solid.surface_area()*.001):
+        raise ManufacturingError(f'{name}: STL hassasiyeti onarımı doğrulanamadı.')
+    check(fixed,name)
+    return fixed
+
+
 def check(solid, name, connected=True):
     if solid.status() != md.Error.NoError or solid.is_empty() or solid.volume() <= .001:
         raise ManufacturingError(f'{name}: geçerli baskı hacmi oluşturulamadı.')
@@ -189,7 +219,7 @@ def generate(data):
     body,lid,outer,rings,hatch_holes,hatch_opening,cavity_rings=make_fuselage(data,wall,gap,screw,nf,nh)
     specs=data['panels']
     if not 3<=len(specs)<=10: raise ManufacturingError('Kanat / kuyruk yüzeyleri eksik.')
-    assemblies={};frames={};notes=[];interfaces=[];spar_channels=[];cuts={'body':[hatch_opening]}
+    assemblies={};frames={};notes=[];interfaces=[];spar_channels=[];cuts={'body':[hatch_opening]};body_obstacles=[]
     # Vertical fins first: T-tail horizontal sockets are fused to their parent fin.
     specs=sorted(specs,key=lambda p: ('horizontal' in p['name'],p['kind']!='wing'))
     for spec in specs:
@@ -265,6 +295,7 @@ def generate(data):
             if spec['kind']=='wing':
                 bridge=bridge-box([center_x-3,yc-half_h,-half_w],[center_x+3,yc+half_h,half_w])
             body=(body+bridge+local_transform(support,mat)+world_sleeve+saddle)-world_female-world_drill-world_nut
+            body_obstacles.append(bridge+local_transform(support,mat)+world_sleeve+saddle)
         elif parent in assemblies:
             support=box([cx-keyw/2-3,-keyh/2-3,0],[cx+keyw/2+3,keyh/2+3,root]) if trim else sleeve
             assemblies[parent]=(assemblies[parent]+local_transform(support,mat)+world_sleeve+saddle)-world_female-world_drill-world_nut
@@ -329,7 +360,7 @@ def generate(data):
               'Kapak ve yüzey dilimleri kesit boyunca yapıştırılarak birleştirilir. Kanatta boru kanalları hizalamayı sağlar.',
               'Kontrol yüzeyleri bu pakette bütünleşik kabuktur; servo/menteşe mekanizması ayrıca tasarlanmalıdır.',
               'Bu kontrol uçuşa elverişlilik veya malzeme dayanımı onayı değildir.']
-    return parts,{'bed_mm':bed,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'hatch_bolts_mm':hatch_holes,'interfaces':interfaces,'spar_channels':spar_channels,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body']}
+    return parts,{'bed_mm':bed,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'hatch_bolts_mm':hatch_holes,'interfaces':interfaces,'spar_channels':spar_channels,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'obstacles':body_obstacles}
 
 
 def orthogonal_print(solid,bed):
@@ -338,7 +369,23 @@ def orthogonal_print(solid,bed):
     for perm in itertools.permutations(range(3)):
         dims=size[list(perm)]
         if np.all(dims<=np.array(bed)+.001): fits.append((dims[2],perm))
-    if not fits: raise ManufacturingError(f'Parça {np.round(size,1).tolist()} mm: {bed} mm yazıcı hacmine sığmıyor. Yazıcı ölçüsünü veya model boyutunu değiştirin.')
+    if not fits:
+        # Long thin panels can fit diagonally even when no axis permutation fits.
+        candidates=[]
+        for axis in range(3):
+            for angle in [15,30,45,60,75]:
+                angles=[0,0,0];angles[axis]=angle
+                tilted=solid.rotate(angles)
+                for perm in itertools.permutations(range(3)):
+                    rot=np.eye(3)[list(perm)]
+                    if np.linalg.det(rot)<0:rot[0]*=-1
+                    candidate=tilted.transform(np.column_stack([rot,[0,0,0]]).tolist())
+                    bounds=np.array(candidate.bounding_box());dims=bounds[3:]-bounds[:3]
+                    if np.all(dims<=np.array(bed)+.001):candidates.append((dims[2],candidate))
+        if candidates:
+            _,out=min(candidates,key=lambda c:c[0]);b=out.bounding_box()
+            return out.translate([-b[0],-b[1],-b[2]])
+        raise ManufacturingError(f'Parça {np.round(size,1).tolist()} mm: {bed} mm yazıcı hacmine sığmıyor. Yazıcı ölçüsünü veya model boyutunu değiştirin.')
     _,perm=min(fits)
     rot=np.eye(3)[list(perm)]
     if np.linalg.det(rot)<0:rot[0]*=-1
@@ -347,6 +394,7 @@ def orthogonal_print(solid,bed):
 
 
 def printable_parts(parts,manifest,rings):
+    obstacles=rings.get('obstacles',[])
     cavity_rings=rings['cavity'];cutters=rings['cuts'];rings=rings['outer']
     bed=manifest['bed_mm'];wall=manifest['wall_mm'];gap=manifest['clearance_mm'];result=[]
     # Conservative segment length also reserves room for the fuselage joining sleeve.
@@ -358,7 +406,9 @@ def printable_parts(parts,manifest,rings):
         b=local.bounding_box();start=b[p.axis];end=b[p.axis+3]
         count=max(1,math.ceil((end-start)/maxlen));step=(end-start)/count
         for i in range(count):
-            lo=start+i*step;hi=start+(i+1)*step
+            # Shared, quantized cut planes avoid float32 slivers at fractional cuts.
+            lo=start if i==0 else round(start+i*step,2)
+            hi=end if i==count-1 else round(start+(i+1)*step,2)
             low=[-10000]*3;high=[10000]*3;low[p.axis]=lo;high[p.axis]=hi
             piece=local^box(low,high)
             if p.name=='body' and i<count-1:
@@ -385,17 +435,20 @@ def printable_parts(parts,manifest,rings):
                 sleeve=mesh_solid(lip_outer,lip_outer[0][:,[1,2]])-mesh_solid(lip_inner,lip_inner[0][:,[1,2]])
                 # Saddles and internal brackets occupy some of the original cavity.
                 # Reserve their real material in the receiving slice as well.
-                sleeve=sleeve-local
-                for direction in ([0,gap/2,0],[0,-gap/2,0],[0,0,gap/2],[0,0,-gap/2]):
-                    sleeve=sleeve-local.translate(direction)
+                for obstacle in obstacles:
+                    sleeve=sleeve-obstacle
+                    for direction in ([0,gap/2,0],[0,-gap/2,0],[0,0,gap/2],[0,0,-gap/2]):
+                        sleeve=sleeve-obstacle.translate(direction)
                 flange=(cs-cs.offset(-wall-2,circular_segments=32)).extrude(4).transform([[0,0,1,hi-4],[1,0,0,0],[0,1,0,0]])
                 # Entire flange/sleeve is one solid with the outgoing body slice.
                 piece=piece+flange+ sleeve
                 for tool in cutters:piece=piece-tool
             name=p.name if count==1 else f'{p.name}_{i+1:02d}of{count:02d}'
             piece=piece.as_original().set_tolerance(.02).simplify(.02)
+            piece=printable_precision(piece,name)
             check(piece,name)
             printpiece=orthogonal_print(piece,bed)
+            printpiece=printable_precision(printpiece,name)
             check(printpiece,name)
             assembled=piece if p.frame is None else local_transform(piece,p.frame)
             result.append(Part(name,printpiece,family=p.family,assembled=assembled))

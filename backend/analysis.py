@@ -56,6 +56,7 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
 
         # Lift coefficient from Fourier coefficients (Anderson Eq. 5.53).
         CL = np.pi * ar * coeffs[0]
+        CL_linear = float(CL)
 
         # Induced drag from Fourier coefficients (Anderson Eq. 5.61).
         CDi = 0
@@ -97,7 +98,11 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
                 gamma += coeffs[n] * np.sin(k * theta)
             gamma *= 2 * b
             chord = chord_dist[i]
-            cl_local = 2 * gamma / (chord * b)
+            # gamma is circulation divided by airspeed (units of length).
+            # Kutta-Joukowski gives cl = 2*(Gamma/V)/chord.
+            # A global heuristic stall cap must also scale the displayed distribution.
+            scale = float(CL)/CL_linear if abs(CL_linear)>1e-12 else 1.0
+            cl_local = 2 * gamma / chord * scale
             y_pos = -b/2 * np.cos(theta)
             lift_dist.append({
                 'y': round(y_pos, 3),
@@ -122,6 +127,9 @@ def calculate_polars(geom, airfoil_props, max_alpha=20):
     results = lifting_line_analysis(geom, airfoil_props, max_alpha=max_alpha)
 
     polars = {
+        'model_scope': 'wing_only',
+        'experimental_validation': False,
+        'lift_distribution_alpha': 5.0,
         'cl_vs_alpha': [],
         'cd_vs_cl': [],
         'cm_vs_alpha': [],
@@ -135,13 +143,8 @@ def calculate_polars(geom, airfoil_props, max_alpha=20):
         polars['cm_vs_alpha'].append({'x': r['alpha'], 'y': r['Cm']})
         polars['efficiency'].append({'x': r['alpha'], 'y': r['CL_CD']})
 
-    for r in results:
-        if r['alpha'] == 5.0:
-            polars['lift_distribution'] = r['lift_distribution']
-            break
-
-    if not polars['lift_distribution'] and results:
-        mid = len(results) // 2
-        polars['lift_distribution'] = results[mid]['lift_distribution']
+    # Use a separate 5-degree solution: the plotted alpha grid need not contain 5.
+    distribution = lifting_line_analysis(geom,airfoil_props,max_alpha=5)[-1]
+    polars['lift_distribution'] = distribution['lift_distribution']
 
     return polars

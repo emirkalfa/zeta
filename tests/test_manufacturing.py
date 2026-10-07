@@ -117,6 +117,26 @@ def test_boom_layout_is_explicitly_rejected(coords):
     with pytest.raises(ManufacturingError,match='Çift bomlu'):
         generate(data)
 
+@pytest.mark.parametrize('shape',['tapered','ste_tapered'])
+def test_vtail_and_tapered_wings_fit_default_bed_without_degenerate_faces(coords,shape):
+    parts,manifest,rings=generate(request_data(coords,'vtail',wing_shape=shape))
+    archive=zipfile.ZipFile(io.BytesIO(package(parts,manifest,rings)))
+    report=json.loads(archive.read('manifest.json'))
+    for p in report['parts']:
+        assert np.all(np.array(p['size_mm'])<=np.array(report['bed_mm'])+.001)
+        assert_stl(archive.read(p['file']))
+
+@pytest.mark.parametrize('preset,shape,tail',[
+    ('seyir','ste_tapered','conventional'),
+    ('akin','tapered','vtail'),
+    ('akin','ste_tapered','vtail'),
+])
+def test_audited_fractional_cuts_have_no_float32_slivers(coords,preset,shape,tail):
+    parts,manifest,rings=generate(request_data(coords,tail,preset=preset,wing_shape=shape))
+    archive=zipfile.ZipFile(io.BytesIO(package(parts,manifest,rings)))
+    for filename in archive.namelist():
+        if filename.endswith('.stl'):assert_stl(archive.read(filename))
+
 
 @pytest.mark.parametrize('shape',['tapered','ste_tapered'])
 def test_tapered_wing_channels_stop_before_the_thin_edge(coords,shape):

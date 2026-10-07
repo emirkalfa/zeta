@@ -5,6 +5,8 @@ import numpy as np
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'zeta.db')
 
 def naca_4_digit_coordinates(code, n=150):
+    from backend.airfoil import validate_four_digit
+    validate_four_digit(code)
     m = int(code[0]) / 100.0
     p = int(code[1]) / 10.0
     t = int(code[2:4]) / 100.0
@@ -51,8 +53,7 @@ def seed(db_path=DB_PATH):
         ('NACA 2415', '2415', 2.0, 40.0, 15),
         ('NACA 0015', '0015', 0.0, 0.0, 15),
         ('NACA 4415', '4415', 4.0, 40.0, 15),
-        ('NACA 23012', '23012', 2.0, 30.0, 12),
-        ('NACA 6412', '6412', 6.0, 50.0, 12),
+        ('NACA 6412', '6412', 6.0, 40.0, 12),
     ]
 
     for name, code, camber, camber_pos, thickness in airfoils:
