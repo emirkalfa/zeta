@@ -1,9 +1,9 @@
 """Dimensioned BLDC firewalls and twin wing nacelles; motors/props are purchased parts."""
 import math
 import numpy as np
-from backend.manufacturing import number,box,cylinder,ManufacturingError
+from backend.manufacturing import number,box,cylinder,ManufacturingError,Part
 
-def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap):
+def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=None):
     options=data.get('options',{});layout=options.get('motorLayout','none')
     if layout not in ['none','single','twin']:raise ManufacturingError('Motor yerleşimi geçersiz.')
     if layout=='none':return body,[],[],[]
@@ -65,7 +65,26 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap):
             for cut in drills+[center,front_wire,cable]:pod=pod-cut
             if (pod^assemblies[parent]).volume()<1:
                 raise ManufacturingError(f'{name}: motor taşıyıcısı kanada bağlanamıyor. Motor konumunu veya ölçüsünü değiştirin.')
-            assemblies[parent]=(assemblies[parent]+pod)-cable
+            # Lower half-shell provides hand/tool access behind all four bolts.
+            start=x+thickness+2;end=back-4;seam=y-2
+            if end-start<18:raise ManufacturingError('Motor taşıyıcısı servis kapağı için çok kısa.')
+            opening=box([start,y-radius-5,z-radius-5],[end,seam,z+radius+5])
+            cover=(pod^box([start+gap,y-radius-5,z-radius-5],[end-gap,seam-gap,z+radius+5]))
+            combined=(assemblies[parent]+pod)-opening-cable
+            fasteners=[]
+            for side in [-1,1]:
+                bx=(start+end)/2;bz=z+side*(radius-3)
+                boss=box([bx-5,seam,bz-4],[bx+5,y+3,bz+4])
+                tab=box([bx-5,seam-9,bz-4],[bx+5,seam-gap,bz+4])
+                # Limit tabs to the nacelle outline; retain the curved outer shell.
+                tab=tab^cylinder(radius,10,[bx-5,y,z],[1,0,0])
+                drill=cylinder((3+gap)/2,20,[bx,seam-12,bz],[0,1,0])
+                nut=cylinder((5.5+gap)/math.sqrt(3),2.6,[bx,seam-.01,bz],[0,1,0],sides=6)
+                combined=(combined+boss)-drill-nut
+                cover=(cover+tab)-drill
+                fasteners.append([bx,bz])
+            assemblies[parent]=combined
+            if service_parts is not None:service_parts.append(Part(name+'_service_cover',cover,0,family='wing'))
         prop_x=x-length-prop_offset
         prop_disks.append(cylinder(prop/2,2,[prop_x-1,y,z],[1,0,0]))
         motor_envelopes.append(cylinder(diameter/2,length,[x-length,y,z],[1,0,0]))
@@ -79,7 +98,9 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap):
                        'prop_offset_mm':prop_offset,
                        'station_fraction':station if layout=='twin' else None,
                        'back_x_mm':back,
-                       'pattern':pattern})
+                       'pattern':pattern,
+                       'service_cover':name+'_service_cover' if parent!='body' else None,
+                       'service_screws':{'diameter_mm':3,'nut_flat_mm':5.5,'positions_xz_mm':fasteners,'axis':[0,1,0]} if parent!='body' else None})
     fixed_parts=[body,lid,*assemblies.values()]
     for i,disk in enumerate(prop_disks):
         if any((disk^part).volume()>.1 for part in fixed_parts):

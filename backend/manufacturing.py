@@ -343,7 +343,8 @@ def generate(data):
         assemblies[name]=world_panel;frames[name]=(mat,trim,spec['kind'])
         interfaces.append({'part':name,'parent':parent,'key_mm':[keyw,keyh,depth], 'bolt_axis':mat[:,1].tolist(),'bolt_point_mm':(mat[:,:3]@np.array([cx,0,screw_z])+mat[:,3]).tolist(),'diametral_clearance_mm':gap,'entry_lead_mm':lead,'entry_flare_per_side_mm':.6})
     from backend.motor_mounts import install_motor_mounts
-    body,motor_obstacles,motor_cuts,motors=install_motor_mounts(body,lid,assemblies,data,outer,wall,gap)
+    motor_service_parts=[]
+    body,motor_obstacles,motor_cuts,motors=install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,motor_service_parts)
     body_obstacles.extend(motor_obstacles);cuts['body'].extend(motor_cuts)
     # Adding the next socket/rib or motor pod must never fill existing bores.
     for owner,tools in cuts.items():
@@ -351,12 +352,13 @@ def generate(data):
             for tool in tools:body=body-tool
         elif owner in assemblies:
             for tool in tools:assemblies[owner]=assemblies[owner]-tool
-    parts=[Part('body',body,0,family='body'),Part('hatch',lid,0,family='hatch')]
+    parts=[Part('body',body,0,family='body'),Part('hatch',lid,0,family='hatch')]+motor_service_parts
     for name,solid in assemblies.items():
         mat,trim,kind=frames[name]
         parts.append(Part(name,solid,2,mat,kind))
     for p in parts:
         p.solid=p.solid.as_original().set_tolerance(.02).simplify(.02)
+        if motor_service_parts:p.solid=printable_precision(p.solid,p.name)
         check(p.solid,p.name)
     notes += ['Ölçüler örnek ayarlardır. Yazıcı / malzeme için tolerans kuponunu basın.',
               'Vida: metrik geçme delik + altıgen somun cebi; basılı diş veya ısı inserti kullanılmaz.',
@@ -497,6 +499,7 @@ def package(parts,manifest,rings,filter='all'):
             label={'body':'Gövde burnu','wing_right':'Sağ kanat','wing_left':'Sol kanat'}.get(motor['parent'],motor['parent'])
             text+=f"{label} motor montajı: motor Ø{motor['motor_diameter_mm']:g} × {motor['motor_length_mm']:g} mm; plaka {motor['plate_thickness_mm']:g} mm; vida geçme deliği Ø{motor['hole_diameter_mm']:g} mm; orta delik Ø{motor['center_bore_mm']:g} mm.\n"
             text+='Motor vidalarını plakanın arka tarafından takın. Burun motorunu gövde dilimlerini yapıştırmadan önce monte edin. Ayrı kablo deliğinden kabloları geçirin; motor metal dişine giren vida boyunu üretici ölçüsüyle kontrol edin.\n'
+            if motor.get('service_cover'):text+='Kanat motoru: alt servis kapağını çıkarın, içeriden motor vidalarını takıp sıkın. Kapak yuvalarına iki M3 altıgen somun yerleştirin; kapağı iki M3 vida ile sabitleyin. Kapak ayrı STL parçasıdır. Vida boyunu basılan kapağa göre seçin.\n'
         text+='1. fit_test_key ve fit_test_socket dosyalarını basın. Sıkı/geçmeyen veya gevşek sonuçta uygulamadaki geçme boşluğunu değiştirin.\n2. STL dosyaları mm birimindedir; her parça Z=0 tabanına yerleştirilmiştir. Destek, brim ve katman ayarlarını dilimleyicide kontrol edin.\n3. Gövde numaraları burundan kuyruğa ilerler. İç bilezikler sonraki parçada hizalama sağlar; bu birleşimleri yapıştırın.\n4. Kapakta dört vida deliği vardır; karşı somunlar gövde içinden erişilir.\n5. Kanat/kuyruk anahtarlarını karşı soketlerine takın. Aynı eksendeki vida deliklerinden bağlantı yapın. Somun ceplerine seçtiğiniz somunu yerleştirin.\n6. Menteşe, servo montajı, motor yatağı ve yapısal yük doğrulaması tamamlanmadan uçuşa geçmeyin.\n'
         z.writestr('MONTAJ.txt',text)
     return buf.getvalue()

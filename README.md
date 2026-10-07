@@ -224,9 +224,14 @@ vida çapı, orta mil deliği, pervane çapı ve mesafesi ayrı mm ölçüleridi
 açıklığı değiştiğinde bu ölçüler ölçeklenmez; çift motor konumu yarı açıklığın
 yüzdesiyle takip edilir. Motor plakalarında ayrı kablo deliği, kanat taşıyıcılarında
 ayrıca arka kablo çıkışı vardır. Gerçek delikler
+ve iki M3 vida/somun ile tutulan ayrı alt servis kapakları
 üretim önizlemesinde ve gövde/kanat STL paketinde bulunur; motor/pervane referans
 görüntüleri basılacak parçalar değildir. Varsayılan değerler satın alınacak motorun
-verisi sayılmaz. Motor vidalarının boyu, sargı mesafesi, ısı/titreşim/yük dayanımı
+verisi sayılmaz. Kanat motorunun vidaları alt servis kapağı çıkarılarak içeriden
+sıkılır; kapakların STL adları `motor_wing_right_service_cover` ve
+`motor_wing_left_service_cover` içerir. Burun motoru gövde dilimleri
+yapıştırılmadan önce açık arka taraftan monte edilir.
+Motor vidalarının boyu, sargı mesafesi, ısı/titreşim/yük dayanımı
 fiziksel olarak doğrulanmalıdır. Pervane/airframe çakışmaları reddedilir; iniş
 takımı ve zemin mesafesi modellenmez. Görev modeline motorların toplam elektrik
 gücü girilir; nacelle sürüklemesi ve tek motor arızasının yaw etkisi çözülmez.

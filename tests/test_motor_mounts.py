@@ -26,6 +26,21 @@ def test_mount_holes_are_real_voids_and_archive_is_closed(coords,layout):
         hy,hz=mount['front_wire_center_yz_mm']
         wire=cylinder(2,3,[x+1,y+hy,z+hz],[1,0,0])
         assert (owner^wire).volume()<1e-5
+        if layout=='twin':
+            cover=named[mount['service_cover']]
+            assert (owner^cover).volume()<1e-5
+            for travel in [1,5,15]:
+                assert (owner^cover.translate([0,-travel,0])).volume()<1e-5
+            # A 3 mm driver shaft can approach each bolt from the open underside.
+            for hy,hz in mount['hole_centers_yz_mm']:
+                start=np.array([x+mount['plate_thickness_mm']+1,y+hy,z+hz])
+                end=np.array([mount['back_x_mm']-7,y-mount['plate_radius_mm']-5,z+hz])
+                direction=end-start
+                tool=cylinder(1.5,np.linalg.norm(direction),start.tolist(),direction.tolist())
+                assert (owner^tool).volume()<1e-4
+            for bx,bz in mount['service_screws']['positions_xz_mm']:
+                tool=cylinder(1,20,[bx,y-15,bz],[0,1,0])
+                assert (cover^tool).volume()<1e-5
     archive=zipfile.ZipFile(io.BytesIO(package(parts,report,rings)))
     manifest=json.loads(archive.read('manifest.json'))
     assert len(manifest['motors'])==len(report['motors'])

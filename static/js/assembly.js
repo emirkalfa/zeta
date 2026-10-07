@@ -74,7 +74,7 @@ function showManufacturingPreview(data) {
     const geo=new THREE.BufferGeometry();
     geo.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices.map(v=>v/1000),3));
     geo.setIndex(part.faces);geo.computeVertexNormals();
-    const color=part.name==='hatch'?0x34424d:part.name==='body'?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
+    const color=part.name.endsWith('_service_cover')?0xef9353:part.name==='hatch'?0x34424d:part.name==='body'?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
     const mesh=new THREE.Mesh(geo,modelMaterial(color));mesh.userData.partName=part.name;
     manufacturingOverlay.add(mesh);
   }
