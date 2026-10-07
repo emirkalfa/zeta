@@ -303,7 +303,9 @@ def generate(data):
         if parent=='body':
             # Local support beam connects the socket housing to the fuselage skin.
             support=sleeve
-            if trim and spec['kind']=='tail':
+            # A wide/swept root may sit farther from the skin than socket depth.
+            # Carry its housing inward to the fixed body rib at every scale.
+            if trim:
                 support=box([cx-keyw/2-3,-keyh/2-3,0],[cx+keyw/2+3,keyh/2+3,root])
             center_x=float((mat[:,:3]@np.array([cx,0,root-depth*.5])+mat[:,3])[0])
             bridge=outer^box([center_x-2,-10000,-10000],[center_x+2,10000,10000])
@@ -470,6 +472,44 @@ def orthogonal_print(solid,bed,with_transform=False):
     return (printed,np.column_stack([rot,-np.array(b[:3])])) if with_transform else printed
 
 
+def connected_solids(solid):
+    """Keep enclosed cavity boundaries with their containing material component."""
+    components=solid.decompose()
+    positive=[c for c in components if c.volume()>0]
+    negative=[c for c in components if c.volume()<0]
+    groups=[[c] for c in positive]
+    for cavity in negative:
+        b=np.array(cavity.bounding_box())
+        owners=[i for i,c in enumerate(positive)
+                if np.all(b[:3]>=np.array(c.bounding_box())[:3]-.001)
+                and np.all(b[3:]<=np.array(c.bounding_box())[3:]+.001)]
+        if not owners:raise ManufacturingError('Bölünmüş parçanın iç boşluğu eşleştirilemedi.')
+        groups[min(owners,key=lambda i:positive[i].volume())].append(cavity)
+    return [md.Manifold.compose(g) if len(g)>1 else g[0] for g in groups]
+
+
+def fit_or_split(solid,bed,depth=0):
+    """Partition actual assembly geometry until each connected piece fits rigidly."""
+    try:
+        printed,transform=orthogonal_print(solid,bed,True)
+        return [(solid,printed,transform)]
+    except ManufacturingError:
+        if depth>=24:raise ManufacturingError('Otomatik bölme sınırına ulaşıldı; yazıcı ölçülerini kontrol edin.')
+    b=np.array(solid.bounding_box());size=b[3:]-b[:3]
+    axis=int(np.argmax(size));cut=round(float((b[axis]+b[axis+3])/2),2)
+    if cut<=b[axis]+.02 or cut>=b[axis+3]-.02:
+        raise ManufacturingError('Yazıcı hacmi bu parçayı bölmek için çok küçük.')
+    lo=b[:3]-1;hi=b[3:]+1;left_hi=hi.copy();left_hi[axis]=cut
+    right_lo=lo.copy();right_lo[axis]=cut
+    children=[]
+    for fragment in (solid^box(lo,left_hi),solid^box(right_lo,hi)):
+        children.extend(connected_solids(fragment))
+    result=[]
+    for child in children:
+        result.extend(fit_or_split(child,bed,depth+1))
+    return result
+
+
 def printable_parts(parts,manifest,rings):
     part_cuts=rings.get('part_cuts',{})
     obstacles=rings.get('obstacles',[])
@@ -537,17 +577,22 @@ def printable_parts(parts,manifest,rings):
             name=p.name if count==1 else f'{p.name}_{i+1:02d}of{count:02d}'
             piece=piece.as_original().set_tolerance(.02).simplify(.02)
             piece=printable_precision(piece,name)
-            check(piece,name)
+            check(piece,name,connected=False)
             # Panel frames include sweep/dihedral shear. Restore the physical
             # shape before choosing a rigid print orientation, without scaling it.
             assembled=piece if p.frame is None else local_transform(piece,p.frame)
             assembled=printable_precision(assembled,name)
-            printpiece,print_transform=orthogonal_print(assembled,bed,True)
-            printpiece=printable_precision(printpiece,name)
-            check(printpiece,name)
-            inverse=print_transform[:,:3].T
-            world=np.column_stack([inverse,-inverse@print_transform[:,3]])
-            result.append(Part(name,printpiece,family=p.family,assembled=assembled,print_to_world=world))
+            fitted=[]
+            for component in connected_solids(assembled):
+                fitted.extend(fit_or_split(component,bed))
+            for index,(fragment,printpiece,print_transform) in enumerate(fitted):
+                splitname=name if len(fitted)==1 else f'{name}_split{index+1:02d}of{len(fitted):02d}'
+                fragment=printable_precision(fragment,splitname)
+                printpiece=printable_precision(printpiece,splitname)
+                check(printpiece,splitname)
+                inverse=print_transform[:,:3].T
+                world=np.column_stack([inverse,-inverse@print_transform[:,3]])
+                result.append(Part(splitname,printpiece,family=p.family,assembled=fragment,print_to_world=world))
     return result
 
 
@@ -588,7 +633,7 @@ def package(parts,manifest,rings,filter='all'):
         z.writestr('fit_test_key.stl',binary_stl(orthogonal_print(key,manifest['bed_mm'])))
         z.writestr('fit_test_socket.stl',binary_stl(orthogonal_print(socket,manifest['bed_mm'])))
         z.writestr('manifest.json',json.dumps(manifest,ensure_ascii=False,indent=2))
-        text='ZETA MONTAJ VE BASKI\n\n'+ '\n'.join(manifest['notes'])+'\n\n'
+        text='ZETA MONTAJ VE BASKI\n\nModel boyutu korunur; parçalar yazıcı hacmine göre otomatik bölünür. Dosya adındaki split numaraları ek bölümleri gösterir. Ek kesimler düz yapıştırma yüzeyidir; yeni vida veya geçme bağlantısı eklenmez. Önizlemedeki montaj konumlarını izleyerek bu yüzeyleri hizalayıp yapıştırın.\n\n'+ '\n'.join(manifest['notes'])+'\n\n'
         for motor in manifest['motors']:
             label=('Gövde arkası / itici motor' if motor['axis'][0]<0 else 'Gövde burnu') if motor['parent']=='body' else {'wing_right':'Sağ kanat','wing_left':'Sol kanat'}.get(motor['parent'],motor['parent'])
             text+=f"{label} motor montajı: motor Ø{motor['motor_diameter_mm']:g} × {motor['motor_length_mm']:g} mm; plaka {motor['plate_thickness_mm']:g} mm; vida geçme deliği Ø{motor['hole_diameter_mm']:g} mm; orta delik Ø{motor['center_bore_mm']:g} mm.\n"

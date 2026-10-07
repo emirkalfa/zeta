@@ -90,10 +90,15 @@ def test_invalid_settings_fail_before_export(coords):
     with pytest.raises(ManufacturingError):generate(data)
 
 
-def test_undersized_printer_rejects_package(coords):
+def test_small_printer_automatically_subdivides_package(coords):
     data=request_data(coords);parts,manifest,rings=generate(data)
     manifest['bed_mm']=[80,80,80]
-    with pytest.raises(ManufacturingError):package(parts,manifest,rings)
+    archive=zipfile.ZipFile(io.BytesIO(package(parts,manifest,rings)))
+    report=json.loads(archive.read('manifest.json'))
+    assert any('_split' in p['file'] for p in report['parts'])
+    for p in report['parts']:
+        assert np.all(np.array(p['size_mm'])<=80.001)
+        assert_stl(archive.read(p['file']))
 
 
 def test_manufacturing_http_api(coords):
@@ -149,3 +154,45 @@ def test_tapered_wing_channels_stop_before_the_thin_edge(coords,shape):
     archive=zipfile.ZipFile(io.BytesIO(package(parts,manifest,rings)))
     for name in archive.namelist():
         if name.endswith('.stl'):assert_stl(archive.read(name))
+
+
+def test_adaptive_split_preserves_size_volume_and_cavities():
+    from backend.manufacturing import box, fit_or_split, check
+    solid=box([0,0,0],[360,280,70])-box([4,4,4],[356,276,66])
+    large=fit_or_split(solid,[400,400,400])
+    small=fit_or_split(solid,[120,120,120])
+    assert len(large)==1 and len(small)>len(large)
+    assert sum(p[0].volume() for p in small)==pytest.approx(solid.volume(),rel=1e-6)
+    for assembled,printed,transform in small:
+        check(printed,'split')
+        b=np.array(printed.bounding_box())
+        assert np.all(b[3:]-b[:3]<=120.001)
+        v=np.asarray(printed.to_mesh().vert_properties)[:,:3]
+        recovered=(v-transform[:,3])@transform[:,:3]
+        original=np.asarray(assembled.to_mesh().vert_properties)[:,:3]
+        assert recovered.min(axis=0)==pytest.approx(original.min(axis=0),abs=.001)
+        assert recovered.max(axis=0)==pytest.approx(original.max(axis=0),abs=.001)
+
+
+@pytest.mark.parametrize('tail,preset,combat',[('conventional','atlas',False),('ttail','combat',True),('vtail','combat',True)])
+def test_large_aircraft_zip_fits_without_rescaling(coords,tail,preset,combat):
+    geometry=calculate_geometry(3.0,1.2,'2412',tail_type=tail,wing_position='high',airframe='combat' if combat else 'standard')
+    data=request_data(coords,tail,preset,combat,geometry=geometry)
+    parts,report,rings=generate(data)
+    printed=printable_parts(parts,report,rings)
+    assert any('_split' in p.name for p in printed)
+    archive=zipfile.ZipFile(io.BytesIO(package(parts,report,rings)))
+    packed=json.loads(archive.read('manifest.json'))
+    assert [p.name+'.stl' for p in printed]==[p['file'] for p in packed['parts']]
+    for p in printed:
+        bounds=np.array(p.solid.bounding_box())
+        assert np.all(bounds[3:]-bounds[:3]<=np.array(report['bed_mm'])+.001)
+        assert_stl(archive.read(p.name+'.stl'))
+    # The extra partitions occupy their original assembly coordinates.
+    for original in parts:
+        fragments=[p.assembled for p in printed if p.name==original.name or p.name.startswith(original.name+'_')]
+        # Shell joining lips can add material; the original solid must stay present.
+        import manifold3d as md
+        union=md.Manifold.batch_boolean(fragments,md.OpType.Add)
+        # Existing 0.02 mm shell simplification can change a thin wall's volume.
+        assert (original.solid-union).volume()<max(.1,original.solid.volume()*.001)
