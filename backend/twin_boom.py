@@ -1,7 +1,25 @@
 """Printable twin boom tubes, pinned wing sockets and removable tail bridge."""
 import math
 import numpy as np
-from backend.manufacturing import box,cylinder,ManufacturingError
+from backend.manufacturing import box,cylinder,mesh_solid,ManufacturingError
+
+def vtail_end_fairing(g,x,y,z,radius,wall):
+    """Tangent round-to-taper transition, with a closed printable aft end."""
+    start=x-.5
+    end=max(x+max(8,wall*3),(float(g['tail_x_pos'])+float(g['vtail_chord']))*1000)
+    positions=np.linspace(start,end,33)
+    u=(positions-start)/(end-start)
+    radii=wall+(radius-wall)*(1-3*u*u+2*u*u*u)
+    angles=np.arange(48)*2*math.pi/48
+    def rings(xs,rs):
+        return np.array([np.column_stack([np.full(48,xx),y+rr*np.sin(angles),z-rr*np.cos(angles)]) for xx,rr in zip(xs,rs)])
+    outer=rings(positions,radii)
+    valid=radii>wall+.25
+    inner_x=positions[valid].copy();inner_x[0]-=.1
+    inner=rings(inner_x,radii[valid]-wall)
+    skin=mesh_solid(outer,outer[0][:,[1,2]])-mesh_solid(inner,inner[0][:,[1,2]])
+    return skin,{'start_x_mm':start,'end_x_mm':end,'start_radius_mm':radius,
+                 'end_radius_mm':wall,'wall_mm':wall,'closed_aft_end':True}
 
 def prepare_booms(g,assemblies,frames,cuts,wall,gap,screw,nf,nh):
     b=g['tail_booms'];r=float(b['diameter'])*500
@@ -12,12 +30,17 @@ def prepare_booms(g,assemblies,frames,cuts,wall,gap,screw,nf,nh):
     report=[]
     for sign,side in [(1,'right'),(-1,'left')]:
         name='boom_'+side;z=sign*by
-        assemblies[name]=cylinder(r,x1-x0,[x0,y,z],[1,0,0])-cylinder(r-wall,x1-x0+2,[x0-1,y,z],[1,0,0])
+        tube=cylinder(r,x1-x0,[x0,y,z],[1,0,0])-cylinder(r-wall,x1-x0+2,[x0-1,y,z],[1,0,0])
+        fairing=None
+        if g['tail_type']=='vtail':
+            transition,fairing=vtail_end_fairing(g,x1,y,z,r,wall)
+            tube=tube+transition
+        assemblies[name]=tube
         frames[name]=(identity,0,'tail');cuts[name]=[]
         report.append({'part':name,'parent':'wing_'+side,'center_mm':[x0,y,z],'end_x_mm':x1,
                        'outer_diameter_mm':2*r,'wall_mm':wall,'socket_length_mm':25,
                        'bolt_point_mm':[x0+12,y,z],'bolt_axis':[0,1,0],
-                       'screw_diameter_mm':screw,'nut_flat_mm':nf,'segment_spigot_mm':12})
+                       'screw_diameter_mm':screw,'nut_flat_mm':nf,'segment_spigot_mm':12,'tail_fairing':fairing})
     if g['tail_type']=='conventional':
         x=(float(g['tail_x_pos'])+float(g['htail_chord'])*.4)*1000
         bridge=box([x-5,y-r-5,-by],[x+5,y-r-1,by])

@@ -115,6 +115,9 @@ takılır. Çift kanat motoru seçilirse sökülebilir motor servis kapakları d
 anahtarı ve vida/somunla takılır. Ters V tepesinde yüzeyler orta düzlemde
 birleşir; eğik uç kapakları birbirine çakışmaz. Manuel uç veterleri korunur,
 bom boruları son montaj yuvasında biter.
+Ters V bomlarının arka uçlarında, geniş kuyruk köküne uzanan kapalı ve
+yumuşak incelen bir geçiş vardır. Bu geçiş bom STL'sinin parçasıdır; düz
+kesilmiş açık boru ağzı bırakılmaz. H ve Π bomları bu geçişten etkilenmez.
 H yerleşiminde dikey finler yatay kuyruğun uçlarındaki yuvalara takılır;
 bom boruları ve kelepçeleri için ayrılan boşluklar parçaların çakışmasını önler.
 Motor, pervane, vidalar ve somunlar satın alınır. Baskı bomlarının yük/dayanım
