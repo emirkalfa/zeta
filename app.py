@@ -135,7 +135,7 @@ def api_manufacturing():
         if request.args.get('mode') == 'zip':
             content = package(parts, manifest, rings, request.args.get('part', 'all'))
             return Response(content, mimetype='application/zip', headers={'Content-Disposition': 'attachment; filename=zeta_montajli_stl.zip'})
-        return jsonify(preview(parts, manifest))
+        return jsonify(preview(parts, manifest, rings))
     except (ManufacturingError, ValueError, KeyError, TypeError, OverflowError) as e:
         return jsonify(error=str(e)), 400
 

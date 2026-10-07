@@ -104,7 +104,7 @@ def test_manufacturing_http_api(coords):
     data=request_data(coords)
     result=client.post('/api/manufacturing',json=data)
     assert result.status_code==200
-    assert any(p['name']=='hatch' for p in result.json['parts'])
+    assert any(p['name'].startswith('hatch') for p in result.json['parts'])
     result=client.post('/api/manufacturing?mode=zip&part=fuselage',json=data)
     assert result.status_code==200 and result.mimetype=='application/zip'
     archive=zipfile.ZipFile(io.BytesIO(result.data))

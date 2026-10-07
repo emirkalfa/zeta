@@ -3,7 +3,7 @@ import io,json,zipfile
 import manifold3d as md
 import numpy as np
 import pytest
-from backend.manufacturing import generate,package,ManufacturingError,cylinder
+from backend.manufacturing import generate,package,preview,ManufacturingError,cylinder,orthogonal_print,box
 from tests.test_manufacturing import coords,request_data,assert_stl
 
 def settings(layout):
@@ -44,6 +44,13 @@ def test_mount_holes_are_real_voids_and_archive_is_closed(coords,layout):
     archive=zipfile.ZipFile(io.BytesIO(package(parts,report,rings)))
     manifest=json.loads(archive.read('manifest.json'))
     assert len(manifest['motors'])==len(report['motors'])
+    shown=preview(parts,report,rings)['parts']
+    volumes={p['file']:p['volume_mm3'] for p in manifest['parts']}
+    assert {p['name']+'.stl' for p in shown}==set(volumes)
+    for p in shown:
+        solid=md.Manifold(md.Mesh(np.array(p['vertices'],dtype=np.float32).reshape(-1,3),np.array(p['faces'],dtype=np.uint32).reshape(-1,3)))
+        assert solid.status()==md.Error.NoError
+        assert solid.volume()==pytest.approx(volumes[p['name']+'.stl'],rel=1e-4,abs=.1)
     for file in archive.namelist():
         if file.endswith('.stl'):assert_stl(archive.read(file))
 
@@ -81,3 +88,12 @@ def test_rectangle_pattern_and_filtered_packages(coords):
     assert len(json.loads(archive.read('manifest.json'))['motors'])==2
     archive=zipfile.ZipFile(io.BytesIO(package(parts,report,rings,'fuselage')))
     assert json.loads(archive.read('manifest.json'))['motors']==[]
+
+def test_diagonal_print_rotation_can_be_reversed_for_exact_preview():
+    original=box([30,-10,70],[280,-2,80])
+    printed,transform=orthogonal_print(original,[220,220,220],True)
+    v=np.asarray(printed.to_mesh().vert_properties)[:,:3]
+    restored=(v-transform[:,3])@transform[:,:3]
+    assert restored.min(axis=0)==pytest.approx([30,-10,70],abs=.001)
+    assert restored.max(axis=0)==pytest.approx([280,-2,80],abs=.001)
+    assert np.linalg.det(transform[:,:3])==pytest.approx(1)

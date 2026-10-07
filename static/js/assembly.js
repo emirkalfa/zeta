@@ -40,6 +40,27 @@ function aircraftPanelSpecs(g, wingCoords, hCoords, vCoords) {
 
 let manufacturingResult = null;
 let manufacturingOverlay = null;
+let manufacturingTimer=null, manufacturingRevision=0;
+function previewStatus(message) {
+  for(const id of ['manufacturingStatus','modelPreviewStatus']) {const el=$(id);if(el)el.textContent=message;}
+}
+function scheduleManufacturingPreview() {
+  clearTimeout(manufacturingTimer);
+  const revision=++manufacturingRevision;
+  if(!state.geometry || !scene)return;
+  previewStatus('STL parçalarının gerçek 3D önizlemesi hazırlanıyor…');
+  manufacturingTimer=setTimeout(async()=>{
+    try {
+      const stamp=JSON.stringify(manufacturingPayload());
+      const res=await fetch('/api/manufacturing?mode=preview&part=all',{method:'POST',headers:{'Content-Type':'application/json'},body:stamp});
+      const data=await res.json();
+      if(revision!==manufacturingRevision || stamp!==JSON.stringify(manufacturingPayload()))return;
+      if(!res.ok)throw new Error(data.error||'STL önizlemesi oluşturulamadı.');
+      manufacturingResult=data;showManufacturingPreview(data,false);
+      previewStatus('STL ile aynı parçalar gösteriliyor. Turuncu parçalar sökülebilir motor kapaklarıdır.');
+    } catch(e) {if(revision===manufacturingRevision)previewStatus('STL önizlemesi hazır değil: '+e.message);}
+  },750);
+}
 const MOTOR_FIELDS=['motorLayout','motorPattern','motorDiameter','motorLength','motorSpacingY','motorSpacingZ','motorBore','motorScrew','motorPlate','motorWire','propDiameter','propOffset','motorStation'];
 function motorMountSettings() {
   return Object.fromEntries(MOTOR_FIELDS.map(id=>[id,['motorLayout','motorPattern'].includes(id)?$(id).value:Number($(id).value)]));
@@ -66,7 +87,7 @@ function manufacturingPayload() {
   return {geometry:g, options, fuselage:buildFuselageSections(g,g.fuse_type,state.airfoilCoords).sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000])), panels:aircraftPanelSpecs(g,state.airfoilCoords,state.tailCoords,state.vtailCoords||state.tailCoords)};
 }
 
-function showManufacturingPreview(data) {
+function showManufacturingPreview(data,focus=true) {
   if (!scene) return;
   if (manufacturingOverlay) {scene.remove(manufacturingOverlay);disposeModel(manufacturingOverlay);}
   manufacturingOverlay=new THREE.Group();
@@ -74,13 +95,15 @@ function showManufacturingPreview(data) {
     const geo=new THREE.BufferGeometry();
     geo.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices.map(v=>v/1000),3));
     geo.setIndex(part.faces);geo.computeVertexNormals();
-    const color=part.name.endsWith('_service_cover')?0xef9353:part.name==='hatch'?0x34424d:part.name==='body'?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
+    const color=part.name.includes('_service_cover')?0xef9353:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
     const mesh=new THREE.Mesh(geo,modelMaterial(color));mesh.userData.partName=part.name;
+    if(part.name.includes('_service_cover'))mesh.visible=$('motorCoverView').checked;
     manufacturingOverlay.add(mesh);
   }
   addMotorHardware(manufacturingOverlay,data.manifest.motors||[]);
   wingGroup.visible=false;tailGroup.visible=false;fuseGroup.visible=false;
   scene.add(manufacturingOverlay);
+  if(!focus)return;
   switchTab('viewer');
   const box=new THREE.Box3().setFromObject(manufacturingOverlay), sphere=box.getBoundingSphere(new THREE.Sphere());
   viewTarget.copy(sphere.center);viewDist=sphere.radius/Math.sin(Math.min(THREE.MathUtils.degToRad(camera.fov/2),Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.aspect)))*1.05;
@@ -95,6 +118,7 @@ function invalidateManufacturingPreview() {
   if (tailGroup) tailGroup.visible=true;
   if (fuseGroup) fuseGroup.visible=true;
   const status=$('manufacturingStatus');if(status) status.textContent='Ayarları değiştirdikten sonra üretim kontrolünü yeniden çalıştırın.';
+  scheduleManufacturingPreview();
 }
 
 async function runManufacturing(mode='preview',filter='all') {
@@ -136,6 +160,9 @@ function setupManufacturing() {
   }
   $('motorHardwareView').addEventListener('change',()=>{
     for(const root of [fuseGroup,wingGroup,manufacturingOverlay]) if(root)root.traverse(o=>{if(o.userData.motorHardware)o.visible=$('motorHardwareView').checked;});
+  });
+  $('motorCoverView').addEventListener('change',()=>{
+    if(manufacturingOverlay)for(const mesh of manufacturingOverlay.children)if(mesh.userData.partName?.includes('_service_cover'))mesh.visible=$('motorCoverView').checked;
   });
   for(const id of ['wallThickness','sparMainDia','sparRearDia','ribSpacing','ribThickness']) $(id).addEventListener('change',invalidateManufacturingPreview);
 }

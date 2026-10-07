@@ -34,6 +34,7 @@ class Part:
     frame: object = None
     family: str = 'body'
     assembled: object = None
+    print_to_world: object = None
 
 
 def box(lo, hi):
@@ -371,7 +372,7 @@ def generate(data):
     return parts,{'bed_mm':bed,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'hatch_bolts_mm':hatch_holes,'interfaces':interfaces,'spar_channels':spar_channels,'motors':motors,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'obstacles':body_obstacles}
 
 
-def orthogonal_print(solid,bed):
+def orthogonal_print(solid,bed,with_transform=False):
     bbox=np.array(solid.bounding_box());size=bbox[3:]-bbox[:3]
     fits=[]
     for perm in itertools.permutations(range(3)):
@@ -384,21 +385,25 @@ def orthogonal_print(solid,bed):
             for angle in [15,30,45,60,75]:
                 angles=[0,0,0];angles[axis]=angle
                 tilted=solid.rotate(angles)
+                radians=math.radians(angle);c=math.cos(radians);s=math.sin(radians)
+                tilt=[np.array([[1,0,0],[0,c,-s],[0,s,c]]),np.array([[c,0,s],[0,1,0],[-s,0,c]]),np.array([[c,-s,0],[s,c,0],[0,0,1]])][axis]
                 for perm in itertools.permutations(range(3)):
                     rot=np.eye(3)[list(perm)]
                     if np.linalg.det(rot)<0:rot[0]*=-1
                     candidate=tilted.transform(np.column_stack([rot,[0,0,0]]).tolist())
                     bounds=np.array(candidate.bounding_box());dims=bounds[3:]-bounds[:3]
-                    if np.all(dims<=np.array(bed)+.001):candidates.append((dims[2],candidate))
+                    if np.all(dims<=np.array(bed)+.001):candidates.append((dims[2],candidate,rot@tilt))
         if candidates:
-            _,out=min(candidates,key=lambda c:c[0]);b=out.bounding_box()
-            return out.translate([-b[0],-b[1],-b[2]])
+            _,out,rotation=min(candidates,key=lambda c:c[0]);b=np.array(out.bounding_box())
+            printed=out.translate((-b[:3]).tolist())
+            return (printed,np.column_stack([rotation,-b[:3]])) if with_transform else printed
         raise ManufacturingError(f'Parça {np.round(size,1).tolist()} mm: {bed} mm yazıcı hacmine sığmıyor. Yazıcı ölçüsünü veya model boyutunu değiştirin.')
     _,perm=min(fits)
     rot=np.eye(3)[list(perm)]
     if np.linalg.det(rot)<0:rot[0]*=-1
     out=solid.transform(np.column_stack([rot,[0,0,0]]).tolist());b=out.bounding_box()
-    return out.translate([-b[0],-b[1],-b[2]])
+    printed=out.translate([-b[0],-b[1],-b[2]])
+    return (printed,np.column_stack([rot,-np.array(b[:3])])) if with_transform else printed
 
 
 def printable_parts(parts,manifest,rings):
@@ -455,11 +460,16 @@ def printable_parts(parts,manifest,rings):
             piece=piece.as_original().set_tolerance(.02).simplify(.02)
             piece=printable_precision(piece,name)
             check(piece,name)
-            printpiece=orthogonal_print(piece,bed)
+            # Panel frames include sweep/dihedral shear. Restore the physical
+            # shape before choosing a rigid print orientation, without scaling it.
+            assembled=piece if p.frame is None else local_transform(piece,p.frame)
+            assembled=printable_precision(assembled,name)
+            printpiece,print_transform=orthogonal_print(assembled,bed,True)
             printpiece=printable_precision(printpiece,name)
             check(printpiece,name)
-            assembled=piece if p.frame is None else local_transform(piece,p.frame)
-            result.append(Part(name,printpiece,family=p.family,assembled=assembled))
+            inverse=print_transform[:,:3].T
+            world=np.column_stack([inverse,-inverse@print_transform[:,3]])
+            result.append(Part(name,printpiece,family=p.family,assembled=assembled,print_to_world=world))
     return result
 
 
@@ -471,8 +481,14 @@ def binary_stl(solid):
     return b'ZETA mm manifold validated'.ljust(80,b'\0')+struct.pack('<I',len(f))+arr.tobytes()
 
 
-def preview(parts,manifest):
-    return {'parts':[{'name':p.name,'vertices':np.asarray(p.solid.to_mesh().vert_properties)[:,:3].reshape(-1).tolist(),'faces':np.asarray(p.solid.to_mesh().tri_verts).reshape(-1).tolist()} for p in parts], 'manifest':manifest,'summary':f'{len(parts)} montaj parçası kontrol edildi. Ayrı kapak, eşleşen geçme bağlantıları ve vida/somun yuvaları oluşturuldu. Baskı uyumu için tolerans denemesi gereklidir.'}
+def preview(parts,manifest,rings):
+    printed=printable_parts(parts,manifest,rings)
+    meshes=[]
+    for part in printed:
+        mesh=part.solid.to_mesh()
+        vertices=np.asarray(mesh.vert_properties)[:,:3]@part.print_to_world[:,:3].T+part.print_to_world[:,3]
+        meshes.append({'name':part.name,'vertices':vertices.reshape(-1).tolist(),'faces':np.asarray(mesh.tri_verts).reshape(-1).tolist()})
+    return {'parts':meshes,'manifest':manifest,'summary':f'{len(printed)} STL parçası montaj konumunda gösteriliyor; delikler, kapaklar ve dilim bağlantıları dahil.'}
 
 
 def package(parts,manifest,rings,filter='all'):

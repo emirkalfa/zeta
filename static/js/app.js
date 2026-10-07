@@ -468,6 +468,7 @@ function setupEventListeners() {
 
 async function calculateAll() {
   if (typeof invalidateManufacturingPreview === 'function') invalidateManufacturingPreview();
+  clearTimeout(manufacturingTimer);++manufacturingRevision;
   const btn = $('calculateBtn');
   showFormError('');
 
@@ -575,6 +576,7 @@ async function calculateAll() {
     displayMissionCharts(state.mission);
 
     switchTab('results');
+    scheduleManufacturingPreview();
   } catch (err) {
     showFormError('Hesaplama sırasında bir hata oluştu: ' + err.message);
   } finally {
