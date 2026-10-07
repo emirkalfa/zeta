@@ -70,7 +70,7 @@ function motorMountSettings() {
 }
 function motorPreviewSpecs(g,settings,sections) {
   if(!settings || settings.motorLayout==='none')return [];
-  const radius=Math.max(settings.motorDiameter/2+3,
+  const radius=settings.motorLayout==='single' && g.tail_booms?settings.motorDiameter/2:Math.max(settings.motorDiameter/2+3,
     (settings.motorPattern==='rectangle'?Math.hypot(settings.motorSpacingY/2,settings.motorSpacingZ/2):Math.max(settings.motorSpacingY,settings.motorSpacingZ)/2)+(settings.motorScrew+.3)/2+3,
     ((settings.motorBore??8)+.3)/2+(settings.motorWire??6)+4);
   let faces=[];
@@ -159,6 +159,7 @@ function setupManufacturing() {
       invalidateManufacturingPreview();store.set('zeta-manufacturing',JSON.stringify(Object.fromEntries(ids.map(k=>[k,read(k)]))));
       if(state.geometry && MOTOR_FIELDS.includes(id)) {
         state.geometry.motor_mount=motorMountSettings();
+        if(typeof updateFuseViewer==='function')updateFuseViewer(state.geometry,state.airfoilCoords);
         if(scene && fuseGroup) {scene.remove(fuseGroup);disposeModel(fuseGroup);fuseGroup=buildFuselageGroup(state.geometry,state.geometry.fuse_type,state.airfoilCoords);scene.add(fuseGroup);}
         if(scene && wingGroup) {scene.remove(wingGroup);disposeModel(wingGroup);wingGroup=buildWingGroup(state.geometry,state.airfoilCoords);scene.add(wingGroup);}
       }
@@ -167,6 +168,7 @@ function setupManufacturing() {
   $('motorHardwareView').addEventListener('change',()=>{
     for(const root of [fuseGroup,wingGroup,manufacturingOverlay]) if(root)root.traverse(o=>{if(o.userData.motorHardware)o.visible=$('motorHardwareView').checked;});
   });
+  $('motorDiameter').addEventListener('input',()=>$('motorDiameter').dispatchEvent(new Event('change')));
   $('motorCoverView').addEventListener('change',()=>{
     if(manufacturingOverlay)for(const mesh of manufacturingOverlay.children)if(mesh.userData.partName?.includes('_service_cover'))mesh.visible=$('motorCoverView').checked;
   });

@@ -207,6 +207,8 @@ def make_fuselage(data, wall, clearance, screw, nutflat, nuth):
 
 
 def generate(data):
+    from backend.motor_mounts import motor_sized_fuselage
+    data=motor_sized_fuselage(data)
     options=data.get('options',{});g=data['geometry']
     wall=number(options,'wall',1.2,.8,4)
     gap=number(options,'clearance',.3,.1,.8)

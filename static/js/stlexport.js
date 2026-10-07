@@ -79,7 +79,7 @@ async function exportSTL(part) {
 
 function buildFuselageSections(geom, type, airfoilCoords) {
   // One generator for the two viewers and every fuselage STL export.
-  return type === 'manual' ? loftFuselage(geom.fuse_sections || [], geom.fuse_section_exponent || 2) : libraryFuselageSections(geom);
+  return type === 'manual' ? motorSizedFuselageSections(geom,loftFuselage(geom.fuse_sections || [], geom.fuse_section_exponent || 2)) : libraryFuselageSections(geom);
 }
 
 function meshFromSections(sections, nCirc) {

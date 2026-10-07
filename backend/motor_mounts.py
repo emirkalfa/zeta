@@ -3,6 +3,22 @@ import math
 import numpy as np
 from backend.manufacturing import number,box,cylinder,ManufacturingError,Part
 
+def motor_sized_fuselage(data):
+    if not data['geometry'].get('tail_booms') or data.get('options',{}).get('motorLayout')!='single':return data
+    radius=number(data['options'],'motorDiameter',28,10,100)/2
+    rings=np.asarray(data['fuselage'],dtype=float).copy()
+    if rings.ndim!=3 or rings.shape[0]<3 or rings.shape[1]<16 or rings.shape[2]!=3 or not np.isfinite(rings).all():return data
+    if rings[-1,0,0]<=rings[0,0,0]:return data
+    cy,cz=rings[-1,:,1:].mean(axis=0)
+    distances=np.linalg.norm(rings[-1,:,1:]-[cy,cz],axis=1)
+    if np.all(abs(distances-radius)<.01):return data
+    first,last=rings[0,0,0],rings[-1,0,0];start=first+.8*(last-first)
+    u=np.clip((rings[:,:,0]-start)/(last-start),0,1);blend=u*u*(3-2*u)
+    delta=rings[:,:,1:]-[cy,cz];length=np.linalg.norm(delta,axis=2)
+    target=np.array([cy,cz])+radius*delta/np.maximum(length[:,:,None],1e-12)
+    rings[:,:,1:]+=blend[:,:,None]*(target-rings[:,:,1:])
+    return {**data,'fuselage':rings.tolist()}
+
 def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=None):
     options=data.get('options',{});layout=options.get('motorLayout','none')
     if layout not in ['none','single','twin']:raise ManufacturingError('Motor yerleşimi geçersiz.')
@@ -24,11 +40,14 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
     else:raise ManufacturingError('Motor vida düzeni geçersiz.')
     if min(math.hypot(y,z) for y,z in holes)-(bore+screw+gap)/2<2:
         raise ManufacturingError('Motor orta deliği vida deliklerine çok yakın. Delik/aralık ölçülerini kontrol edin.')
-    radius=max(diameter/2+3,max(math.hypot(y,z) for y,z in holes)+(screw+gap)/2+3,(bore+gap)/2+wire+4)
+    exact_face=layout=='single' and bool(data['geometry'].get('tail_booms'))
+    radius=diameter/2 if exact_face else max(diameter/2+3,max(math.hypot(y,z) for y,z in holes)+(screw+gap)/2+3,(bore+gap)/2+wire+4)
+    if exact_face and max(math.hypot(y,z) for y,z in holes)+(screw+gap)/2+max(2,wall)>radius:
+        raise ManufacturingError('Motor çapı bu vida aralıkları için küçük. Motorun gerçek çapını ve vida ölçülerini kontrol edin.')
     wire_center=None
     for angle in [45,0,90,135,180,225,270,315]:
-        candidate=np.array([math.cos(math.radians(angle)),math.sin(math.radians(angle))])*(radius-wire/2-2)
-        if min(np.linalg.norm(candidate-np.array(hole)) for hole in holes)>=wire/2+(screw+gap)/2+2:
+        candidate=np.array([math.cos(math.radians(angle)),math.sin(math.radians(angle))])*(radius-wire/2-(max(1.5,wall) if exact_face else 2))
+        if (not exact_face or np.linalg.norm(candidate)>=(bore+gap)/2+wire/2+2) and min(np.linalg.norm(candidate-np.array(hole)) for hole in holes)>=wire/2+(screw+gap)/2+2:
             wire_center=candidate.tolist();break
     if wire_center is None:raise ManufacturingError('Kablo deliği ile motor vidaları için yeterli alan yok. Motor/plaka ve delik ölçülerini kontrol edin.')
     rings=np.asarray(data['fuselage']);poses=[];obstacles=[];body_cuts=[]

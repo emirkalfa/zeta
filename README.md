@@ -248,7 +248,13 @@ ve iki M3 vida/somun ile tutulan ayrı alt servis kapakları
 görüntüleri basılacak parçalar değildir. Varsayılan değerler satın alınacak motorun
 verisi sayılmaz. Kanat motorunun vidaları alt servis kapağı çıkarılarak içeriden
 sıkılır; kapakların STL adları `motor_wing_right_service_cover` ve
-`motor_wing_left_service_cover` içerir. Burun motoru gövde dilimleri
+`motor_wing_left_service_cover` içerir.
+
+Savaşan İHA'nın tek itici motorunda arka gövde yüzeyi ve montaj plakası motor
+çapıyla aynı dairedir; son gövde bölümü bu çapa yumuşak geçiş yapar. Çap alanı
+değişince iki önizleme ve üretim geometrisi yenilenir. Vida/kablo delikleri bu
+çapa sığmıyorsa daha büyük bir plaka sessizce eklenmez; ölçü hatası gösterilir.
+Burun motoru gövde dilimleri
 yapıştırılmadan önce açık arka taraftan monte edilir.
 Motor vidalarının boyu, sargı mesafesi, ısı/titreşim/yük dayanımı
 fiziksel olarak doğrulanmalıdır. Pervane/airframe çakışmaları reddedilir; iniş

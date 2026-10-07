@@ -97,7 +97,22 @@ function loftFuselage(keys, exponent = 2) {
 
 function libraryFuselageSections(geom) {
   const id = FUSELAGE_PRESETS[geom.fuse_preset] ? geom.fuse_preset : 'atlas';
-  return loftFuselage(presetFuseKeys(geom, id), FUSELAGE_PRESETS[id].exponent);
+  return motorSizedFuselageSections(geom,loftFuselage(presetFuseKeys(geom, id), FUSELAGE_PRESETS[id].exponent));
+}
+
+function motorSizedFuselageSections(geom,result) {
+  const motor=geom.motor_mount;
+  if(!geom.tail_booms || motor?.motorLayout!=='single' || !(motor.motorDiameter>0) || !result.sections.length)return result;
+  const sections=result.sections,end=sections[sections.length-1],radius=motor.motorDiameter/2000;
+  const cy=end.reduce((s,p)=>s+p.y,0)/end.length,cz=end.reduce((s,p)=>s+p.z,0)/end.length;
+  if(end.every(p=>Math.abs(Math.hypot(p.y-cy,p.z-cz)-radius)<.00001))return result;
+  const first=sections[0][0].x,last=end[0].x,start=first+.8*(last-first);
+  for(const ring of sections)for(const p of ring) {
+    const u=Math.max(0,Math.min(1,(p.x-start)/(last-start))),blend=u*u*(3-2*u);
+    const dy=p.y-cy,dz=p.z-cz,n=Math.hypot(dy,dz);
+    if(n>0){p.y+=blend*(cy+radius*dy/n-p.y);p.z+=blend*(cz+radius*dz/n-p.z);}
+  }
+  return result;
 }
 
 function fusePresetThumbnail(id) {

@@ -54,3 +54,14 @@ test('3D meshes use server STL vertices and split cover visibility',()=>{
   assert.ok(Math.abs(mesh.geometry.attributes.position.array[3]-.1)<1e-7);
   assert.equal(ctx.wingGroup.visible,false);
 });
+test('typing motor diameter updates geometry and the secondary viewer immediately',()=>{
+  const nodes={};const c=vm.createContext({window:{addEventListener(){}},Event:class{constructor(type){this.type=type;}},
+    scene:null,wingGroup:null,tailGroup:null,fuseGroup:null,state:{geometry:{}},
+    store:{get(){return null;},set(){}},clearTimeout(){},updates:0,
+    $(id){return nodes[id]??={value:id==='motorLayout'?'single':id==='motorPattern'?'cross':'28',checked:true,handlers:{},
+      addEventListener(type,fn){this.handlers[type]=fn;},dispatchEvent(event){this.handlers[event.type]?.();}};}});
+  vm.runInContext(source,c);vm.runInContext('updateFuseViewer=()=>updates++;setupManufacturing();',c);
+  nodes.motorDiameter.value='48';nodes.motorDiameter.handlers.input();
+  assert.equal(c.state.geometry.motor_mount.motorDiameter,48);
+  assert.equal(c.updates,1);
+});
