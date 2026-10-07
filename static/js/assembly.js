@@ -1,4 +1,20 @@
 /* One panel layout for visualization and manufactured STL parts. */
+function syncWingPlacement(g,sections) {
+  if(!sections?.length)return;
+  const x=g.wing_x_pos+g.root_chord*.4;
+  let j=sections.findIndex(r=>r[0].x>=x);if(j<0)j=sections.length-1;
+  const a=sections[Math.max(0,j-1)],b=sections[j],u=a===b?0:Math.max(0,Math.min(1,(x-a[0].x)/(b[0].x-a[0].x)));
+  const low=r=>Math.min(...r.map(p=>p.y)),high=r=>Math.max(...r.map(p=>p.y));
+  const lo=low(a)+(low(b)-low(a))*u,hi=high(a)+(high(b)-high(a))*u;
+  g.wing_position_offset=(hi+lo)/2+({low:-.65,mid:0,high:.65}[g.wing_position]??0)*(hi-lo)/2;
+}
+
+function refreshWingAndTailGroups() {
+  const g=state.geometry;if(!g)return;
+  syncWingPlacement(g,buildFuselageSections(g,g.fuse_type,state.airfoilCoords).sections);
+  if(scene && wingGroup){scene.remove(wingGroup);disposeModel(wingGroup);wingGroup=buildWingGroup(g,state.airfoilCoords);scene.add(wingGroup);}
+  if(scene && tailGroup){scene.remove(tailGroup);disposeModel(tailGroup);tailGroup=buildTailGroup(g,state.tailCoords,state.vtailCoords||state.tailCoords);scene.add(tailGroup);}
+}
 function aircraftPanelSpecs(g, wingCoords, hCoords, vCoords) {
   const rad = d => d * Math.PI / 180;
   const specs = [];
@@ -90,7 +106,9 @@ function manufacturingPayload() {
   const options={};
   Object.assign(options,motorMountSettings());
   for (const [key,id] of Object.entries({bedX:'printBedX',bedY:'printBedY',bedZ:'printBedZ',wall:'wallThickness',clearance:'fitClearance',screw:'mountScrew',nutFlat:'mountNutFlat',nutHeight:'mountNutHeight',sparMain:'sparMainDia',sparRear:'sparRearDia',ribSpacing:'ribSpacing',ribThickness:'ribThickness'})) options[key]=Number($(id).value);
-  return {geometry:g, options, fuselage:buildFuselageSections(g,g.fuse_type,state.airfoilCoords).sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000])), panels:aircraftPanelSpecs(g,state.airfoilCoords,state.tailCoords,state.vtailCoords||state.tailCoords)};
+  const sections=buildFuselageSections(g,g.fuse_type,state.airfoilCoords).sections;
+  syncWingPlacement(g,sections);
+  return {geometry:g, options, fuselage:sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000])), panels:aircraftPanelSpecs(g,state.airfoilCoords,state.tailCoords,state.vtailCoords||state.tailCoords)};
 }
 
 function showManufacturingPreview(data,focus=true) {
@@ -159,9 +177,9 @@ function setupManufacturing() {
       invalidateManufacturingPreview();store.set('zeta-manufacturing',JSON.stringify(Object.fromEntries(ids.map(k=>[k,read(k)]))));
       if(state.geometry && MOTOR_FIELDS.includes(id)) {
         state.geometry.motor_mount=motorMountSettings();
+        refreshWingAndTailGroups();
         if(typeof updateFuseViewer==='function')updateFuseViewer(state.geometry,state.airfoilCoords);
         if(scene && fuseGroup) {scene.remove(fuseGroup);disposeModel(fuseGroup);fuseGroup=buildFuselageGroup(state.geometry,state.geometry.fuse_type,state.airfoilCoords);scene.add(fuseGroup);}
-        if(scene && wingGroup) {scene.remove(wingGroup);disposeModel(wingGroup);wingGroup=buildWingGroup(state.geometry,state.airfoilCoords);scene.add(wingGroup);}
       }
     });
   }

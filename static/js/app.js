@@ -27,6 +27,7 @@ const RESULT_TABS = ['results', 'viewer', 'fuse', 'charts', 'flight', 'mission',
 const MISSION_FIELDS = ['motorPower', 'batteryWh', 'avionicsPower', 'nLimit', 'targetEndurance', 'targetTurnRate', 'targetStall'];
 // Bataryadan itkiye toplam verim (ESC · motor · pervane) için tipik değer
 const PROP_EFFICIENCY = 0.6;
+let wingPlacementRequest=0;
 
 const state = {
   geometry: null,
@@ -285,6 +286,7 @@ function updateFuselageViews() {
   geom.fuse_width_scale = state.fuseWidthScale;
   geom.fuse_height_scale = state.fuseHeightScale;
   geom.fuse_section_exponent = state.fuseSectionExponent;
+  refreshWingAndTailGroups();
   updateFuseViewer(geom, state.airfoilCoords);
   if (typeof rebuildFuselage === 'function' && fuseGroup) {
     rebuildFuselage(geom, state.airfoilCoords);
@@ -448,6 +450,17 @@ function updateCGDisplay() {
 
 function setupEventListeners() {
   $('paramForm').addEventListener('submit', (e) => { e.preventDefault(); calculateAll(); });
+  document.querySelectorAll('input[name="wing_pos"]').forEach(input=>input.addEventListener('change',()=>{
+    if(!state.geometry)return;
+    const request=++wingPlacementRequest;
+    const previous=document.querySelector('.tab-pane.active')?.dataset.tab||'input';
+    const recalculate=async()=>{
+      if(request!==wingPlacementRequest)return;
+      if($('calculateBtn').disabled){setTimeout(recalculate,250);return;}
+      await calculateAll();if(request===wingPlacementRequest)switchTab(previous);
+    };
+    recalculate();
+  }));
   $('cgSlider').addEventListener('input', updateCGDisplay);
   document.querySelectorAll('input[name="mode"]').forEach(input => {
     input.addEventListener('change', () => {
@@ -571,6 +584,7 @@ async function calculateAll() {
     state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
     syncFuseLibrary();
     state.geometry.motor_mount=motorMountSettings();
+    syncWingPlacement(state.geometry,buildFuselageSections(state.geometry,fuse_type,state.airfoilCoords).sections);
     saveProject();
 
     displayResults(state.geometry);

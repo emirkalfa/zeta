@@ -209,6 +209,8 @@ def make_fuselage(data, wall, clearance, screw, nutflat, nuth):
 def generate(data):
     from backend.motor_mounts import motor_sized_fuselage
     data=motor_sized_fuselage(data)
+    from backend.wing_placement import place_wing_assembly
+    data=place_wing_assembly(data)
     options=data.get('options',{});g=data['geometry']
     wall=number(options,'wall',1.2,.8,4)
     gap=number(options,'clearance',.3,.1,.8)
@@ -244,9 +246,10 @@ def generate(data):
         # Wing panels start at the actual body side instead of overlapping at z=0.
         trim=0
         if spec['kind']=='wing':
-            x=mat[0,3]+chord*.4
-            ring=rings[np.argmin(np.abs(rings[:,0,0]-x))]
-            trim=float(np.max(np.abs(ring[:,2])))+1
+            inverse=np.linalg.inv(mat[:,:3])
+            local_body=outer.transform(np.column_stack([inverse,-inverse@mat[:,3]]).tolist())
+            embedded=local_body^panel
+            trim=round(float(embedded.bounding_box()[5]),2)+.35 if not embedded.is_empty() else 20
         elif (parent=='body' or fin_parent or parent=='tail_bridge') and abs(mat[2,2])>.5:
             # A short central tail saddle prevents the two insertion tabs colliding.
             trim=20
@@ -302,7 +305,7 @@ def generate(data):
             support=sleeve
             if trim and spec['kind']=='tail':
                 support=box([cx-keyw/2-3,-keyh/2-3,0],[cx+keyw/2+3,keyh/2+3,root])
-            center_x=float(mat[0,3]+cx)
+            center_x=float((mat[:,:3]@np.array([cx,0,root-depth*.5])+mat[:,3])[0])
             bridge=outer^box([center_x-2,-10000,-10000],[center_x+2,10000,10000])
             nearest=rings[np.argmin(abs(rings[:,0,0]-center_x))]
             yc=float(nearest[:,1].mean());half_h=float(np.ptp(nearest[:,1]))*.32;half_w=float(np.ptp(nearest[:,2]))*.32
@@ -361,7 +364,7 @@ def generate(data):
         if parent=='body': body=body-local_transform(mating_envelope,mat)
         elif parent in assemblies: assemblies[parent]=assemblies[parent]-local_transform(mating_envelope,mat)
         assemblies[name]=world_panel;frames[name]=(mat,trim,spec['kind'])
-        interfaces.append({'part':name,'parent':parent,'key_mm':[keyw,keyh,depth], 'bolt_axis':mat[:,1].tolist(),'bolt_point_mm':(mat[:,:3]@np.array([cx,0,screw_z])+mat[:,3]).tolist(),'diametral_clearance_mm':gap,'entry_lead_mm':lead,'entry_flare_per_side_mm':.6})
+        interfaces.append({'part':name,'parent':parent,'key_mm':[keyw,keyh,depth], 'root_trim_mm':trim,'bolt_axis':mat[:,1].tolist(),'bolt_point_mm':(mat[:,:3]@np.array([cx,0,screw_z])+mat[:,3]).tolist(),'diametral_clearance_mm':gap,'entry_lead_mm':lead,'entry_flare_per_side_mm':.6})
     from backend.motor_mounts import install_motor_mounts
     if booms:
         from backend.twin_boom import install_boom_sockets
@@ -405,7 +408,7 @@ def generate(data):
     if motors:notes+=['Motorlar ve pervaneler satın alınır; STL yalnız bağlantı taşıyıcılarını içerir. Vida boyunu motor üreticisine göre seçin; sargılara değmemelidir. Girilen ölçüleri gerçek motorla doğrulayın. Motor vidaları motorun metal dişlerine girer; plastik plakada geçme delikleri vardır.']
     if booms:notes+=['Savaşan İHA: bom kökleri kanat soketlerine girer ve enine vida/somunla tutulur. Bom dilimlerinin iç geçmelerini hizalayıp yapıştırın. Ayrı kuyruk köklerini yuvalarına takıp vidalayın. Yatay kuyruk köprüsünü iki bom üzerindeki vida/somunla sabitleyin. İtici motor arka gövde plakası üzerinden monte edilir; gövde dilimlerini yapıştırmadan önce vidalarını içeriden takın.']
     if center_parts:notes+=['Kuyruk orta birleştirme parçası tail_center_joint ayrı STL olarak verilir. İki kuyruk ucunun anahtarlarını bu parçaya geçirin; iki vida ve somunla sabitleyin. Ters V tepesindeki yüzeyler orta düzleme göre birleşir; serbest uçlar birbirine yapıştırılarak bağlantısız bırakılmaz.']
-    return parts,{'bed_mm':bed,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'hatch_bolts_mm':hatch_holes,'interfaces':interfaces,'spar_channels':spar_channels,'motors':motors,'booms':booms,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'part_cuts':cuts,'obstacles':body_obstacles}
+    return parts,{'bed_mm':bed,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'wing_position_offset_mm':float(g['wing_position_offset'])*1000,'hatch_bolts_mm':hatch_holes,'interfaces':interfaces,'spar_channels':spar_channels,'motors':motors,'booms':booms,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'part_cuts':cuts,'obstacles':body_obstacles}
 
 
 def orthogonal_print(solid,bed,with_transform=False):

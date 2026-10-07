@@ -264,6 +264,10 @@ gücü girilir; nacelle sürüklemesi ve tek motor arızasının yaw etkisi çö
 Hesaplama sonrasında 3D model otomatik olarak ZIP'teki baskı parçalarının aynı
 yüzeylerini montaj konumlarında gösterir; ölçü değişikliklerinde yeniden hazırlanır.
 Motor servis kapakları 3D modelde gizlenerek iç bağlantılar incelenebilir.
+Alçak/orta/yüksek kanat seçimi hesaplamayı otomatik yeniler. Yükseklik, seçilen
+gövdenin gerçek kesitinden alınır; kanat kök kesimi gövdeyle gerçek kesişime göre
+yapılır. Kanat motorları, karbon boru kanalları ve çift bomlu kuyruk aynı konumu
+takip eder; motor/vida ölçüleri ölçeklenmez. Gövde motoru gövdeye bağlı kalır.
 
 Uçuş sonuçları ön değerlendirmedir; uçuşa uygunluk onayı değildir. Profil CD0,
 CLmaks ve stall sonrası davranış ölçülmüş polarlara kalibre edilmemiş yaklaşık

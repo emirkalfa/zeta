@@ -56,7 +56,7 @@ test('3D meshes use server STL vertices and split cover visibility',()=>{
 });
 test('typing motor diameter updates geometry and the secondary viewer immediately',()=>{
   const nodes={};const c=vm.createContext({window:{addEventListener(){}},Event:class{constructor(type){this.type=type;}},
-    scene:null,wingGroup:null,tailGroup:null,fuseGroup:null,state:{geometry:{}},
+    scene:null,wingGroup:null,tailGroup:null,fuseGroup:null,state:{geometry:{}},buildFuselageSections(){return {sections:[]};},
     store:{get(){return null;},set(){}},clearTimeout(){},updates:0,
     $(id){return nodes[id]??={value:id==='motorLayout'?'single':id==='motorPattern'?'cross':'28',checked:true,handlers:{},
       addEventListener(type,fn){this.handlers[type]=fn;},dispatchEvent(event){this.handlers[event.type]?.();}};}});
