@@ -232,6 +232,12 @@ def generate(data):
         panel=panel+key+beam
         sleeve=box([cx-keyw/2-3,-keyh/2-3,root-depth-3],[cx+keyw/2+3,keyh/2+3,root])
         female=box([cx-keyw/2-gap/2,-keyh/2-gap/2,root-depth-gap],[cx+keyw/2+gap/2,keyh/2+gap/2,root+gap])
+        # Flared mouth guides insertion without loosening the deeper seating faces.
+        lead=1.5
+        mouth=md.CrossSection.square([keyw+gap,keyh+gap],center=True).extrude(
+            lead,scale_top=[(keyw+gap+1.2)/(keyw+gap),(keyh+gap+1.2)/(keyh+gap)]
+        ).translate([cx,0,root-lead])
+        female=female+mouth
         screw_z=root-depth*.55
         drill=cylinder((screw+gap)/2,500,[cx,-250,screw_z],[0,1,0])
         nut=nut_cut(cx,-keyh/2-1,screw_z,nf+gap,nh+gap)
@@ -295,7 +301,7 @@ def generate(data):
         if parent=='body': body=body-local_transform(mating_envelope,mat)
         elif parent in assemblies: assemblies[parent]=assemblies[parent]-local_transform(mating_envelope,mat)
         assemblies[name]=world_panel;frames[name]=(mat,trim,spec['kind'])
-        interfaces.append({'part':name,'parent':parent,'key_mm':[keyw,keyh,depth], 'bolt_axis':mat[:,1].tolist(),'bolt_point_mm':(mat[:,:3]@np.array([cx,0,screw_z])+mat[:,3]).tolist(),'diametral_clearance_mm':gap})
+        interfaces.append({'part':name,'parent':parent,'key_mm':[keyw,keyh,depth], 'bolt_axis':mat[:,1].tolist(),'bolt_point_mm':(mat[:,:3]@np.array([cx,0,screw_z])+mat[:,3]).tolist(),'diametral_clearance_mm':gap,'entry_lead_mm':lead,'entry_flare_per_side_mm':.6})
     # Adding the next socket/rib must never fill the previous socket or bore.
     for owner,tools in cuts.items():
         if owner=='body':
