@@ -32,6 +32,7 @@ classifiers = [
 dependencies = [
     "flask>=3.0",
     "numpy>=2.0",
+    "manifold3d>=3.5.4,<4",
 ]
 
 [project.optional-dependencies]

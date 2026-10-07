@@ -70,21 +70,6 @@ function buildSurface(group, def) {
     chord: def.rootChord + (def.tipChord - def.rootChord) * eta,
     thick: 1,
   }));
-  // Yuvarlatılmış uç: kalınlık çeyrek daire boyunca sıfıra iner
-  const maxThick = Math.max(...xs.map(x => prof.upper(x) - prof.lower(x)));
-  const tipRadius = 0.5 * maxThick * def.tipChord;
-  const N_TIP = 5;
-  for (let k = 1; k <= N_TIP; k++) {
-    const a = (k / N_TIP) * Math.PI / 2;
-    stations.push({
-      eta: 1,
-      tipCap: true,
-      le: def.tipLE.clone().addScaledVector(spanDir, tipRadius * Math.sin(a)),
-      chord: def.tipChord,
-      thick: Math.cos(a),
-    });
-  }
-
   // Kesit halkası: üst yüzey firar→hücum, ardından alt yüzey hücum→firar
   const loop = [];
   for (let k = xs.length - 1; k >= 0; k--) loop.push({ x: xs[k], y: prof.upper(xs[k]) });
@@ -122,6 +107,19 @@ function buildSurface(group, def) {
       const c = vertex(part, i + 1, j), d = vertex(part, i + 1, jn);
       part.idx.push(a, b, c, b, d, c);
     }
+  }
+  // Flat, closed tips match the manufactured panel. Mirrored left panels need
+  // reversed winding; otherwise their normals point inward despite DoubleSide.
+  const caps = THREE.ShapeUtils.triangulateShape(loop.map(p => new THREE.Vector2(p.x,p.y)), []);
+  const main = partFor(-1);
+  for (const tri of caps) {
+    main.idx.push(vertex(main,0,tri[2]),vertex(main,0,tri[1]),vertex(main,0,tri[0]));
+    const end=stations.length-1;
+    main.idx.push(vertex(main,end,tri[0]),vertex(main,end,tri[1]),vertex(main,end,tri[2]));
+  }
+  const orientation = new THREE.Vector3(1,0,0).cross(def.up).dot(spanDir);
+  if (orientation < 0) for (const p of parts.values()) {
+    for(let i=0;i<p.idx.length;i+=3) [p.idx[i+1],p.idx[i+2]]=[p.idx[i+2],p.idx[i+1]];
   }
   for (const [key, part] of parts) {
     const geo = new THREE.BufferGeometry();
@@ -163,152 +161,33 @@ function buildSurface(group, def) {
 
 function buildWingGroup(geom, coords) {
   const group = new THREE.Group();
-  const halfSpan = geom.wingspan / 2;
-  const rootChord = geom.root_chord;
-  const taper = geom.taper_ratio != null ? geom.taper_ratio : 0.5;
-  const tipChord = rootChord * taper;
-  const sweep = THREE.MathUtils.degToRad(geom.sweep_angle != null ? geom.sweep_angle : 5);
-  const dihedral = THREE.MathUtils.degToRad(geom.dihedral_angle != null ? geom.dihedral_angle : 3);
-  const wingY = geom.wing_position_offset || 0;
-  const wingX = geom.wing_x_pos || geom.fuselage_length * 0.35;
-  const tipX = geom.straight_te ? rootChord - tipChord : halfSpan * Math.tan(sweep);
-
   const cs = geom.control_surfaces || {};
   const controls = [
-    { ...cs.flap, defaults: [0.08, 0.50, 0.30], color: MODEL_COLORS.flap },
-    { ...cs.aileron, defaults: [0.55, 0.90, 0.25], color: MODEL_COLORS.aileron },
-  ].map(c => ({
-    etaStart: c.eta_start ?? c.defaults[0],
-    etaEnd: c.eta_end ?? c.defaults[1],
-    chordRatio: c.chord_ratio ?? c.defaults[2],
-    color: c.color,
-  }));
-
-  for (const sign of [1, -1]) {
-    buildSurface(group, {
-      rootLE: new THREE.Vector3(wingX, wingY, 0),
-      tipLE: new THREE.Vector3(wingX + tipX, wingY + halfSpan * Math.sin(dihedral), sign * halfSpan),
-      rootChord, tipChord, coords, controls,
-      up: new THREE.Vector3(0, 1, 0),
-    });
+    { etaStart: cs.flap?.eta_start ?? .08, etaEnd: cs.flap?.eta_end ?? .5, chordRatio: cs.flap?.chord_ratio ?? .3, color: MODEL_COLORS.flap },
+    { etaStart: cs.aileron?.eta_start ?? .55, etaEnd: cs.aileron?.eta_end ?? .9, chordRatio: cs.aileron?.chord_ratio ?? .25, color: MODEL_COLORS.aileron },
+  ];
+  for (const p of aircraftPanelSpecs(geom,coords,coords,coords).filter(p=>p.kind==='wing')) {
+    buildSurface(group,{rootLE:new THREE.Vector3(...p.root),tipLE:new THREE.Vector3(...p.tip),rootChord:p.chord,tipChord:p.tipChord,up:new THREE.Vector3(...p.up),coords:p.coords,controls});
   }
   return group;
 }
 
 function buildTailGroup(geom, hCoords, vCoords) {
   const group = new THREE.Group();
-  const tailX = geom.tail_x_pos || geom.fuselage_length * 0.82;
-  const cs = geom.control_surfaces || {};
-  const fullSpan = (ratio, color) => [{ etaStart: 0, etaEnd: 1, chordRatio: ratio ?? 0.3, color }];
-  const elevator = fullSpan(cs.elevator?.chord_ratio, MODEL_COLORS.elevator);
-  const rudder = fullSpan(cs.rudder?.chord_ratio, MODEL_COLORS.rudder);
-
-  const hHalf = geom.htail_span / 2;
-  const hTip = geom.htail_chord * (geom.htail_taper || 0.5);
-  const hSweep = Math.tan(THREE.MathUtils.degToRad(geom.htail_sweep || 3));
-  const vSpan = geom.vtail_span;
-  const vTip = geom.vtail_chord * (geom.vtail_taper || 0.4);
-  const vSweep = Math.tan(THREE.MathUtils.degToRad(geom.vtail_sweep || 5));
-
   if (geom.tail_booms) {
-    buildBoomTail(group, geom, hCoords, vCoords, { tailX, elevator, rudder, vTip, vSweep });
-    return group;
+    const b=geom.tail_booms;
+    const y=(geom.wing_position_offset||0)+b.y*Math.sin(THREE.MathUtils.degToRad(geom.dihedral_angle));
+    for(const sign of [1,-1]) {
+      const boom=new THREE.Mesh(new THREE.CylinderGeometry(b.diameter/2,b.diameter/2,b.length,20),modelMaterial(MODEL_COLORS.carbon));
+      boom.rotation.z=Math.PI/2;boom.position.set((b.x_start+b.x_end)/2,y,sign*b.y);group.add(boom);
+    }
   }
-
-  const horizontal = (root) => {
-    for (const sign of [1, -1]) {
-      buildSurface(group, {
-        rootLE: root,
-        tipLE: root.clone().add(new THREE.Vector3(hHalf * hSweep, 0, sign * hHalf)),
-        rootChord: geom.htail_chord, tipChord: hTip, coords: hCoords, controls: elevator,
-        up: new THREE.Vector3(0, 1, 0),
-      });
-    }
-  };
-  const vertical = () => {
-    buildSurface(group, {
-      rootLE: new THREE.Vector3(tailX, 0, 0),
-      tipLE: new THREE.Vector3(tailX + vSpan * vSweep, vSpan, 0),
-      rootChord: geom.vtail_chord, tipChord: vTip, coords: vCoords, controls: rudder,
-      up: new THREE.Vector3(0, 0, 1),
-    });
-  };
-
-  if (geom.tail_type === 'vtail') {
-    // V-kuyruk: iki eğik panel hem elevator hem rudder görevi görür (ruddervator)
-    const angle = THREE.MathUtils.degToRad(35);
-    const panel = vSpan / 2;
-    for (const sign of [1, -1]) {
-      buildSurface(group, {
-        rootLE: new THREE.Vector3(tailX, 0, 0),
-        tipLE: new THREE.Vector3(tailX + panel * vSweep, panel * Math.sin(angle), sign * panel * Math.cos(angle)),
-        rootChord: geom.vtail_chord, tipChord: vTip, coords: hCoords, controls: elevator,
-        up: new THREE.Vector3(0, Math.cos(angle), -sign * Math.sin(angle)),
-      });
-    }
-  } else if (geom.tail_type === 'ttail') {
-    vertical();
-    // Yatay kuyruk dikey kuyruğun tepesinde, firar kenarları hizalı
-    horizontal(new THREE.Vector3(tailX + vSpan * vSweep + vTip - geom.htail_chord, vSpan, 0));
-  } else {
-    vertical();
-    horizontal(new THREE.Vector3(tailX, 0, 0));
+  for (const p of aircraftPanelSpecs(geom,hCoords,hCoords,vCoords).filter(p=>p.kind==='tail')) {
+    const vertical=p.name.includes('vertical');
+    const control=vertical?geom.control_surfaces?.rudder:geom.control_surfaces?.elevator;
+    buildSurface(group,{rootLE:new THREE.Vector3(...p.root),tipLE:new THREE.Vector3(...p.tip),rootChord:p.chord,tipChord:p.tipChord,up:new THREE.Vector3(...p.up),coords:p.coords,controls:[{etaStart:0,etaEnd:1,chordRatio:control?.chord_ratio??.3,color:vertical?MODEL_COLORS.rudder:MODEL_COLORS.elevator}]});
   }
   return group;
-}
-
-// Yarışma (çift bomlu) yerleşim: kuyruk, kanada bağlı iki karbon bomun ucunda taşınır
-function buildBoomTail(group, geom, hCoords, vCoords, { tailX, elevator, rudder, vTip, vSweep }) {
-  const booms = geom.tail_booms;
-  const dihedral = THREE.MathUtils.degToRad(geom.dihedral_angle != null ? geom.dihedral_angle : 3);
-  const y = (geom.wing_position_offset || 0) + booms.y * Math.sin(dihedral);
-  const vSpan = geom.vtail_span;
-
-  const carbon = new THREE.MeshStandardMaterial({ color: MODEL_COLORS.carbon, roughness: 0.45, metalness: 0.2 });
-  for (const sign of [1, -1]) {
-    const boom = new THREE.Mesh(new THREE.CylinderGeometry(booms.diameter / 2, booms.diameter / 2, booms.length, 20), carbon);
-    boom.rotation.z = Math.PI / 2;   // silindir ekseni +y → +x
-    boom.position.set((booms.x_start + booms.x_end) / 2, y, sign * booms.y);
-    boom.castShadow = true;
-    group.add(boom);
-  }
-
-  if (geom.tail_type === 'vtail') {
-    // Ters V: paneller bom uçlarından yükselip ortada birleşir
-    const angle = THREE.MathUtils.degToRad(35);
-    for (const sign of [1, -1]) {
-      buildSurface(group, {
-        rootLE: new THREE.Vector3(tailX, y, sign * booms.y),
-        tipLE: new THREE.Vector3(tailX + booms.y * vSweep, y + booms.y * Math.tan(angle), 0),
-        rootChord: geom.vtail_chord, tipChord: vTip, coords: hCoords, controls: elevator,
-        up: new THREE.Vector3(0, Math.cos(angle), sign * Math.sin(angle)),
-      });
-    }
-    return;
-  }
-
-  // İkiz dikey kuyruk, firar kenarı yatay kuyrukla hizalı
-  const finX = tailX + geom.htail_chord - geom.vtail_chord;
-  for (const sign of [1, -1]) {
-    buildSurface(group, {
-      rootLE: new THREE.Vector3(finX, y, sign * booms.y),
-      tipLE: new THREE.Vector3(finX + vSpan * vSweep, y + vSpan, sign * booms.y),
-      rootChord: geom.vtail_chord, tipChord: vTip, coords: vCoords, controls: rudder,
-      up: new THREE.Vector3(0, 0, 1),
-    });
-  }
-  // Yatay kuyruk bomlar arasında; T-kuyrukta dikey kuyrukların tepesinde
-  const top = geom.tail_type === 'ttail';
-  const hx = top ? finX + vSpan * vSweep + vTip - geom.htail_chord : tailX;
-  const hy = top ? y + vSpan : y;
-  for (const sign of [1, -1]) {
-    buildSurface(group, {
-      rootLE: new THREE.Vector3(hx, hy, 0),
-      tipLE: new THREE.Vector3(hx, hy, sign * booms.y),
-      rootChord: geom.htail_chord, tipChord: geom.htail_chord, coords: hCoords, controls: elevator,
-      up: new THREE.Vector3(0, 1, 0),
-    });
-  }
 }
 
 function buildFuselageGroup(geom, type, wingCoords) {

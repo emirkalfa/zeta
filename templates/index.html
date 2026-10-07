@@ -356,7 +356,7 @@
         <div class="fuse-preview">
           <div id="fuse-three-container" class="viewport"></div>
           <p class="hint">Sürükle: döndür · Tekerlek: yakınlaştır</p>
-          <p class="hint">Üst kapak rengi görsel amaçlıdır. STL, kesintisiz gövde kabuğu olarak üretilir.</p>
+          <p class="hint">STL adımındaki Üretim önizlemesi, ayrı kapağı ve gerçek montaj deliklerini gösterir.</p>
         </div>
         <aside class="fuse-properties">
           <h3>Gövde oranları</h3>
@@ -493,7 +493,7 @@
       <header class="page-head">
         <div>
           <h2>STL indirme</h2>
-          <p class="page-desc">Parçaları 3D yazıcı için tek parça ya da yazıcı tablasına sığacak şekilde dilimlenmiş olarak indirin.</p>
+          <p class="page-desc">Yazıcı hacmine göre bölünmüş, montaj bağlantıları işlenmiş parçaları ZIP paketinde indirin.</p>
         </div>
       </header>
 
@@ -504,7 +504,7 @@
         </div>
         <div class="field stl-wall">
           <div class="input-wrap"><input type="number" id="wallThickness" min="0" max="5" step="0.1" value="1.2" aria-label="Duvar kalınlığı"><span class="unit">mm</span></div>
-          <small class="hint">Dış yüzey korunur, kalınlık içe doğru eklenir. 0 girilirse yalnızca yüzey (içi boş) üretilir.</small>
+          <small class="hint">Montajlı üretim için 0,8–4 mm. Baskı ve malzemenize göre seçin.</small>
         </div>
       </div>
 
@@ -534,18 +534,32 @@
               <small class="hint">Veterin %62'sinde. 0 = yok</small>
             </div>
           </div>
-          <small class="hint">Delik çapını borunun çapından yaklaşık 0,2 mm büyük girin. Kanat uca doğru inceldiğinden delik sığmadığı rib'de spar sonlanır; uç kapalıdır. Duvar kalınlığı 0 ise kanat dolu üretilir.</small>
+          <small class="hint">Delik çapını kendi borunuzun ölçüsüne göre girin. Her kanat yarısı kendi ekseninde boru taşır. Duvar kalınlığı 0,8–4 mm olmalıdır.</small>
         </div>
       </div>
 
+      <div class="form-section">
+        <div class="form-section-head"><h3>Yazıcı ve montaj ölçüleri</h3><p>Başlangıç değerleri örnektir. Kendi yazıcınızın ve satın aldığınız vida/somunun ölçülerini girin.</p></div>
+        <div class="form-grid">
+          <div class="field"><label for="printBedX">Tabla eni</label><div class="input-wrap"><input id="printBedX" type="number" value="220" min="80" max="1000"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="printBedY">Tabla derinliği</label><div class="input-wrap"><input id="printBedY" type="number" value="220" min="80" max="1000"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="printBedZ">Baskı yüksekliği</label><div class="input-wrap"><input id="printBedZ" type="number" value="250" min="80" max="1000"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="fitClearance">Geçme boşluğu (toplam)</label><div class="input-wrap"><input id="fitClearance" type="number" value="0.3" min="0.1" max="0.8" step="0.05"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="mountScrew">Vida çapı</label><div class="input-wrap"><input id="mountScrew" type="number" value="3" min="2" max="5" step="0.1"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="mountNutFlat">Somun karşılıklı yüz mesafesi</label><div class="input-wrap"><input id="mountNutFlat" type="number" value="5.5" min="4" max="10" step="0.1"><span class="unit">mm</span></div></div>
+          <div class="field"><label for="mountNutHeight">Somun kalınlığı</label><div class="input-wrap"><input id="mountNutHeight" type="number" value="2.4" min="1.5" max="5" step="0.1"><span class="unit">mm</span></div></div>
+        </div>
+        <div class="form-actions"><button id="manufacturingPreview" class="btn">Üretim önizlemesi</button><button id="manufacturingDownload" class="btn btn-primary">Montajlı STL paketini indir</button></div>
+        <p id="manufacturingStatus" class="hint" role="status">Önce küçük tolerans parçalarını basın. Dosya kontrolü fiziksel uyum ve uçuş dayanımı onayı değildir.</p>
+      </div>
       <div class="stl-list">
         <div class="stl-row">
           <div class="stl-part">
             <h3>Kanat</h3>
             <p>Parça sayısı her kanat yarısı için geçerlidir.</p>
           </div>
-          <button id="stlWing" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
-          <div class="stl-sliced">
+          <button id="stlWing" class="btn"><i class="ph ph-download-simple"></i> Montajlı paket</button>
+          <div class="stl-sliced" hidden>
             <div class="input-wrap"><input type="number" id="sliceCount" min="2" max="20" value="3" step="1" aria-label="Kanat parça sayısı"><span class="unit">parça</span></div>
             <button id="stlWingSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
           </div>
@@ -555,19 +569,19 @@
             <h3>Kuyruk</h3>
             <p>Yatay ve dikey kuyruk birlikte.</p>
           </div>
-          <button id="stlTail" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
-          <div class="stl-sliced">
+          <button id="stlTail" class="btn"><i class="ph ph-download-simple"></i> Montajlı paket</button>
+          <div class="stl-sliced" hidden>
             <div class="input-wrap"><input type="number" id="tailSliceCount" min="2" max="20" value="2" step="1" aria-label="Kuyruk parça sayısı"><span class="unit">parça</span></div>
             <button id="stlTailSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
           </div>
         </div>
         <div class="stl-row">
           <div class="stl-part">
-            <h3>Koleksiyondan seçilen gövde</h3>
-            <p>Gövde adımında seçilen model ve genişlik/yükseklik ayarları.</p>
+            <h3>Seçili gövde ve ayrı kapak</h3>
+            <p>Vida delikli ayrı kapak, karşı somun yuvaları ve iç hizalama bilezikleri.</p>
           </div>
-          <button id="stlFuseConv" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
-          <div class="stl-sliced">
+          <button id="stlFuseConv" class="btn"><i class="ph ph-download-simple"></i> Montajlı paket</button>
+          <div class="stl-sliced" hidden>
             <div class="input-wrap"><input type="number" id="fuseConvSliceCount" min="2" max="20" value="3" step="1" aria-label="Seçili gövde parça sayısı"><span class="unit">parça</span></div>
             <button id="stlFuseConvSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
           </div>
@@ -577,8 +591,8 @@
             <h3>Özgün gövde</h3>
             <p>Gövde adımında düzenlediğiniz özgün kesitlerden.</p>
           </div>
-          <button id="stlFuseManual" class="btn"><i class="ph ph-download-simple"></i> Tek parça</button>
-          <div class="stl-sliced">
+          <button id="stlFuseManual" class="btn"><i class="ph ph-download-simple"></i> Montajlı paket</button>
+          <div class="stl-sliced" hidden>
             <div class="input-wrap"><input type="number" id="fuseManualSliceCount" min="2" max="20" value="3" step="1" aria-label="Özgün gövde parça sayısı"><span class="unit">parça</span></div>
             <button id="stlFuseManualSliced" class="btn"><i class="ph ph-download-simple"></i> Dilimli</button>
           </div>
@@ -609,6 +623,7 @@
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script src="/static/js/fuselage.js"></script>
+<script src="/static/js/assembly.js"></script>
 <script src="/static/js/app.js"></script>
 <script src="/static/js/aircraftmodel.js"></script>
 <script src="/static/js/viewer3d.js"></script>

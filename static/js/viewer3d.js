@@ -214,6 +214,13 @@ function applyWingRootCutout(sections, nCirc, geom, airfoilCoords) {
 
 // Toggle fuselage visibility
 function toggleFuselage() {
+  if (typeof manufacturingOverlay !== 'undefined' && manufacturingOverlay) {
+    const bodies=manufacturingOverlay.children.filter(m=>['body','hatch'].includes(m.userData.partName));
+    const visible= !bodies[0]?.visible;
+    bodies.forEach(m=>m.visible=visible);
+    document.getElementById('toggleFuse')?.setAttribute('aria-pressed',visible);
+    return;
+  }
   if (!fuseGroup) return;
   fuseGroup.visible = !fuseGroup.visible;
   document.getElementById('toggleFuse')?.setAttribute('aria-pressed', fuseGroup.visible);

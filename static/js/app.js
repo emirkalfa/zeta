@@ -267,6 +267,7 @@ function syncFuseControls() {
 }
 
 function updateFuselageViews() {
+  if (typeof invalidateManufacturingPreview === 'function') invalidateManufacturingPreview();
   const geom = state.geometry;
   if (!geom) return;
   geom.fuse_sections = state.fuseSections.map(s => ({ ...s }));
@@ -466,6 +467,7 @@ function setupEventListeners() {
 }
 
 async function calculateAll() {
+  if (typeof invalidateManufacturingPreview === 'function') invalidateManufacturingPreview();
   const btn = $('calculateBtn');
   showFormError('');
 

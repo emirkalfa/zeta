@@ -90,8 +90,8 @@ Genişlik ve yükseklik %70–%150 arasında ayarlanabilir; seçim ve oranlar ta
 **Kanat ve kuyruğu göster** ile gövdeyi tek başına veya uçak üzerinde inceleyebilirsiniz.
 **Kesitlerle düzenle**, seçili modeli dokuz düzenlenebilir kesite dönüştürür; eski altı kesitli projeler de açılır.
 
-Ana 3D görünüm, gövde önizlemesi ve STL aynı gövde yüzeyini kullanır. Üst kapak rengi yalnızca görsel bir ayrıntıdır;
-STL kesintisiz bir kabuktur, sökülebilir kapak veya bağlantı elemanı içermez.
+Gövde önizlemesi dış formu gösterir. **STL → Üretim önizlemesi** gerçek kapak açıklığını, ayrı kapağı,
+kanat/kuyruk geçme anahtarlarını ve vida/somun yuvalarını STL ile aynı geometri motorundan gösterir.
 Gövde oranları bu sürümde aerodinamik, kütle merkezi ve görev hesaplarını yeniden modellemez.
 Bu modeller üretim ve uçuş doğrulaması yapılmış uçaklar değil, düzenlenebilir ön tasarımlardır.
 
@@ -117,19 +117,24 @@ Aynı adımda motor gücünü, batarya enerjisini, aviyonik tüketimini ve yapı
 
 Hedeflerin varsayılan değerleri (20 dk, 30 °/s, 12 m/s) yalnızca başlangıç noktasıdır; güncel yarışma şartnamesine ve takım stratejinize göre düzenleyin. "Örnek yarışma İHA'sı değerlerini yükle" düğmesi 2 m açıklıklı, 5 kg'lık, 1200 W motorlu ve 6S 10 Ah bataryalı bir başlangıç tasarımı doldurur.
 
-STL çıktısında ikiz dikey kuyruk tek parça olarak verilir ve iki kez basılır; bomlar basılmaz, karbon borudan kesilir.
+Montajlı STL üretimi şu an tek gövdeli genel model uçaklarla sınırlıdır. Çift bomlu yarışma yerleşimi
+ayrı taşıyıcı tasarımı gerektirdiğinden bu üretim yolu açık bir hata mesajıyla durdurulur; analiz ve 3D görünümü çalışmaya devam eder.
 
 Model idealdir: parabolik sürükleme poları (profil sürüklemesine gövde ve kuyruk için 0,015 eklenir), hızdan bağımsız mevcut güç ve %60 toplam tahrik verimi varsayılır. Rüzgâr, tırmanma ve manevra tüketimi hesaba katılmadığından gerçek havada kalış süresi daha kısadır.
 
 ## 3D baskı için STL
 
 - **Kanat, içi boş ve iskeletli:** dış kabuk ayarlanan duvar kalınlığındadır; açıklık boyunca rib'ler iç boşluğu bölmelere ayırır. Rib'lerde ana (veterin %28'i) ve arka (%62'si) spar delikleri bulunur; karbon boru ya da çubuk bu deliklerden geçirilerek iskelet oluşturulur. Rib aralığı, rib kalınlığı ve delik çapları ayarlanabilir.
-- **Dilimli çıktı:** büyük parçalar yazıcı tablasına sığacak şekilde eşit parçalara bölünür. Kanat dilimlerinin iki ucunda rib vardır ve parçalar spar üzerinde hizalanır.
-- **Gövde:** otomatik hesaplanan konvansiyonel gövde ya da altı kesitle tanımlanan özgün gövde.
-- **Kuyruk:** yatay ve dikey kuyruk (ya da V-kuyruk panelleri), duvar kalınlığıyla içi boş.
-- Dosyalar milimetre ölçeğindedir. Duvar kalınlığı 0 girilirse parçalar dolu katı olarak üretilir.
+- **Dilimli çıktı:** parçalar yazıcı hacmine göre bölünür, sığabilen bir ortogonal yönde Z=0'a yerleştirilir. Gövde dilimleri iç hizalama bilezikleriyle birleştirilir; bu birleşimler yapıştırılmalıdır.
+- **Gövde ve kapak:** ayrı, dört vida delikli üst kapak; gövdede karşılık açıklığı, taşıyıcı kollar ve altıgen somun cepleri.
+- **Kanat ve kuyruk:** eşleşen erkek anahtar/dişi soket ve geçme vida/somun bağlantıları. V ve T kuyruk dahil aynı panel yerleşimi ekran ve üretimde kullanılır.
+- **Baskı ayarları:** örnek 220×220×250 mm hacim, 3 mm vida ve 5,5×2,4 mm somun; gerçek yazıcı ve donanım ölçülerinizi girin. Geçme boşluğu toplam/çapsal değerdir, yüz başına uygulanmaz.
+- Dosyalar mm birimindedir. Montajlı üretimde duvar kalınlığı 0,8–4 mm olmalıdır. Taperli yüzeylerde kök daha kalındır; uçta en az girilen et hedeflenir. Mesh sadeleştirme toleransı 0,02 mm'dir.
+- Üretim kontrolü: kapalı kenarlar, sıfır alanlı yüzeyler, pozitif hacim ve kopuk malzeme adaları; yazıcıya sığmayan/başarısız parçalarda paket indirilmez.
+- ZIP, her parça için ölçü/hacim raporu (`manifest.json`), `MONTAJ.txt` ve iki küçük tolerans deneme parçasını içerir. Önce deneme parçalarını basın.
 
-İndirme sonrası rib sayısı ve spar'ın kökten ne kadar uzandığı bildirilir; spar borusunu buna göre kesebilirsiniz.
+Yazıcı, filament, katman ve donanım bilinmeden fiziksel geçme veya uçuş dayanımı garanti edilemez.
+Destek/brim ihtiyacını dilimleyicide kontrol edin; servis edilebilir menteşe, servo ve motor bağlantıları bu paketin kapsamı dışındadır.
 
 ## Hesap yöntemleri
 

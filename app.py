@@ -16,7 +16,7 @@ for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, 'reconfigure'):
         _stream.reconfigure(errors='replace')
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, Response
 from backend.geometry import calculate_geometry
 from backend.airfoil import get_airfoil_properties
 from backend.analysis import calculate_polars
@@ -109,6 +109,21 @@ def get_airfoil(airfoil_id):
     result = dict(airfoil)
     result['coordinates'] = [dict(c) for c in coords]
     return jsonify(result)
+
+
+@app.route('/api/manufacturing', methods=['POST'])
+def api_manufacturing():
+    from backend.manufacturing import generate, preview, package, ManufacturingError
+    if request.content_length and request.content_length > 8_000_000:
+        return jsonify(error='Model verisi çok büyük.'), 413
+    try:
+        parts, manifest, rings = generate(request.get_json())
+        if request.args.get('mode') == 'zip':
+            content = package(parts, manifest, rings, request.args.get('part', 'all'))
+            return Response(content, mimetype='application/zip', headers={'Content-Disposition': 'attachment; filename=zeta_montajli_stl.zip'})
+        return jsonify(preview(parts, manifest))
+    except (ManufacturingError, ValueError, KeyError, TypeError, OverflowError) as e:
+        return jsonify(error=str(e)), 400
 
 @app.route('/api/calculate', methods=['POST'])
 def api_calculate():
