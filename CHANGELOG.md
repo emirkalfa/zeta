@@ -4,6 +4,17 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-08
+
+### Fixed
+- Boru kanalı çapı 0 girildiğinde yalnız ilgili kanal devre dışı bırakılıyor; arayüz ile üretim doğrulaması eşleşiyor.
+- Hesap ayrıntılarında etiket, değer ve birimler ortak sütunlarda hizalanıyor; mobil ve koyu tema kontrolü eklendi.
+- Eski açık/koyu logo dosyaları güncel simgeyle eşitlendi.
+- Kanat konumu testlerinde gerçek boru kanalının açık olduğu hacim kesişimiyle doğrulanıyor.
+
+### Scope
+- Flap/aileron/elevator/rudder henüz bağımsız hareketli STL parçaları değildir; bu sürüm bunu tamamlanmış bir özellik olarak sunmaz.
+
 ## [3.0.0] - 2026-10-08
 
 ### ZETA Studio
@@ -145,7 +156,8 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - MIT lisansı.
 - Karanlık mod, favicon, profil README.
 
-[Unreleased]: https://github.com/emirkalfa/zeta/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/emirkalfa/zeta/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/emirkalfa/zeta/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/emirkalfa/zeta/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/emirkalfa/zeta/compare/v1.3.3...v2.0.0
 [1.2.3]: https://github.com/emirkalfa/zeta/compare/v1.2.2...v1.2.3

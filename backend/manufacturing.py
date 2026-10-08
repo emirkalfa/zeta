@@ -217,7 +217,7 @@ def generate(data):
     screw=number(options,'screw',3,2,5)
     nf=number(options,'nutFlat',5.5,4,10);nh=number(options,'nutHeight',2.4,1.5,5)
     bed=[number(options,k,v,80,1000) for k,v in [('bedX',220),('bedY',220),('bedZ',250)]]
-    main=number(options,'sparMain',6.2,2,16);rear=number(options,'sparRear',4.2,2,12)
+    main=number(options,'sparMain',6.2,0,50);rear=number(options,'sparRear',4.2,0,50)
     rib=number(options,'ribSpacing',60,20,150);rt=number(options,'ribThickness',1.6,1,4)
     body,lid,outer,rings,hatch_holes,hatch_opening,cavity_rings=make_fuselage(data,wall,gap,screw,nf,nh)
     specs=data['panels']
@@ -339,6 +339,8 @@ def generate(data):
         # Continuous carbon-tube channels through both wing halves and their body saddle.
         if spec['kind']=='wing':
             for pos,dia in [(0.28,main),(0.62,rear)]:
+                if dia == 0:
+                    continue
                 # A straight tube cannot track taper. Stop at the last station
                 # where the bore still has skin clearance, before it exits the TE.
                 coordinates=spec['coords'];half=len(coordinates)//2

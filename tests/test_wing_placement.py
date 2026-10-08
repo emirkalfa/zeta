@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from backend.geometry import calculate_geometry
-from backend.manufacturing import generate,package
+from backend.manufacturing import generate,package,cylinder,panel_frame,local_transform
 from backend.wing_placement import place_wing_assembly
 from backend.motor_mounts import motor_sized_fuselage
 from tests.test_manufacturing import coords,request_data,assert_stl
@@ -22,6 +22,14 @@ def test_all_mounts_follow_actual_wing_height(coords,preset,position,layout):
     assert report['wing_position_offset_mm']==pytest.approx(expected['geometry']['wing_position_offset']*1000)
     for joint in report['interfaces']:
         assert (named[joint['part']]^named[joint['parent']]).volume()<.1,joint['part']
+    # Verify the actual void, not only a channel label in the manifest.
+    for channel in report['spar_channels']:
+        spec=next(p for p in expected['panels'] if p['name']==channel['part'])
+        mat,length=panel_frame(spec)
+        reach=channel['reach_from_center_mm'];trim=reach-channel['wing_insertion_length_mm']
+        x=spec['chord']*1000*channel['chord_position']
+        probe=local_transform(cylinder(channel['hole_diameter_mm']*.4,reach-trim-2,[x,0,trim+1],[0,0,1]),mat)
+        assert (named[channel['part']]^probe).volume()<.01, channel['part']+' tube blocked'
     if layout=='twin':
         for motor in report['motors']:
             p=next(p for p in expected['panels'] if p['name']==motor['parent']);f=motor['station_fraction']

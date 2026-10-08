@@ -89,6 +89,12 @@ def test_invalid_settings_fail_before_export(coords):
     data=request_data(coords);data['options']['wall']=0
     with pytest.raises(ManufacturingError):generate(data)
 
+def test_zero_spar_diameter_disables_only_that_channel(coords):
+    data=request_data(coords);data['options'].update(sparMain=0,sparRear=4.2)
+    _,report,_=generate(data)
+    assert len(report['spar_channels'])==2
+    assert all(c['chord_position']==.62 for c in report['spar_channels'])
+
 
 def test_small_printer_automatically_subdivides_package(coords):
     data=request_data(coords);parts,manifest,rings=generate(data)

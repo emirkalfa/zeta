@@ -17,3 +17,11 @@ input[type="number"],select{height:43px;background:var(--bg);border-color:transp
 /* Content-sized options avoid overlapping translated labels. */
 .segmented label{flex:0 1 auto;min-width:max-content}.segmented{flex-wrap:wrap}.form-actions:has(#calculateBtn){position:static;margin-top:0}.form-section .form-section-head:empty{display:none}
 [data-theme="dark"] .btn-primary,[data-theme="dark"] .segmented input:checked+span{color:#102c3b}
+/* Keep labels, values and units aligned in both flight detail panels. */
+.mission-details,.flight-details{max-width:640px;padding:22px;background:var(--surface)}
+.mission-details dl>div,.flight-details dl>div{display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:baseline;gap:18px;padding:11px 0;border-bottom:1px solid var(--border)}
+.mission-details dt,.flight-details dt{line-height:1.5;min-width:0;color:var(--text-secondary)}
+.mission-details dd,.flight-details dd{margin:0;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;display:grid;grid-template-columns:minmax(80px,1fr) 4.3em;width:11.5em;column-gap:10px}
+.mission-details dd .unit,.flight-details dd .unit{display:inline-block;text-align:left;margin-left:0}
+[data-theme="dark"] .mission-details,[data-theme="dark"] .flight-details{background:#203747;border-color:#3d586b}
+@media(max-width:440px){.mission-details,.flight-details{padding:16px}.mission-details dl>div,.flight-details dl>div{gap:10px;font-size:12px}}
