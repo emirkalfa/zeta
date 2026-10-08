@@ -1,15 +1,15 @@
 <p align="center">
   <img src="static/favicon.svg" alt="ZETA logosu" width="88">
 </p>
-<h1 align="center">ZETA 3.0</h1>
+<h1 align="center">ZETA 3.1</h1>
 <p align="center"><strong>Sabit kanatlı uçaklar için parametrik tasarım, aerodinamik ön değerlendirme ve parçalı STL üretimi.</strong></p>
 <p align="center">
   <a href="https://github.com/emirkalfa/zeta/releases/latest">En son sürümü indir</a> ·
-  <a href="https://github.com/emirkalfa/zeta/releases/tag/v3.0.0">3.0.0 sürüm notları</a> ·
+  <a href="https://github.com/emirkalfa/zeta/releases/tag/v3.1.0">3.1.0 sürüm notları</a> ·
   <a href="docs/AUDIT-2026-10-08.md">Hesap denetimi</a>
 </p>
 
-![ZETA 3.0: STL parçalarıyla aynı geometriyi gösteren 3D uçak görünümü](docs/studio-3d.png)
+![ZETA 3.1: STL parçalarıyla aynı geometriyi gösteren 3D uçak görünümü](docs/studio-3d.png)
 
 ZETA; kanat açıklığı, toplam ağırlık, profil, gövde, kuyruk ve motor ölçülerinden düzenlenebilir bir uçak modeli oluşturur. Montaj parçalarını 3D görünümde inceleyebilir, aerodinamik eğrileri karşılaştırabilir ve yazıcınızın hacmine göre bölünmüş STL dosyalarını ZIP halinde indirebilirsiniz. Arayüz Türkçedir ve internet olmadan çalışır.
 
@@ -17,19 +17,19 @@ ZETA; kanat açıklığı, toplam ağırlık, profil, gövde, kuyruk ve motor ö
 
 **Python kurmanız gerekmez.** [GitHub Releases](https://github.com/emirkalfa/zeta/releases/latest) sayfasında **Assets** bölümünü açın ve işletim sisteminize uygun uygulama dosyasını indirin. GitHub'ın otomatik eklediği `Source code` arşivleri hazır uygulama değildir.
 
-| Sistem | 3.0.0 paketi | Açılış |
+| Sistem | 3.1.0 paketi | Açılış |
 |---|---|---|
-| Windows 10/11, x64 | [ZETA-3.0.0-windows-x64.exe](https://github.com/emirkalfa/zeta/releases/download/v3.0.0/ZETA-3.0.0-windows-x64.exe) | Dosyaya çift tıklayın. |
-| Linux, x86_64 | [ZETA-3.0.0-linux-x86_64.AppImage](https://github.com/emirkalfa/zeta/releases/download/v3.0.0/ZETA-3.0.0-linux-x86_64.AppImage) | Çalıştırma izni verip açın. |
-| macOS, Apple Silicon | [ZETA-3.0.0-macos-arm64.zip](https://github.com/emirkalfa/zeta/releases/download/v3.0.0/ZETA-3.0.0-macos-arm64.zip) | ZIP'i açıp `ZETA.app` dosyasını Uygulamalar'a taşıyın. |
+| Windows 10/11, x64 | [ZETA-3.1.0-windows-x64.exe](https://github.com/emirkalfa/zeta/releases/download/v3.1.0/ZETA-3.1.0-windows-x64.exe) | Dosyaya çift tıklayın. |
+| Linux, x86_64 | [ZETA-3.1.0-linux-x86_64.AppImage](https://github.com/emirkalfa/zeta/releases/download/v3.1.0/ZETA-3.1.0-linux-x86_64.AppImage) | Çalıştırma izni verip açın. |
+| macOS, Apple Silicon | [ZETA-3.1.0-macos-arm64.zip](https://github.com/emirkalfa/zeta/releases/download/v3.1.0/ZETA-3.1.0-macos-arm64.zip) | ZIP'i açıp `ZETA.app` dosyasını Uygulamalar'a taşıyın. |
 
 Windows'ta Chrome/Edge varsa ayrı uygulama penceresi açılır; diğer durumlarda varsayılan tarayıcı kullanılır. Pencere/sekme kapatılınca ZETA sunucusu da kapanır. Aynı porttaki açık kopya tekrar kullanılabilir. İşlem ve dosyalar bilgisayarınızda kalır.
 
-Paketler imzasızdır. Windows'ta dosyanın bu depodan geldiğini doğruladıktan sonra **Ek bilgi → Yine de çalıştır**, macOS'ta sağ tık **Aç** gerekebilir. Linux'ta FUSE yoksa `./ZETA-3.0.0-linux-x86_64.AppImage --appimage-extract-and-run` kullanılabilir. İndirilen dosyayı sürümdeki `SHA256SUMS.txt` ile doğrulayabilirsiniz.
+Paketler imzasızdır. Windows'ta dosyanın bu depodan geldiğini doğruladıktan sonra **Ek bilgi → Yine de çalıştır**, macOS'ta sağ tık **Aç** gerekebilir. Linux'ta FUSE yoksa `./ZETA-3.1.0-linux-x86_64.AppImage --appimage-extract-and-run` kullanılabilir. İndirilen dosyayı sürümdeki `SHA256SUMS.txt` ile doğrulayabilirsiniz.
 
 Masaüstünde yalnızca bir simge istiyorsanız uygulamayı ayrı bir klasöre koyup masaüstüne kısayol oluşturun. Paketli uygulamanın veritabanı kullanıcı veri dizininde, form tercihleri tarayıcının yerel deposunda saklanır.
 
-## 3.0.0 ile gelenler
+## 3.1.0 ile gelenler
 
 - **Yeni stüdyo arayüzü:** açık/koyu tema, mobil düzen, katlanabilir gelişmiş ayarlar ve özgün ZETA logosu.
 - **Yerinde açıklamalar:** parametrelerin yanındaki küçük **ⓘ** düğmeleri ne işe yaradıklarını, birimlerini, varsayımlarını ve NASA/MIT/UIUC kaynaklarını açar.
@@ -37,9 +37,12 @@ Masaüstünde yalnızca bir simge istiyorsanız uygulamayı ayrı bir klasöre k
 - **Üretimle eşleşen önizleme:** gövde kapağı, kanat/kuyruk bağlantıları ve motor taşıyıcıları gerçek STL geometrisiyle gösterilir.
 - **Ölçüye göre motor montajı:** tek gövde motoru veya çift kanat motoru; çap, vida düzeni, delik aralığı, mil ve kablo boşlukları. Kanat değişirken motorun gerçek ölçüleri sabit kalır.
 - **Yazıcıya göre parçalı ZIP:** model büyüdükçe gerekli parça sayısı artar. ZIP; ayrı STL'ler, montaj bilgileri ve geçme deneme parçalarını içerir.
+- **Ayrı hareketli kontrol yüzeyleri:** flap, aileron, elevator ve rudder/ruddervator ayrı STL olarak alınabilir. 3D görünümde pim ekseni çevresinde hareketi incelenebilir; menteşe/pim kuponları ZIP'e dahildir.
+- **Kanat kökü kaplamaları:** kavisli gövde ile düz kanat kökü arasındaki boşluğu örten, montaja göre yeniden oluşan içi boş parçalar tüm montaj ZIP'inde ayrı STL'dir.
+- **Hareket boşluğu denetimi:** kontrol yüzeylerinin ±25° hareketi gövdeye ve diğer basılı parçalara çarpma yönünden temsilî testlerle kontrol edilir.
 - **Hesap düzeltmeleri:** gerçek kuyruk kolu, güç dengesiyle azami hız, aviyonik tüketimini içeren menzil hesabı ve açık girdi doğrulaması.
 
-![ZETA 3.0 parametre ekranı: sade form ve açıklama düğmeleri](docs/studio-parameters.png)
+![ZETA 3.1 parametre ekranı: sade form ve açıklama düğmeleri](docs/studio-parameters.png)
 
 ## İlk tasarımın
 
@@ -53,9 +56,9 @@ Masaüstünde yalnızca bir simge istiyorsanız uygulamayı ayrı bir klasöre k
 
 Üç kanat planformu, üç yükseklik konumu ve klasik/T/V kuyruk düzenleri bulunur. Çift bomlu gövdede kuyruk yerleşimleri gövdeye uygun biçimde oluşturulur. Kanat yüksekliği değişince gövde yuvaları, kanat motorları ve çift bomlu kuyruk birlikte güncellenir.
 
-Gövde kapağı ayrı parçadır. Kanat/kuyruk geçmeleri ve vida/somun yuvaları ZIP'e yansır. Kanat motorlarının ayrı alt servis kapakları içeriden vidalamaya erişim sağlar. Savaşan İHA'nın tek arka motorunda montaj yüzeyi girilen motor çapına uyarlanır. Delikler bu çapa sığmıyorsa ölçü hatası gösterilir.
+Gövde kapağı ayrı parçadır. Kanat/kuyruk geçmeleri ve vida/somun yuvaları ZIP'e yansır. Kanat motorlarının ayrı alt servis kapakları içeriden vidalamaya erişim sağlar. Savaşan İHA'nın tek arka motorunda montaj yüzeyi girilen motor çapına uyarlanır. Delikler bu çapa sığmıyorsa ölçü hatası gösterilir. Flap, aileron, elevator ve rudder/ruddervator parçaları ayrı basılır ve modeldeki pimli menteşeleri kullanır; metal pim, servo ve itme çubukları donanım olarak ayrıca alınır, servo modeline özel yatak değildir.
 
-Motorlar, pervaneler, vidalar ve karbon borular satın alınan donanımdır; önizlemedeki motor/pervane referansları basılacak parça değildir. Flap, aileron ve elevatorlar henüz bağımsız hareketli menteşe/servo parçaları değildir. Büyük modeldeki ek kesimler düz yapıştırma yüzeyleri olabilir; ZIP'in montaj notlarını okuyun.
+Motorlar, pervaneler, vidalar ve karbon borular satın alınan donanımdır; önizlemedeki motor/pervane referansları basılacak parça değildir. Hareket yüzeyi bağlantı ve hareketi, servo/itme çubuğu kurulumu ve baskı dayanımı gerçek donanımla ayrıca denenmelidir. Büyük modeldeki ek kesimler düz yapıştırma yüzeyleri olabilir; ZIP'in montaj notlarını okuyun.
 
 ## Hesaplar ne kadar doğrulanmış?
 
@@ -66,7 +69,7 @@ Motorlar, pervaneler, vidalar ve karbon borular satın alınan donanımdır; ön
 - Görev hesabında sabit hava yoğunluğu, girilen toplam tahrik verimi ve genel ek sürükleme payı kullanılır.
 - Gerçek CG, yapısal dayanım, trim, dinamik/yönelme kararlılığı, kumanda sistemi ve tahrik performansı ayrıca doğrulanmalıdır.
 
-[Denetim raporu](docs/AUDIT-2026-10-08.md), [uygulama içindeki yöntem ve kaynaklar](static/references.html) ve [karşılaştırma verileri](tests/reference_data/README.md) ayrıntıları açıklar. Denetimde **312 Python testi ve 28 JavaScript testi** geçti; arayüz, ZIP indirme ve Windows paketinin gerçek STL üretimi de kontrol edildi. Testler temsilî senaryoları kapsar.
+[Denetim raporu](docs/AUDIT-2026-10-08.md), [3.1.0 doğrulama raporu](docs/VALIDATION-3.1.0.md), [uygulama içindeki yöntem ve kaynaklar](static/references.html) ve [karşılaştırma verileri](tests/reference_data/README.md) ayrıntıları açıklar. 3.1.0 sürümünde bu çalışma alanında 100 Python testi ve 29 JavaScript testi geçti; Windows paketinden 36 gerçek baskı parçası üretildi ve kapalı STL/yazıcı hacmi kontrolleri doğrulandı. Testler temsilî senaryoları kapsar.
 
 ## Kaynak koddan çalıştırma
 

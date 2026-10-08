@@ -105,7 +105,7 @@ function manufacturingPayload() {
   const g=state.geometry;
   const options={};
   Object.assign(options,motorMountSettings());
-  for (const [key,id] of Object.entries({bedX:'printBedX',bedY:'printBedY',bedZ:'printBedZ',wall:'wallThickness',clearance:'fitClearance',screw:'mountScrew',nutFlat:'mountNutFlat',nutHeight:'mountNutHeight',sparMain:'sparMainDia',sparRear:'sparRearDia',ribSpacing:'ribSpacing',ribThickness:'ribThickness'})) options[key]=Number($(id).value);
+  for (const [key,id] of Object.entries({bedX:'printBedX',bedY:'printBedY',bedZ:'printBedZ',wall:'wallThickness',clearance:'fitClearance',screw:'mountScrew',nutFlat:'mountNutFlat',nutHeight:'mountNutHeight',sparMain:'sparMainDia',sparRear:'sparRearDia',sparRearPosition:'sparRearPosition',ribSpacing:'ribSpacing',ribThickness:'ribThickness',hingePin:'hingePin',controlTravel:'controlTravel'})) options[key]=Number($(id).value);
   const sections=buildFuselageSections(g,g.fuse_type,state.airfoilCoords).sections;
   syncWingPlacement(g,sections);
   return {geometry:g, options, fuselage:sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000])), panels:aircraftPanelSpecs(g,state.airfoilCoords,state.tailCoords,state.vtailCoords||state.tailCoords)};
@@ -119,7 +119,8 @@ function showManufacturingPreview(data,focus=true) {
     const geo=new THREE.BufferGeometry();
     geo.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices.map(v=>v/1000),3));
     geo.setIndex(part.faces);geo.computeVertexNormals();
-    const color=part.name.includes('tail_center_joint')?0x2a9d8f:part.name.includes('_service_cover')?0xef9353:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
+    const control=(data.manifest.controls||[]).find(c=>part.name===c.part||part.name.startsWith(c.part+'_'));
+    const color=control?({flap:0x3b7dd8,aileron:0xe8590c,elevator:0x2a9d8f,ruddervator:0x2a9d8f,rudder:0xd4a017}[control.kind]):part.name.includes('tail_center_joint')?0x2a9d8f:part.name.includes('_service_cover')?0xef9353:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
     const mesh=new THREE.Mesh(geo,modelMaterial(color));mesh.userData.partName=part.name;
     if(part.name.includes('_service_cover'))mesh.visible=$('motorCoverView').checked;
     manufacturingOverlay.add(mesh);
@@ -127,12 +128,46 @@ function showManufacturingPreview(data,focus=true) {
   addMotorHardware(manufacturingOverlay,data.manifest.motors||[]);
   wingGroup.visible=false;tailGroup.visible=false;fuseGroup.visible=false;
   scene.add(manufacturingOverlay);
+  applyInternalStructureView();
+  const panel=$('controlPreviewPanel'),select=$('controlPreviewSelect');
+  if(panel&&select){
+    const controls=data.manifest.controls||[];panel.hidden=!controls.length;select.replaceChildren();
+    for(const c of controls){const option=document.createElement('option');option.value=c.part;option.textContent=controlLabel(c);select.append(option);}
+    $('controlPreviewAngle').value='0';applyControlPreviewAngle();
+  }
   if(!focus)return;
   switchTab('viewer');
   const box=new THREE.Box3().setFromObject(manufacturingOverlay), sphere=box.getBoundingSphere(new THREE.Sphere());
   viewTarget.copy(sphere.center);viewDist=sphere.radius/Math.sin(Math.min(THREE.MathUtils.degToRad(camera.fov/2),Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.aspect)))*1.05;
   setCameraDirection(HOME_VIEW);
   notify('Gerçek üretim geometrisi gösteriliyor: kapak, delikler ve montaj yuvaları dahil.');
+}
+
+function controlLabel(c){
+  const kind={flap:'Flap',aileron:'Aileron',elevator:'Elevator',rudder:'Rudder',ruddervator:'V kuyruk kontrolü'}[c.kind]||c.kind;
+  return kind+(c.parent.endsWith('_right')?' — sağ':c.parent.endsWith('_left')?' — sol':'')+(c.segment==='inboard'?' / iç bölüm':c.segment==='outboard'?' / dış bölüm':'');
+}
+function applyInternalStructureView(){
+  if(!manufacturingOverlay)return;
+  const transparent=$('internalStructureView')?.checked||false;
+  for(const mesh of manufacturingOverlay.children){
+    if(!mesh.userData.partName)continue;
+    mesh.material.transparent=transparent;mesh.material.opacity=transparent ? 0.28 : 1;
+    mesh.material.depthWrite=!transparent;mesh.material.needsUpdate=true;
+  }
+}
+function applyControlPreviewAngle(){
+  const control=manufacturingResult?.manifest.controls?.find(c=>c.part===$('controlPreviewSelect')?.value);
+  if(!control||!manufacturingOverlay)return;
+  const input=$('controlPreviewAngle');[input.min,input.max]=control.travel_deg;
+  const angle=Math.max(Number(input.min),Math.min(Number(input.max),Number(input.value)));input.value=angle;
+  $('controlPreviewValue').textContent=angle+'°';
+  const p=new THREE.Vector3(...control.hinge_point_mm.map(v=>v/1000)),axis=new THREE.Vector3(...control.hinge_axis);
+  const transform=new THREE.Matrix4().makeTranslation(p.x,p.y,p.z).multiply(new THREE.Matrix4().makeRotationAxis(axis,THREE.MathUtils.degToRad(angle))).multiply(new THREE.Matrix4().makeTranslation(-p.x,-p.y,-p.z));
+  for(const mesh of manufacturingOverlay.children){
+    if(!mesh.userData.partName)continue;mesh.matrixAutoUpdate=false;mesh.matrix.identity();
+    if(mesh.userData.partName===control.part||mesh.userData.partName.startsWith(control.part+'_'))mesh.matrix.copy(transform);
+  }
 }
 
 function invalidateManufacturingPreview() {
@@ -169,10 +204,12 @@ function setupManufacturing() {
   $('manufacturingPreview').addEventListener('click',()=>runManufacturing('preview'));
   $('manufacturingDownload').addEventListener('click',()=>runManufacturing('zip'));
   let saved=null;try {saved=JSON.parse(store.get('zeta-manufacturing')||'null');} catch(e) { /* damaged local settings */ }
-  const ids=['printBedX','printBedY','printBedZ','fitClearance','mountScrew','mountNutFlat','mountNutHeight',...MOTOR_FIELDS];
+  const ids=['printBedX','printBedY','printBedZ','fitClearance','mountScrew','mountNutFlat','mountNutHeight','wallThickness','sparMainDia','sparRearDia','sparRearPosition','ribSpacing','ribThickness','hingePin','controlTravel',...MOTOR_FIELDS];
   const read=id=>['motorLayout','motorPattern'].includes(id)?$(id).value:Number($(id).value);
   for (const id of ids) {
-    if(saved && (Number.isFinite(saved[id]) || (['motorLayout','motorPattern'].includes(id) && Array.from($(id).options).some(o=>o.value===saved[id])))) $(id).value=saved[id];
+    const field=$(id);
+    const validNumber=saved && Number.isFinite(saved[id]) && (!field.min || saved[id]>=Number(field.min)) && (!field.max || saved[id]<=Number(field.max));
+    if(saved && (validNumber || (['motorLayout','motorPattern'].includes(id) && Array.from(field.options).some(o=>o.value===saved[id])))) field.value=saved[id];
     $(id).addEventListener('change',()=>{
       invalidateManufacturingPreview();store.set('zeta-manufacturing',JSON.stringify(Object.fromEntries(ids.map(k=>[k,read(k)]))));
       if(state.geometry && MOTOR_FIELDS.includes(id)) {
@@ -190,6 +227,8 @@ function setupManufacturing() {
   $('motorCoverView').addEventListener('change',()=>{
     if(manufacturingOverlay)for(const mesh of manufacturingOverlay.children)if(mesh.userData.partName?.includes('_service_cover'))mesh.visible=$('motorCoverView').checked;
   });
-  for(const id of ['wallThickness','sparMainDia','sparRearDia','ribSpacing','ribThickness']) $(id).addEventListener('change',invalidateManufacturingPreview);
+  $('controlPreviewAngle')?.addEventListener('input',applyControlPreviewAngle);
+  $('internalStructureView')?.addEventListener('change',applyInternalStructureView);
+  $('controlPreviewSelect')?.addEventListener('change',()=>{$('controlPreviewAngle').value='0';applyControlPreviewAngle();});
 }
 window.addEventListener('DOMContentLoaded',setupManufacturing);

@@ -303,7 +303,8 @@ def _running_instance(host, port):
     url = f'http://{host}:{port}'
     try:
         with urllib.request.urlopen(url + '/api/version', timeout=0.5) as res:
-            if json.load(res).get('name') == APP_NAME:
+            identity=json.load(res)
+            if identity.get('name') == APP_NAME and identity.get('version') == APP_VERSION:
                 return url
     except Exception:
         pass

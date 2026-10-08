@@ -70,6 +70,20 @@ def pyinstaller(onefile, icon=None):
     ]
     if icon:
         cmd += ["--icon", icon]
+    if sys.platform == 'win32':
+        from PyInstaller.utils.win32.versioninfo import (VSVersionInfo,FixedFileInfo,
+            StringFileInfo,StringTable,StringStruct,VarFileInfo,VarStruct)
+        numeric=tuple(map(int,VERSION.split('-')[0].split('.')))+(0,)
+        info=VSVersionInfo(ffi=FixedFileInfo(filevers=numeric,prodvers=numeric,mask=0x3f,
+            flags=0,OS=0x40004,fileType=1,subtype=0,date=(0,0)),kids=[
+            StringFileInfo([StringTable('040904b0',[StringStruct(k,v) for k,v in {
+                'CompanyName':'ZETA','FileDescription':'ZETA Aircraft Design Studio',
+                'FileVersion':VERSION,'ProductName':'ZETA','ProductVersion':VERSION,
+                'InternalName':'ZETA','OriginalFilename':'ZETA.exe',
+                'LegalCopyright':'ZETA contributors - MIT License'}.items()])]),
+            VarFileInfo([VarStruct('Translation',[1033,1200])])])
+        resource=BUILD/'windows-version.txt';resource.write_text(str(info),encoding='utf-8')
+        cmd += ['--version-file',resource]
     if sys.platform == "darwin":
         cmd += ["--osx-bundle-identifier", "com.zeta.aircraftdesigner"]
     run(cmd, cwd=ROOT)
@@ -84,6 +98,11 @@ def build_windows():
 
 def build_macos():
     pyinstaller(onefile=False, icon=make_icon("icns"))
+    import plistlib
+    plist_path=DIST/'ZETA.app'/'Contents'/'Info.plist'
+    with plist_path.open('rb') as f:info=plistlib.load(f)
+    info.update(CFBundleShortVersionString=VERSION.split('-')[0],CFBundleVersion=VERSION.split('-')[0],CFBundleDisplayName='ZETA')
+    with plist_path.open('wb') as f:plistlib.dump(info,f)
     arch = "arm64" if platform.machine() == "arm64" else "x64"
     out = RELEASE / f"ZETA-{VERSION}-macos-{arch}.zip"
     # ditto, .app içindeki sembolik bağları ve izinleri korur

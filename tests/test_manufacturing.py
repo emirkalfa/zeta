@@ -93,7 +93,7 @@ def test_zero_spar_diameter_disables_only_that_channel(coords):
     data=request_data(coords);data['options'].update(sparMain=0,sparRear=4.2)
     _,report,_=generate(data)
     assert len(report['spar_channels'])==2
-    assert all(c['chord_position']==.62 for c in report['spar_channels'])
+    assert all(c['chord_position']==.55 for c in report['spar_channels'])
 
 
 def test_small_printer_automatically_subdivides_package(coords):
@@ -154,7 +154,8 @@ def test_tapered_wing_channels_stop_before_the_thin_edge(coords,shape):
     data=request_data(coords,wing_shape=shape)
     data['options'].update(bedX=350,bedY=350,bedZ=350)
     parts,manifest,rings=generate(data)
-    rear=[s for s in manifest['spar_channels'] if s['chord_position']==.62]
+    rear=[s for s in manifest['spar_channels'] if s['chord_position']==.55]
+    assert len(rear)==2
     assert all(s['reach_from_center_mm']<750 for s in rear)
     assert all(s['wing_insertion_length_mm']>0 for s in rear)
     archive=zipfile.ZipFile(io.BytesIO(package(parts,manifest,rings)))

@@ -4,6 +4,23 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-10-08
+
+### Added
+- Flap, aileron, elevator ve rudder/ruddervator artık ayrı STL parçaları. Metal pimli, karşılıklı menteşe gözleri ve Ø2 mm servo bağlantı kolları; pim çapı ve geometrik hareket açısı ayarlanabilir.
+- 3D görünümde gerçek STL parçasını seçip pim ekseni etrafında hareket ettirme; ayrı kontrol parçaları ZIP'i ve menteşe deneme kuponları.
+- Eğri gövdeyle düz kanat kökü arasındaki açıklığı dolduran sabit, içi boş kök parçaları. Kanat/gövde ölçüsü ve yüksekliğiyle birlikte yeniden oluşur.
+- Çift bomda flap bölgeleri bom bağlantısının iki yanına ayrılır. Arka boru konumu ayarlanabilir; boru hareketli bölgeye girmeden sonlandırılır.
+
+### Fixed
+- Kanat/boru/menteşe ayarları yeniden açılışta korunur; eski logo dosyaları, ayrıntı hizaları ve koyu panel renkleri güncellendi.
+- Uygulama, farklı sürümdeki çalışan sunucuyu yeni sürüm diye açmaz. Windows dosya sürümü ve macOS paket sürümü VERSION ile eşleştirildi.
+- Çok küçük float32 kesim yüzeyleri yeniden manifoldlaştırılıp hacim ve kapalı yüzey kontrolleriyle doğrulanıyor.
+- Akın gövdesinde kanat kökü kaplamalarının gövde kabuğuyla birleşimi düzeltildi; yüksek kanat ve V kuyruk dahil baskı geometrisi kapalı mesh olarak doğrulanıyor.
+
+### Hardware
+- Metal pim/mil, somunlar, servo ve itme çubukları satın alınır. Gerçek servo gövdesine özel yatak ve elektronik bağlantı bu modelin ölçülerinden çıkarılamaz; gerçek donanımla monte edilip ayarlanır. Paket geometrisi fiziksel dayanım/uçuş onayı değildir.
+
 ## [3.0.1] - 2026-10-08
 
 ### Fixed
@@ -156,7 +173,8 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - MIT lisansı.
 - Karanlık mod, favicon, profil README.
 
-[Unreleased]: https://github.com/emirkalfa/zeta/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/emirkalfa/zeta/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/emirkalfa/zeta/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/emirkalfa/zeta/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/emirkalfa/zeta/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/emirkalfa/zeta/compare/v1.3.3...v2.0.0

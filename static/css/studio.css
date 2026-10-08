@@ -24,4 +24,5 @@ input[type="number"],select{height:43px;background:var(--bg);border-color:transp
 .mission-details dd,.flight-details dd{margin:0;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;display:grid;grid-template-columns:minmax(80px,1fr) 4.3em;width:11.5em;column-gap:10px}
 .mission-details dd .unit,.flight-details dd .unit{display:inline-block;text-align:left;margin-left:0}
 [data-theme="dark"] .mission-details,[data-theme="dark"] .flight-details{background:#203747;border-color:#3d586b}
+.control-preview-row{display:flex;gap:24px;flex-wrap:wrap;padding:16px 20px;border:1px solid var(--border);border-radius:12px;background:var(--surface);margin:16px 0}.control-preview-row[hidden]{display:none}.control-preview-row .field{flex:1;min-width:220px}.control-preview-row output{margin-left:10px;color:var(--primary)}
 @media(max-width:440px){.mission-details,.flight-details{padding:16px}.mission-details dl>div,.flight-details dl>div{gap:10px;font-size:12px}}

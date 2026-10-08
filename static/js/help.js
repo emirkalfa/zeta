@@ -13,6 +13,11 @@
     method: ['ZETA · Yöntemler, varsayımlar ve denetim', '/static/references.html'],
   };
   const entries = {
+    hingePin:['Menteşe içinden geçirilen satın alınmış metal pim veya dişli milin nominal çapı. Varsayılan 2 mm için M2 donanım kullanılır. Delik, girilen geçme boşluğu kadar büyütülür. Mil uzunluğu ve giriş yönü ZIP manifestinde bulunur; kök başını girintiye oturtup uçtan uygun somunla sabitleyin. Pim basılmaz.',['method']],
+    controlTravel:['Kontrol yüzeyinin nötr konumdan iki yöne mekanik inceleme açısı. Menteşe ve karşı kabuk bu hareketin süpürdüğü hacme göre hazırlanır. Bu değer uçuş kumanda otoritesi veya servo torku onayı değildir; gerçek servo sınırlarını donanımla ayarlayın.',['method']],
+    internalStructureView:['Gerçek STL kabuklarını saydamlaştırır; içerideki rib, boru ve menteşe kanallarını inceleyebilirsiniz. Gövde düğmesiyle gövdeyi gizlemek, kanat kök deliklerini görmeyi kolaylaştırır. Bu seçenek yalnız görünümü değiştirir; ZIP aynı kapalı üretim parçalarını içerir.',['method']],
+    controlPreviewSelect:['STL paketindeki ayrı flap, aileron veya kuyruk kontrol parçasını seçin. Renkli parça, gerçek metal pim ekseni etrafında hareket ettirilir.',['method']],
+    controlPreviewAngle:['Seçilen parçanın mekanik hareketini inceleyin. ZIP nötr montaj geometrisiyle indirilir; bu kaydırıcı STL şeklini değiştirmez.',['method']],
     wingspan: ['Sol kanat ucundan sağ kanat ucuna yatay uzaklıktır. Metre girin: 150 cm = 1,5 m. Otomatik modda kanat alanı S = b²/AR ile boyutlandırılır; AR = 7 (standart) veya 6 (yarışma) ZETA başlangıç tercihidir.', ['drag','method']],
     weight: ['Pil, motorlar, elektronik ve tüm basılı parçalar dahil toplam uçuş kütlesidir. Kilogram girin. Kaldırma hesabında W = m × 9,81 N kullanılır. Bu değer baskı hacminden otomatik tartılmaz.', ['lift','method']],
     airfoil: ['Kanadın kesitini belirler. NACA 2412: %2 kamburluk, kamburluk konumu %40 veter, %12 kalınlık. Geometri NACA bağıntısından üretilir. CLmax, stall açısı ve profil sürüklemesi yaklaşık tahmindir; seçtiğiniz profil/Re için ölçülmüş polar yerine geçmez.', ['profile','tunnel']],
@@ -51,7 +56,8 @@
     ribSpacing: ['Kanat içindeki kesit destekleri arasındaki mesafe. Küçük aralık daha fazla destek ve ağırlık getirir; yük analiziyle seçilmelidir.', ['print','method']],
     ribThickness: ['Kanat içindeki kesit desteklerinin kalınlığı. Baskı yönü ve katman yapışması gerçek dayanımı etkiler.', ['print','method']],
     sparMainDia: ['Veterin %28’inde açılan ana boru kanalının çapı. Satın aldığınız borunun dış çapını ve geçme boşluğunu hesaba katın. 0 girilirse kanal eklenmez.', ['method']],
-    sparRearDia: ['Veterin %62’sindeki arka boru kanalı. Boru ZIP’te bulunmaz. Her kanat yarısının borusu kendi eksenindedir.', ['method']],
+    sparRearDia: ['Arka taşıyıcı borunun dış çapı ve geçme payı. Boru satın alınır; ZIP’te kanal bulunur. Düz kanal, kanadın ince kısmından veya kontrol yüzeyi menteşesinden önce sonlanır. 0 girilirse eklenmez.', ['method']],
+    sparRearPosition:['Arka borunun kanat kökü ön kenarından geriye konumu. %55 başlangıçtır; %50–62 aralığında seçilir. Konik kanatta düz boru, yerel veteri izlemez. Menteşe payı kalmıyorsa çapı/konumu veya veteri değiştirin.',['method']],
     printBedX: ['Yazıcının kullanılabilir X baskı genişliği. Klips, brim ve destek için gereken alanı toplam tabla ölçüsünden düşerek girin. Model büyüyünce STL sayısı otomatik artar.', ['print','method']],
     printBedY: ['Yazıcının kullanılabilir Y baskı derinliği. Parçalar bu hacme göre döndürülür ve gerekirse birden fazla yönde bölünür.', ['print','method']],
     printBedZ: ['Yazıcının kullanılabilir Z yüksekliği. STL’ler tabla seviyesine yerleştirilir; destek/katman ayarları dilimleyicide yapılır.', ['print','method']],

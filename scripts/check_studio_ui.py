@@ -52,11 +52,35 @@ with sync_playwright() as pw:
     page.screenshot(path=str(OUT/'03-grafikler.png'),full_page=True)
     page.locator('button.sidebar-link[data-tab="viewer"]').click()
     page.wait_for_function("document.querySelector('#modelPreviewStatus').textContent.includes('STL ile aynı')",timeout=120000)
+    assert page.locator('#controlPreviewPanel').is_visible()
+    assert page.locator('#controlPreviewSelect option').count()>=6
+    page.locator('#controlPreviewAngle').fill('20');page.locator('#controlPreviewAngle').dispatch_event('input')
+    assert page.locator('#controlPreviewValue').inner_text()=='20°'
+    page.screenshot(path=str(OUT/'11-kontrol-hareketi.png'))
+    page.locator('#controlPreviewAngle').fill('0');page.locator('#controlPreviewAngle').dispatch_event('input')
     page.screenshot(path=str(OUT/'04-model.png'))
+    page.locator('#internalStructureView').check()
+    assert page.evaluate('manufacturingOverlay.children.filter(m=>m.userData.partName).every(m=>m.material.transparent)')
+    page.locator('#toggleFuse').click()
+    assert page.evaluate('manufacturingOverlay.children.filter(m=>/^(body|hatch)(_|$)/.test(m.userData.partName||"")).every(m=>!m.visible)')
+    page.screenshot(path=str(OUT/'12-ic-yapi.png'))
+    page.locator('#toggleFuse').click();page.locator('#internalStructureView').uncheck()
     page.locator('button.sidebar-link[data-tab="stl"]').click()
     with page.expect_download(timeout=120000) as download:
         page.locator('#manufacturingDownload').click()
     item=download.value;item.save_as(str(OUT/item.suggested_filename))
+    import zipfile
+    archive=zipfile.ZipFile(OUT/item.suggested_filename)
+    manifest=json.loads(archive.read('manifest.json'))
+    assert len(manifest['controls'])>=6 and len(manifest['wing_root_fairings'])==2
+    assert 'hinge_fit_moving.stl' in archive.namelist()
+    with page.expect_download(timeout=120000) as control_download:
+        page.get_by_role('button',name='Kontrol parçaları (ZIP)',exact=True).click()
+    control_item=control_download.value;control_item.save_as(str(OUT/control_item.suggested_filename))
+    control_archive=zipfile.ZipFile(OUT/control_item.suggested_filename)
+    control_report=json.loads(control_archive.read('manifest.json'))
+    assert len(control_report['controls'])>=6
+    assert all(any(p['file'].startswith(c['part']) for c in control_report['controls']) for p in control_report['parts'])
     page.screenshot(path=str(OUT/'05-stl.png'),full_page=True)
     page.locator('button.sidebar-link[data-tab="input"]').click()
     page.locator('#darkToggle').click()

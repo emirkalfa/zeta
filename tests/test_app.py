@@ -1,6 +1,13 @@
 """Smoke tests for Flask API endpoints in app.py."""
 import pytest
 
+@pytest.mark.parametrize('version,current',[('old',False),('current',True)])
+def test_desktop_reuses_only_matching_version(monkeypatch,version,current):
+    import app,io,json,urllib.request
+    payload={'name':app.APP_NAME,'version':app.APP_VERSION if version=='current' else '2.1.0'}
+    monkeypatch.setattr(urllib.request,'urlopen',lambda *args,**kwargs:io.BytesIO(json.dumps(payload).encode()))
+    assert app._running_instance('127.0.0.1',5082)==('http://127.0.0.1:5082' if current else None)
+
 
 class TestIndex:
     def test_index_serves_html(self, client):

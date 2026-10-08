@@ -342,6 +342,11 @@
 <div class="viewport" id="three-container"></div>
 <p class="hint" id="modelPreviewStatus" role="status">Hesapla düğmesinden sonra STL parçalarının gerçek önizlemesi otomatik hazırlanır.</p>
 <label class="toggle-row"><input checked="" id="motorCoverView" type="checkbox"/>Motor servis kapaklarını göster — iç bağlantıları görmek için kapatın</label>
+<label class="toggle-row" for="internalStructureView"><input id="internalStructureView" type="checkbox"/>İç yapıyı göster</label>
+<div class="control-preview-row" id="controlPreviewPanel" hidden="">
+<div class="field"><label for="controlPreviewSelect">Hareketli parçayı incele</label><select id="controlPreviewSelect"></select></div>
+<div class="field"><label for="controlPreviewAngle">Menteşe açısı <output id="controlPreviewValue">0°</output></label><input id="controlPreviewAngle" type="range" min="-25" max="25" step="1" value="0"/></div>
+</div>
 <ul aria-label="Renk açıklaması" class="legend">
 <li><i style="--c:#ef9353"></i>Sökülebilir motor kapağı</li>
 <li><i style="--c:#2a9d8f"></i>Kuyruk orta bağlantısı</li>
@@ -523,11 +528,11 @@
 <div class="form-grid">
 <div class="field">
 <label for="ribSpacing">Rib aralığı</label>
-<div class="input-wrap"><input id="ribSpacing" max="500" min="10" step="5" type="number" value="60"/><span class="unit">mm</span></div>
+<div class="input-wrap"><input id="ribSpacing" max="150" min="20" step="5" type="number" value="60"/><span class="unit">mm</span></div>
 </div>
 <div class="field">
 <label for="ribThickness">Rib kalınlığı</label>
-<div class="input-wrap"><input id="ribThickness" max="10" min="0.4" step="0.1" type="number" value="1.6"/><span class="unit">mm</span></div>
+<div class="input-wrap"><input id="ribThickness" max="4" min="1" step="0.1" type="number" value="1.6"/><span class="unit">mm</span></div>
 </div>
 <div class="field">
 <label for="sparMainDia">Ana spar deliği</label>
@@ -537,8 +542,9 @@
 <div class="field">
 <label for="sparRearDia">Arka spar deliği</label>
 <div class="input-wrap"><input id="sparRearDia" max="50" min="0" step="0.1" type="number" value="4.2"/><span class="unit">mm</span></div>
-<small class="hint">Veterin %62'sinde. 0 = yok</small>
+<small class="hint">0 = yok. Kanal hareketli parçanın menteşesinden önce sonlanır.</small>
 </div>
+<div class="field"><label for="sparRearPosition">Arka boru kök konumu</label><div class="input-wrap"><input id="sparRearPosition" min="50" max="62" step="1" type="number" value="55"/><span class="unit">% veter</span></div></div>
 </div>
 <small class="hint">Delik çapını kendi borunuzun ölçüsüne göre girin. Her kanat yarısı kendi ekseninde boru taşır. Duvar kalınlığı 0,8–4 mm olmalıdır.</small>
 </div>
@@ -553,6 +559,8 @@
 <div class="field"><label for="mountScrew">Vida çapı</label><div class="input-wrap"><input id="mountScrew" max="5" min="2" step="0.1" type="number" value="3"/><span class="unit">mm</span></div></div>
 <div class="field"><label for="mountNutFlat">Somun karşılıklı yüz mesafesi</label><div class="input-wrap"><input id="mountNutFlat" max="10" min="4" step="0.1" type="number" value="5.5"/><span class="unit">mm</span></div></div>
 <div class="field"><label for="mountNutHeight">Somun kalınlığı</label><div class="input-wrap"><input id="mountNutHeight" max="5" min="1.5" step="0.1" type="number" value="2.4"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="hingePin">Menteşe metal pim çapı</label><div class="input-wrap"><input id="hingePin" max="3" min="1.5" step="0.5" type="number" value="2"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="controlTravel">Kontrol parçası hareketi</label><div class="input-wrap"><input id="controlTravel" max="30" min="10" step="5" type="number" value="25"/><span class="unit">±°</span></div></div>
 </div>
 <p class="hint">Kanat ve kuyruk köklerindeki geçme parçaları, gövdedeki pah girişli yuvalara oturur. Eşleşen vida delikleri ve somun cepleri STL paketine dahildir. T kuyrukta yatay yüzeyin yuvası dikey kuyruktadır.</p>
 </div>
@@ -563,6 +571,7 @@
 <h3>Parçalı STL indirme</h3>
 <p class="hint">Her ZIP içinde baskı parçaları ayrı STL dosyalarıdır. Parçaların boyutunu yukarıdaki yazıcı ölçüleri belirler; bağlantı yuvaları ve vida delikleri korunur.</p>
 <div class="stl-list">
+<div class="stl-row"><div class="stl-part"><h3>Hareketli kontrol parçaları</h3><p>Flap, aileron, elevator ve rudder/ruddervator ayrı STL dosyaları; pim ölçüleri ve menteşe deneme parçalarıyla.</p></div><button class="btn" onclick="runManufacturing('zip','controls')">Kontrol parçaları (ZIP)</button></div>
 <div class="stl-row">
 <div class="stl-part">
 <h3>Kanat</h3>
