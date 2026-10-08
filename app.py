@@ -1,4 +1,4 @@
-import os, sys, sqlite3, threading, time
+import os, sys, sqlite3, threading, time, json
 from contextlib import contextmanager
 
 # Paketlenmiş uygulamada (PyInstaller) kaynak dosyalar geçici bir dizine açılır
@@ -92,12 +92,76 @@ def init_db():
         with open(os.path.join(BASE_DIR, 'database', 'schema.sql'), encoding='utf-8') as f:
             conn.executescript(f.read())
         conn.commit()
+        conn.execute('CREATE TABLE IF NOT EXISTS user_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+        conn.execute('CREATE TABLE IF NOT EXISTS saved_designs (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
+        conn.commit()
         empty = not conn.execute('SELECT COUNT(*) as c FROM airfoils').fetchone()['c']
     if empty:
         from database.seed import seed
         seed(DB_PATH)
 
 init_db()
+
+def validate_design(data):
+    if not isinstance(data, dict) or data.get('format') != 'zeta-project' or data.get('schemaVersion') != 1:
+        raise ValueError('Bu dosya desteklenen bir ZETA proje dosyası değil.')
+    if not isinstance(data.get('name'), str) or not 1 <= len(data['name'].strip()) <= 100:
+        raise ValueError('Proje adı 1–100 karakter olmalı.')
+    if not isinstance(data.get('project'), dict) or not data['project'].get('wingspan'):
+        raise ValueError('Proje ölçüleri eksik.')
+    if not isinstance(data.get('manufacturing'), dict):
+        raise ValueError('Üretim ayarları eksik.')
+    text = json.dumps(data, ensure_ascii=False, allow_nan=False)
+    if len(text.encode('utf-8')) > 400_000:
+        raise ValueError('Proje dosyası çok büyük.')
+    return text
+
+@app.route('/api/designs', methods=['GET', 'POST'])
+def api_designs():
+    if request.method == 'GET':
+        with get_db() as conn:
+            return jsonify([dict(row) for row in conn.execute('SELECT id,name,created_at FROM saved_designs ORDER BY id DESC')])
+    if request.content_length and request.content_length > 500_000:
+        return jsonify(error='Proje dosyası çok büyük.'), 413
+    data = request.get_json(silent=True)
+    try:
+        payload = validate_design(data)
+    except (ValueError, TypeError, OverflowError, RecursionError) as e:
+        return jsonify(error=str(e)), 400
+    try:
+        with get_db() as conn:
+            cursor = conn.execute('INSERT INTO saved_designs(name,payload) VALUES(?,?)', (data['name'].strip(),payload))
+            conn.commit()
+            return jsonify(id=cursor.lastrowid), 201
+    except sqlite3.Error:
+        return jsonify(error='Proje diske kaydedilemedi.'), 500
+
+@app.route('/api/designs/<int:design_id>')
+def api_design(design_id):
+    with get_db() as conn:
+        row = conn.execute('SELECT payload FROM saved_designs WHERE id=?',(design_id,)).fetchone()
+    if row is None:
+        return jsonify(error='Proje bulunamadı.'), 404
+    return Response(row['payload'], mimetype='application/json')
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def api_settings():
+    if request.method == 'GET':
+        with get_db() as conn:
+            return jsonify(dict(conn.execute('SELECT key, value FROM user_settings').fetchall()))
+    if request.content_length and request.content_length > 500_000:
+        return jsonify(error='Kayıt verisi çok büyük.'), 413
+    data = request.get_json(silent=True)
+    allowed = {'zeta-project', 'zeta-manufacturing', 'zeta-theme'}
+    if not isinstance(data, dict) or not data or any(k not in allowed or not isinstance(v, str) or len(v)>200_000 for k,v in data.items()):
+        return jsonify(error='Geçersiz kayıt verisi.'), 400
+    try:
+        with get_db() as conn:
+            conn.executemany('INSERT INTO user_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', data.items())
+            conn.commit()
+    except sqlite3.Error:
+        return jsonify(error='Kayıt diske yazılamadı. Boş alanı ve klasör izinlerini kontrol edin.'), 500
+    return jsonify(saved=True)
 
 @app.route('/')
 def index():
@@ -313,6 +377,8 @@ def _running_instance(host, port):
 
 def open_app_window(url):
     import webbrowser,subprocess
+    # Give browser app windows a fresh identity when packaged assets change.
+    url += ('&' if '?' in url else '?') + 'zeta_version=' + APP_VERSION
     if sys.platform=='win32' and DESKTOP_MODE:
         candidates=[]
         for base in [os.environ.get('PROGRAMFILES',''),os.environ.get('PROGRAMFILES(X86)',''),os.environ.get('LOCALAPPDATA','')]:

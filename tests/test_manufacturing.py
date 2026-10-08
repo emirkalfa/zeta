@@ -202,4 +202,12 @@ def test_large_aircraft_zip_fits_without_rescaling(coords,tail,preset,combat):
         import manifold3d as md
         union=md.Manifold.batch_boolean(fragments,md.OpType.Add)
         # Existing 0.02 mm shell simplification can change a thin wall's volume.
-        assert (original.solid-union).volume()<max(.1,original.solid.volume()*.001)
+        removed=original.solid-union
+        # New wing bridge recesses and fastener holes intentionally remove skin,
+        # but only inside the documented support footprints.
+        from backend.manufacturing import box
+        for joint in report.get('wing_segment_joints',[]):
+            if joint['parent']==original.name:
+                b=np.array(joint['support_bounds_world_mm'])
+                removed=removed-box((b[:3]-.03).tolist(),(b[3:]+.03).tolist())
+        assert removed.volume()<max(.1,original.solid.volume()*.001)

@@ -4,6 +4,54 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 
 ## [Unreleased]
 
+## [3.2.7] - 2026-10-09
+
+- İsimli proje kopyaları, yerel kayıt listesi ve listeden açma eklendi.
+- Taşınabilir .zeta.json dosyası indirme ve bilgisayardan açma eklendi.
+- Proje açılmadan mevcut tasarım otomatik yedeklenir; geometri ve üretim ayarları birlikte yüklenir.
+
+## [3.2.6] - 2026-10-09
+
+- Son tasarım ve üretim ayarları yerel veritabanına kaydedilir; eski tarayıcı kayıtları aktarılır.
+- Manuel ölçüler ve hesaplama modu geri yüklenir; hesaplama yapılmadan değişiklikler otomatik kaydedilir.
+- Tasarımı kaydet düğmesi ve görünür kayıt durumu eklendi.
+
+## [3.2.5] - 2026-10-08
+
+- STL önizleme ve indirme hesapları tek sırada yürütülür; bekleyen eski ölçüler atlanır, aynı istek paylaşılır.
+- Görünmeyen 3D sekmeler ve arka plandaki pencere çizim yapmaz.
+- Yeniden hesaplamada eski sahne geometrileri, malzemeleri ve gölge kaynakları serbest bırakılır.
+
+## [3.2.4] - 2026-10-08
+
+- Sol menü dar simge şeridine dönüştürüldü; menü adları fare ve klavye odağında açıklama olarak görünür.
+- Koyu temada nötr koyu gri zemin, pastel simgeler, kartlar ve seçili durumlar.
+- Arayüz yazılarındaki uzun ayırma çizgileri kaldırıldı.
+
+## [3.2.3] - 2026-10-08
+
+- Sabit kanatların yazıcıya göre oluşturulan dilim birleşimlerinde iki dar veya tek geniş gömme geçmeli köprü, dört vida deliği ve alttan erişilen somun cepleri.
+- Köprüler ayrı STL dosyaları olarak ZIP’e eklenir; iki 3D önizlemede mor renkte gösterilir ve vida yakın plan listesinden seçilir.
+- Dilim planı parça sayısını baskı hacmine göre artırır. Boru, gövde kökü, diğer montajlar ve kontrol yüzeyi hareketi bağlantı yerleşiminde korunur; yer bulunamazsa açıklamalı hata verilir.
+- ZIP montaj kılavuzu köprü dosyalarını bağlandıkları kanat dilimleriyle eşleştirir. Geometri doğrulaması fiziksel yük/baskı testinin yerine geçmez.
+
+## [3.2.2] - 2026-10-08
+
+- Ölçü kartlarına iç boşluk eklendi; uzun metinler, değerler ve düğmeler dar ekranlarda satıra sığacak şekilde düzenlendi.
+- Gövde sekmesi tüm gövde tiplerinde gerçek STL geometrisini gösterir; kanat konumu değişince yuva ve delikler iki önizlemede birlikte yenilenir.
+
+## [3.2.1] - 2026-10-08
+
+- Windows pencere ve masaüstü simgeleri yeni ZETA logosuyla eşitlendi; tarayıcı simgesi sürümlendirildi.
+
+## [3.2.0] - 2026-10-08
+
+- Tüm gövdelerde ölçüye göre burun altı kamera yuvası ve yan vida delikleri.
+- Kanat köklerinde profil biçimli oturma yuvası ve her kanat yarısında tek sabitleme pimi.
+- Gerçek STL önizlemesinde bağlantı deliklerine yakın plan seçimi.
+- ZIP üretim hatalarında açıklamalı düzeltme adımları ve ilgili ayara erişim.
+- Açık pastel tema, yenilenen kartlar ve mobil düzen.
+
 ## [3.1.0] - 2026-10-08
 
 ### Added
@@ -173,7 +221,10 @@ Tüm önemli değişiklikler bu dosyada belgelenir. Format [Keep a Changelog](ht
 - MIT lisansı.
 - Karanlık mod, favicon, profil README.
 
-[Unreleased]: https://github.com/emirkalfa/zeta/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/emirkalfa/zeta/compare/v3.2.2...HEAD
+[3.2.2]: https://github.com/emirkalfa/zeta/compare/v3.2.1...v3.2.2
+[3.2.1]: https://github.com/emirkalfa/zeta/compare/v3.2.0...v3.2.1
+[3.2.0]: https://github.com/emirkalfa/zeta/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/emirkalfa/zeta/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/emirkalfa/zeta/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/emirkalfa/zeta/compare/v2.0.0...v3.0.0

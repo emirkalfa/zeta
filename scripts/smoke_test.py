@@ -62,10 +62,20 @@ def main():
         assert version == expected, f"sürüm {version}, beklenen {expected}"
 
         for path in ["/", "/static/js/app.js", "/static/css/style.css",
-                     "/static/css/studio.css", "/static/js/help.js", "/static/references.html", "/static/zeta.ico",
+                     "/static/css/studio.css", "/static/js/help.js", "/static/js/manufacturing-help.js", "/static/references.html", "/static/zeta.ico",
                      "/static/vendor/three.min.js", "/static/vendor/fonts.css", "/static/favicon.svg"]:
             status, body = request(path)
             assert status == 200 and body, path
+
+        html=request('/')[1].decode('utf-8')
+        for feature in ['cameraMount','wingPin','wingSeatDepth','mountDetailSelect','manufacturingIssue','wingJoinMode']:
+            assert f'id="{feature}"' in html, feature
+        assert b'--pastel-mint' in request('/static/css/studio.css')[1]
+        assert b'validateProjectFile' in request('/static/js/projects.js')[1]
+        design={'format':'zeta-project','schemaVersion':1,'name':'Package test',
+                'project':{'wingspan':'2.2'},'manufacturing':{'motorDiameter':42}}
+        saved=json.loads(request('/api/designs',design)[1])
+        assert json.loads(request('/api/designs/'+str(saved['id']))[1])==design
 
         profiles=json.loads(request("/api/airfoils")[1])
         assert {'0012','0015','2412','2415','4412','4415','6412'} <= {p['code'] for p in profiles}, "desteklenen NACA profilleri eksik"
@@ -85,6 +95,19 @@ def main():
             archive=zipfile.ZipFile(io.BytesIO(body))
             report=json.loads(archive.read('manifest.json'))
             assert status==200 and report['parts']
+            if payload.get('options',{}).get('cameraMount'):
+                assert len(report['cameras'])==1
+                assert len(report['cameras'][0]['holes'])==2
+            wings=[j for j in report['interfaces'] if j['part'] in ('wing_right','wing_left')]
+            assert len(wings)==2 and all(j['pin_count']==1 for j in wings)
+            if payload.get('options',{}).get('wingJoinMode')=='bolted':
+                assert report['wing_join_mode']=='bolted' and report['wing_segment_joints']
+                from collections import Counter
+                totals=Counter()
+                for joint in report['wing_segment_joints']:
+                    totals[joint['parent'],joint['seam']]+=len(joint['holes'])
+                    assert all(n+'.stl' in archive.namelist() for n in [joint['bridge'],*joint['segments']])
+                assert set(totals.values())=={4}
             for part in report['parts']:
                 assert all(size <= bed+.001 for size,bed in zip(part['size_mm'],report['bed_mm']))
                 content=archive.read(part['file'])

@@ -1,10 +1,46 @@
 /* ─── Kalıcı ayarlar (localStorage) ─── */
 const store = {
+  cache:{}, pending:{}, active:null, initialized:false,
+  async load() {
+    try {
+      const res=await fetch('/api/settings');
+      if(!res.ok)throw new Error('Kayıtlar okunamadı.');
+      this.cache=await res.json();
+      this.initialized=true;
+      for(const key of ['zeta-project','zeta-manufacturing','zeta-theme']) {
+        if(this.cache[key]===undefined) {
+          const old=this.get(key);
+          if(old!==null)this.set(key,old);
+        }
+      }
+      if(this.cache['zeta-theme'])document.documentElement.dataset.theme=this.cache['zeta-theme'];
+    } catch(e) {this.status('Kayıtlar okunamadı. Yeniden açmadan önce bağlantıyı kontrol edin.');}
+  },
+  status(message) {const el=document.getElementById('projectSaveStatus');if(el)el.textContent=message;},
   get(key) {
+    if(this.cache[key]!==undefined)return this.cache[key];
     try { return localStorage.getItem(key); } catch (e) { return null; }
   },
   set(key, value) {
+    this.cache[key]=value;
     try { localStorage.setItem(key, value); } catch (e) { /* gizli sekme vb. */ }
+    this.pending[key]=value;
+    if(this.initialized)this.flush().catch(()=>{});
+  },
+  async flush() {
+    if(!this.initialized)throw new Error('Kalıcı kayıt bağlantısı kurulamadı. Sayfayı yenileyin.');
+    if(this.active){await this.active;return this.flush();}
+    if(!Object.keys(this.pending).length)return;
+    const batch=this.pending;this.pending={};
+    this.status('Kaydediliyor…');
+    this.active=(async()=>{
+      const res=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(batch),keepalive:true});
+      if(!res.ok)throw new Error('Kayıt tamamlanamadı. Kaydet düğmesiyle yeniden deneyin.');
+    })();
+    try {await this.active;this.status('Bu bilgisayara kaydedildi.');}
+    catch(e){this.pending={...batch,...this.pending};this.status(e.message);throw e;}
+    finally {this.active=null;}
+    if(Object.keys(this.pending).length)return this.flush();
   },
 };
 
@@ -132,9 +168,31 @@ function enableResultTabs() {
 }
 
 function setupSidebar() {
+  const tooltip = $('navTooltip');
+  const hideTooltip = () => { if (tooltip) tooltip.hidden = true; };
+  const showTooltip = link => {
+    if (!tooltip) return;
+    tooltip.textContent = link.getAttribute('aria-label') +
+      (link.disabled ? ', ilk hesaplamadan sonra açılır' : '');
+    tooltip.hidden = false;
+    const rect = link.getBoundingClientRect();
+    const mobile = window.innerWidth <= 760;
+    const left = mobile ? rect.left + (rect.width - tooltip.offsetWidth) / 2 : rect.right + 12;
+    const top = mobile ? rect.bottom + 10 : rect.top + (rect.height - tooltip.offsetHeight) / 2;
+    tooltip.style.left = Math.max(8, Math.min(left, window.innerWidth - tooltip.offsetWidth - 8)) + 'px';
+    tooltip.style.top = Math.max(8, Math.min(top, window.innerHeight - tooltip.offsetHeight - 8)) + 'px';
+  };
   document.querySelectorAll('.sidebar-link').forEach(link => {
-    link.addEventListener('click', () => switchTab(link.dataset.tab));
+    link.parentElement.addEventListener('pointerenter', event => {
+      if (event.pointerType !== 'touch') showTooltip(link);
+    });
+    link.parentElement.addEventListener('pointerleave', hideTooltip);
+    link.addEventListener('focus', () => showTooltip(link));
+    link.addEventListener('blur', hideTooltip);
+    link.addEventListener('click', () => { hideTooltip(); switchTab(link.dataset.tab); });
   });
+  window.addEventListener('resize', hideTooltip);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') hideTooltip(); });
 }
 
 /* ─── Fuselage Helpers ─── */
@@ -296,6 +354,9 @@ function updateFuselageViews() {
 
 /* ─── Init ─── */
 async function init() {
+  store.ready=store.load();
+  await store.ready;
+  setupManufacturing();
   setupTheme();
   setupSidebar();
   renderFuseControls();
@@ -310,6 +371,26 @@ async function init() {
     return;
   }
   restoreProject();
+  setupProjects();
+  $('saveProjectButton').addEventListener('click',async()=>{
+    saveProject();
+    try {await store.flush();notify('Tasarım bu bilgisayara kaydedildi.');}
+    catch(e){notify(e.message);}
+  });
+  document.addEventListener('change',e=>{
+    if(e.target.matches('input,select') && !e.target.closest('#fuse-manual-controls'))saveProject();
+  });
+  let draftTimer;
+  document.addEventListener('input',e=>{
+    if(!e.target.matches('input,select'))return;
+    clearTimeout(draftTimer);draftTimer=setTimeout(saveProject,400);
+  });
+  window.addEventListener('pagehide',()=>{
+    if(window.projectOpening)return;
+    saveProject();
+    if(store.initialized)navigator.sendBeacon('/api/settings',new Blob([JSON.stringify(store.cache)],{type:'application/json'}));
+  });
+  if(store.initialized && store.get('zeta-project'))store.status('Son tasarım yüklendi. Modeli açmak için Hesapla’ya basın.');
 }
 
 // Masaüstü uygulamasında sunucu, bu sekme açık kaldığı sürece çalışır
@@ -360,6 +441,8 @@ function setupTheme() {
 function applyTheme() {
   const dark = document.documentElement.dataset.theme === 'dark';
   $('darkToggle').querySelector('i').className = dark ? 'ph ph-sun' : 'ph ph-moon';
+  $('darkToggle').setAttribute('aria-label', dark ? 'Açık temaya geç' : 'Koyu temaya geç');
+  $('darkToggle').title = dark ? 'Açık temaya geç' : 'Koyu temaya geç';
   if (typeof updateViewerTheme === 'function') updateViewerTheme();
   // Chart.js renkleri oluşturulurken okuduğu için grafikler yeniden çizilir
   if (state.polars) displayCharts(state.polars);
@@ -371,6 +454,10 @@ function restoreProject() {
   let data;
   try { data = JSON.parse(store.get('zeta-project')); } catch (e) { return; }
   if (!data || !data.wingspan) return;
+  if($('projectName'))$('projectName').value=data.project_name||'';
+  setRadio('mode',data.mode||'auto');
+  $('manual-inputs').hidden=(data.mode||'auto')!=='manual';
+  for(const id of MANUAL_FIELDS)if(data.manual?.[id]!=null)$('man_'+id).value=data.manual[id];
 
   $('wingspan').value = data.wingspan;
   $('weight').value = data.weight;
@@ -404,7 +491,11 @@ function restoreProject() {
 }
 
 function saveProject() {
+  if(window.projectOpening)return;
   store.set('zeta-project', JSON.stringify({
+    project_name:$('projectName')?.value||'',
+    mode:radioValue('mode','auto'),
+    manual:Object.fromEntries(MANUAL_FIELDS.map(id=>[id,$('man_'+id).value])),
     wingspan: $('wingspan').value,
     weight: $('weight').value,
     airfoil_code: $('airfoil').value,

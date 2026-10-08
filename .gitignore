@@ -15,4 +15,5 @@ node_modules/
 .opencode/
 build/
 dist/
+/outputs/
 *.spec

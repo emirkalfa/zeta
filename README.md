@@ -54,6 +54,8 @@ Masaüstünde yalnızca bir simge istiyorsanız uygulamayı ayrı bir klasöre k
 
 ### Model ve montaj ayrıntıları
 
+Çalışma sürümünde her kanat yarısı, kanat profili biçimindeki gövde yuvasına oturur ve tek metal pimle tutulur. STL ayarlarındaki **Kanat sabitleme pimi çapı** (varsayılan 3 mm) ve **Kanat kökü oturma derinliği** (varsayılan 8 mm, 4–12 mm) ile bağlantı yeniden oluşturulur. Yuva ve pim deliği gerçek üretim önizlemesinde ve gövde/kanat STL parçalarında bulunur. Başlı, emniyet klipsli pim ayrıca alınır; kök geçmesini önce deneme baskısıyla kontrol edin. Karbon boru kanalları iç takviye için korunur.
+
 Üç kanat planformu, üç yükseklik konumu ve klasik/T/V kuyruk düzenleri bulunur. Çift bomlu gövdede kuyruk yerleşimleri gövdeye uygun biçimde oluşturulur. Kanat yüksekliği değişince gövde yuvaları, kanat motorları ve çift bomlu kuyruk birlikte güncellenir.
 
 Gövde kapağı ayrı parçadır. Kanat/kuyruk geçmeleri ve vida/somun yuvaları ZIP'e yansır. Kanat motorlarının ayrı alt servis kapakları içeriden vidalamaya erişim sağlar. Savaşan İHA'nın tek arka motorunda montaj yüzeyi girilen motor çapına uyarlanır. Delikler bu çapa sığmıyorsa ölçü hatası gösterilir. Flap, aileron, elevator ve rudder/ruddervator parçaları ayrı basılır ve modeldeki pimli menteşeleri kullanır; metal pim, servo ve itme çubukları donanım olarak ayrıca alınır, servo modeline özel yatak değildir.
@@ -110,3 +112,28 @@ Paketler `dist/release/` altında oluşur. Yerel paketleyici yalnız çalıştı
 | Testler ve karşılaştırma koordinatları | `tests/` |
 
 Sürüm geçmişi: [CHANGELOG.md](CHANGELOG.md). Lisans: [MIT](LICENSE).
+
+
+### Kanat dilimlerinin vidalı montajı (3.2.3)
+
+Arayüzde varsayılan **Geçmeli ve vidalı** modda sabit kanatlar yazıcı hacmine göre dilimlenir. Her birleşimde toplam dört vida
+ve bu vidaları taşıyan iki dar veya tek geniş geçmeli köprü oluşturulur.
+`wing_*_join_*_bridge_*.stl` dosyaları köprülerdir; ZIP içindeki `MONTAJ.txt`
+hangi köprünün hangi iki kanat dilimine oturacağını belirtir.
+
+1. Önce mevcut geçme deneme parçalarını basıp boşluk ayarını kontrol edin.
+2. Kanat dilimlerini boru kanalları hizalanacak şekilde yerleştirin.
+3. Mor gösterilen köprüleri üst yüzeydeki eşleşen yuvalarına oturtun.
+4. Alt yüzden altıgen somunları yuvalarına yerleştirip tutun; vidaları üstten
+   takın. Önce hepsini gevşek yerleştirin, hizaladıktan sonra sıkın.
+5. Vida boyunu gerçek basılı parça ve donanımla kontrol edin. Vidalar, somunlar
+   ve karbon borular satın alınır; STL'de basılan parçalar değildir.
+
+Kanadın gövdeye bağlantısı mevcut profil yuvası ve tek emniyetli metal pimle
+kalır. Flap/aileron, kuyruk ve diğer parçaların mevcut dilim montaj yöntemi
+korunur. Bağlantı için yeterli et kalınlığı veya erişim yoksa eksik bağlantılı
+ZIP verilmez; uygulama ilgili ayarlara yönlendiren bir açıklama gösterir.
+3D önizleme ve ZIP aynı üretim geometrisini kullanır. Geometrik testler gerçek
+baskının dayanım, titreşim ve uçuşa elverişlilik testlerinin yerine geçmez.
+
+Önceki yapıştırmalı yöntem, STL ayarlarındaki **Kanat dilim bağlantısı** alanından ayrıca seçilebilir. Eski API istemcilerinde `wingJoinMode` gönderilmezse önceki yöntem korunur; yeni arayüz `bolted` değerini açıkça gönderir. Vidalı üretimde yer bulunamazsa otomatik olarak yapıştırmalı yönteme geçilmez.

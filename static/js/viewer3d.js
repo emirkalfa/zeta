@@ -228,8 +228,15 @@ function toggleFuselage() {
 
 function animate() {
   animFrame = requestAnimationFrame(animate);
+  if (!viewerPaneVisible('three-container')) return;
   if (controls) controls.update();
   if (renderer && scene && camera) renderer.render(scene, camera);
+}
+
+function viewerPaneVisible(id) {
+  if(document.hidden)return false;
+  const container=document.getElementById(id);
+  return !!(container && container.clientWidth && container.clientHeight);
 }
 
 function onResize() {
@@ -1005,10 +1012,23 @@ function buildFuseViewerFuselage(geom, wingCoords) {
   disposeModel(fuseViewerGroup);
   fuseViewerGroup.clear();
   const showAircraft = document.getElementById('fuseShowAircraft')?.checked;
+  const production=typeof manufacturingResult!=='undefined'?manufacturingResult:null;
+  if(production?.parts?.length){
+    for(const part of production.parts){
+      if(!showAircraft&&!/^(body|hatch)(_|$)/.test(part.name))continue;
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices.map(v=>v/1000),3));
+      geometry.setIndex(part.faces);geometry.computeVertexNormals();
+      const color=part.name.includes('_join_')?0x9b85c4:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
+      const mesh=new THREE.Mesh(geometry,modelMaterial(color));mesh.material.flatShading=true;mesh.userData.partName=part.name;
+      fuseViewerGroup.add(mesh);
+    }
+  }else{
   fuseViewerGroup.add(buildFuselageGroup(geom, geom.fuse_type, wingCoords));
   if (showAircraft && fuseViewerWingGrid) fuseViewerGroup.add(buildWingGroup(geom, fuseViewerWingGrid));
   if (showAircraft && fuseViewerTailCoords) {
     fuseViewerGroup.add(buildTailGroup(geom, fuseViewerTailCoords, fuseViewerVtailCoords || fuseViewerTailCoords));
+  }
   }
 
   // Modeli ızgaranın ortasına, zemine oturacak şekilde yerleştir
@@ -1027,12 +1047,14 @@ function updateFuseViewer(geom, wingCoords) {
 function animateFuseViewer() {
   if (!fuseViewerRunning) return;
   fuseViewerAnimFrame = requestAnimationFrame(animateFuseViewer);
+  if (!viewerPaneVisible('fuse-three-container')) return;
   fuseViewerControls.update();
   fuseViewerRenderer.render(fuseViewerScene, fuseViewerCamera);
 }
 
 function disposeFuseViewer() {
   if (fuseViewerAnimFrame) cancelAnimationFrame(fuseViewerAnimFrame);
+  if (fuseViewerScene) disposeViewerScene(fuseViewerScene);
   if (fuseViewerRenderer) {
     fuseViewerRenderer.dispose();
     const c = document.getElementById('fuse-three-container');
@@ -1046,6 +1068,8 @@ function disposeFuseViewer() {
 
 function disposeViewer() {
   if (animFrame) cancelAnimationFrame(animFrame);
+  window.removeEventListener('resize', onResize);
+  if (scene) disposeViewerScene(scene);
   if (renderer) {
     renderer.dispose();
     const c = document.getElementById('three-container');
@@ -1055,6 +1079,17 @@ function disposeViewer() {
   scene = null; camera = null; renderer = null; controls = null;
   wingGroup = null; fuseGroup = null; tailGroup = null;
   viewer = null;
+}
+
+function disposeViewerScene(root) {
+  const geometries=new Set(),materials=new Set();
+  root.traverse(obj=>{
+    if(obj.geometry)geometries.add(obj.geometry);
+    for(const material of (Array.isArray(obj.material)?obj.material:[obj.material]))if(material)materials.add(material);
+    if(obj.shadow)obj.shadow.dispose();
+  });
+  geometries.forEach(item=>item.dispose());
+  materials.forEach(item=>item.dispose());
 }
 
 function updateViewerTheme() {

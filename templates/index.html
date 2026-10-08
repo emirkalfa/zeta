@@ -5,12 +5,12 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>ZETA · Uçak Tasarım Stüdyosu</title>
-<link href="/static/favicon.svg" rel="icon" type="image/svg+xml"/>
+<link href="/static/zeta.ico?v=3.2.1" rel="icon" type="image/x-icon" sizes="16x16 24x24 32x32 48x48 64x64 128x128 256x256"/>
 <script>
   // Temayı ilk boyamadan önce uygula (açılışta yanıp sönmesin)
   try {
     const t = localStorage.getItem('zeta-theme')
-      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      || 'light';
     document.documentElement.dataset.theme = t;
   } catch (e) {}
 </script>
@@ -23,21 +23,22 @@
 <script src="/static/vendor/chart.umd.min.js"></script>
 <link href="/static/css/studio.css" rel="stylesheet"/></head>
 <body>
+<div class="nav-tooltip" id="navTooltip" role="tooltip" hidden></div>
 <div id="app">
 <aside id="sidebar">
-<div class="brand">
-<span class="brand-mark"><svg aria-hidden="true" class="brand-logo" viewBox="0 0 256 256" viewbox="0 0 64 64"><use href="/static/favicon.svg#mark"></use></svg>ZETA</span>
+<div class="brand" title="ZETA, uçak tasarım stüdyosu">
+<span class="brand-mark"><svg aria-hidden="true" class="brand-logo" viewBox="0 0 256 256" viewbox="0 0 64 64"><use href="/static/favicon.svg#mark"></use></svg><span class="brand-wordmark">ZETA</span></span>
 <span class="brand-sub">Uçak tasarım stüdyosu</span>
 </div>
 <ol id="sidebar-nav">
-<li><button class="sidebar-link active" data-tab="input"><span class="nav-num">01</span>Parametreler</button></li>
-<li><button class="sidebar-link" data-tab="results" disabled=""><span class="nav-num">02</span>Ölçüler</button></li>
-<li><button class="sidebar-link" data-tab="viewer" disabled=""><span class="nav-num">03</span>3D model</button></li>
-<li><button class="sidebar-link" data-tab="fuse" disabled=""><span class="nav-num">04</span>Gövde</button></li>
-<li><button class="sidebar-link" data-tab="charts" disabled=""><span class="nav-num">05</span>Analiz</button></li>
-<li><button class="sidebar-link" data-tab="flight" disabled=""><span class="nav-num">06</span>Ön değerlendirme</button></li>
-<li><button class="sidebar-link" data-tab="mission" disabled=""><span class="nav-num">07</span>Görev</button></li>
-<li><button class="sidebar-link" data-tab="stl" disabled=""><span class="nav-num">08</span>STL indirme</button></li>
+<li class="sidebar-item"><button class="sidebar-link active" data-tab="input" aria-label="Parametreler" aria-describedby="navTooltip" aria-current="page"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i><span class="nav-label">Parametreler</span></button></li>
+<li class="sidebar-item"><button class="sidebar-link" data-tab="results" aria-label="Ölçüler" aria-describedby="navTooltip" disabled><i class="ph ph-ruler" aria-hidden="true"></i><span class="nav-label">Ölçüler</span></button></li>
+<li class="sidebar-item"><button class="sidebar-link" data-tab="viewer" aria-label="3D model" aria-describedby="navTooltip" disabled><i class="ph ph-cube" aria-hidden="true"></i><span class="nav-label">3D model</span></button></li>
+<li class="sidebar-item"><button class="sidebar-link" data-tab="fuse" aria-label="Gövde" aria-describedby="navTooltip" disabled><i class="ph ph-airplane-tilt" aria-hidden="true"></i><span class="nav-label">Gövde</span></button></li>
+<li class="sidebar-item"><button class="sidebar-link" data-tab="charts" aria-label="Analiz" aria-describedby="navTooltip" disabled><i class="ph ph-chart-line" aria-hidden="true"></i><span class="nav-label">Analiz</span></button></li>
+<li class="sidebar-item"><button class="sidebar-link" data-tab="flight" aria-label="Ön değerlendirme" aria-describedby="navTooltip" disabled><i class="ph ph-gauge" aria-hidden="true"></i><span class="nav-label">Ön değerlendirme</span></button></li>
+<li class="sidebar-item"><button class="sidebar-link" data-tab="mission" aria-label="Görev" aria-describedby="navTooltip" disabled><i class="ph ph-target" aria-hidden="true"></i><span class="nav-label">Görev</span></button></li>
+<li class="sidebar-item"><button class="sidebar-link" data-tab="stl" aria-label="STL indirme" aria-describedby="navTooltip" disabled><i class="ph ph-download-simple" aria-hidden="true"></i><span class="nav-label">STL indirme</span></button></li>
 </ol>
 <p class="nav-hint" id="navHint">Diğer adımlar ilk hesaplamadan sonra açılır.</p>
 <div class="sidebar-foot">
@@ -59,6 +60,24 @@
 </div>
 </header>
 <form id="paramForm" novalidate="">
+<details class="form-section settings-card" open="" id="projectManager"><summary>Projelerim</summary>
+<div class="form-grid">
+<div class="field"><label for="projectName">Proje adı</label><input id="projectName" maxlength="100" placeholder="Örneğin: Eğitim uçağım" type="text"/></div>
+<div class="field"><label for="savedProjects">Bu bilgisayardaki projeler</label><select id="savedProjects"><option value="">Kayıtlar yükleniyor…</option></select></div>
+</div>
+<div class="project-actions">
+<button class="btn" id="saveNamedProject" type="button">Proje olarak kaydet</button>
+<button class="btn" id="openSavedProject" type="button">Seçili projeyi aç</button>
+<button class="btn" id="exportProject" type="button">Proje dosyasını indir</button>
+<button class="btn" id="importProject" type="button">Bilgisayardan aç</button>
+<input id="projectFile" type="file" accept=".json,.zeta" hidden=""/>
+</div>
+<p id="projectLibraryStatus" role="status">Her kayıt ayrı bir kopyadır. Proje açarken mevcut tasarım otomatik yedeklenir.</p>
+</details>
+<div class="form-section">
+<button id="saveProjectButton" type="button" class="btn">Tasarımı kaydet</button>
+<p id="projectSaveStatus" role="status" aria-live="polite">Son tasarım bu bilgisayara otomatik kaydedilir.</p>
+</div>
 <div class="form-section">
 <div class="form-section-head">
 <h3>Temel ölçüler</h3>
@@ -287,7 +306,7 @@
 <details class="form-section settings-card"><summary>BLDC motor ve pervane montajı</summary>
 <div class="form-section-head"><p>Ölçüler örnektir; satın alacağınız motorun arka bağlantı ölçülerini girin. Kanat açıklığı değişse de motor ve vida ölçüleri korunur.</p></div>
 <div class="form-grid">
-<div class="field"><label for="motorLayout">Motor yerleşimi</label><select id="motorLayout"><option value="none">Montaj ekleme</option><option value="single">Tek motor — gövde (Savaşan İHA’da arka)</option><option value="twin">Çift motor — sağ ve sol kanat</option></select></div>
+<div class="field"><label for="motorLayout">Motor yerleşimi</label><select id="motorLayout"><option value="none">Montaj ekleme</option><option value="single">Tek motor, gövde (Savaşan İHA’da arka)</option><option value="twin">Çift motor, sağ ve sol kanat</option></select></div>
 <div class="field"><label for="motorPattern">Dört vida düzeni</label><select id="motorPattern"><option value="cross">Çapraz: iki karşılıklı çift</option><option value="rectangle">Dikdörtgen: dört köşe</option></select></div>
 <div class="field"><label for="motorDiameter">Motor dış çapı</label><div class="input-wrap"><input id="motorDiameter" max="100" min="10" step="0.1" type="number" value="28"/><span class="unit">mm</span></div></div>
 <div class="field"><label for="motorLength">Montaj yüzünden motorun önüne uzunluk</label><div class="input-wrap"><input id="motorLength" max="150" min="8" step="0.1" type="number" value="30"/><span class="unit">mm</span></div></div>
@@ -304,6 +323,16 @@
 <label class="toggle-row"><input checked="" id="motorHardwareView" type="checkbox"/>Motor ve pervane ölçü referansını göster</label>
 <p class="hint">Çapraz düzende aralıklar karşılıklı deliklerin merkezleri arasındadır; dikdörtgen düzende köşe deliklerinin dikey/yatay aralıklarıdır. Üretim önizlemesi gerçek delikleri gösterir. Motor ve pervane görüntüleri STL'ye eklenmez; taşıyıcılar gövde/kanat STL'sine dahildir. Güç hesabına tüm motorların toplam elektrik gücünü girin.</p>
 </details>
+<details class="settings-card" open=""><summary>Burun kamerası</summary>
+<div class="form-grid">
+<div class="field"><label for="cameraMount">Kamera yuvası</label><select id="cameraMount"><option value="0">Ekleme</option><option value="1" selected>Burun altı, iki yan vida</option></select></div>
+<div class="field"><label for="cameraWidth">Kamera genişliği</label><div class="input-wrap"><input id="cameraWidth" type="number" min="10" max="60" step="0.1" value="19"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="cameraHeight">Kamera yüksekliği</label><div class="input-wrap"><input id="cameraHeight" type="number" min="10" max="60" step="0.1" value="19"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="cameraDepth">Kamera kasa derinliği</label><div class="input-wrap"><input id="cameraDepth" type="number" min="10" max="80" step="0.1" value="25"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="cameraScrew">Yan vida çapı</label><div class="input-wrap"><input id="cameraScrew" type="number" min="1.5" max="4" step="0.1" value="2"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="cameraHoleX">Ön yüzden vida merkezine mesafe</label><div class="input-wrap"><input id="cameraHoleX" type="number" min="3" max="77" step="0.1" value="12"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="cameraHoleY">Üst yüzden vida merkezine mesafe</label><div class="input-wrap"><input id="cameraHoleY" type="number" min="3" max="57" step="0.1" value="9.5"/><span class="unit">mm</span></div></div>
+</div><p class="hint">Örnek ölçülerdir. İki yanında metal vida yuvası olan kameralar içindir. Kamera aşağıdan takılır; kablosu açık arka taraftan çıkar. Lens dahil görüş alanı gerçek kamerayla kontrol edilir.</p></details>
 <div class="form-actions">
 <button class="btn btn-primary" id="calculateBtn" type="submit">Hesapla</button>
 <p class="form-error" hidden="" id="formError" role="alert"></p>
@@ -341,8 +370,14 @@
 </header>
 <div class="viewport" id="three-container"></div>
 <p class="hint" id="modelPreviewStatus" role="status">Hesapla düğmesinden sonra STL parçalarının gerçek önizlemesi otomatik hazırlanır.</p>
-<label class="toggle-row"><input checked="" id="motorCoverView" type="checkbox"/>Motor servis kapaklarını göster — iç bağlantıları görmek için kapatın</label>
+<label class="toggle-row"><input checked="" id="motorCoverView" type="checkbox"/>Motor servis kapaklarını göster, iç bağlantıları görmek için kapatın</label>
 <label class="toggle-row" for="internalStructureView"><input id="internalStructureView" type="checkbox"/>İç yapıyı göster</label>
+<div class="control-preview-row" id="mountDetailPanel" hidden="">
+<div class="field"><label for="mountDetailSelect">Vida ve bağlantı deliğini seç</label><select id="mountDetailSelect"></select></div>
+<button class="btn" id="focusMountDetail" type="button">Yakın plan</button>
+<button class="btn" id="resetMountDetail" type="button">Tüm modeli göster</button>
+</div>
+<p class="hint" id="mountDetailStatus" role="status">Gerçek STL parçaları hazır olduğunda vida delikleri ve montaj noktalarını tek tek yakınlaştırabilirsiniz.</p>
 <div class="control-preview-row" id="controlPreviewPanel" hidden="">
 <div class="field"><label for="controlPreviewSelect">Hareketli parçayı incele</label><select id="controlPreviewSelect"></select></div>
 <div class="field"><label for="controlPreviewAngle">Menteşe açısı <output id="controlPreviewValue">0°</output></label><input id="controlPreviewAngle" type="range" min="-25" max="25" step="1" value="0"/></div>
@@ -371,7 +406,7 @@
 <div class="fuse-preview">
 <div class="viewport" id="fuse-three-container"></div>
 <p class="hint">Sürükle: döndür · Tekerlek: yakınlaştır</p>
-<p class="hint">STL adımındaki Üretim önizlemesi, ayrı kapağı ve gerçek montaj deliklerini gösterir.</p>
+<p class="hint" id="fusePreviewStatus" role="status">Gerçek STL önizlemesi hazırlanırken gövde dış şekli gösterilir. Hazır olduğunda yuvalar ve pim delikleri burada da görünür.</p>
 </div>
 <aside class="fuse-properties">
 <h3>Gövde oranları</h3>
@@ -556,7 +591,10 @@
 <div class="field"><label for="printBedY">Tabla derinliği</label><div class="input-wrap"><input id="printBedY" max="1000" min="80" type="number" value="220"/><span class="unit">mm</span></div></div>
 <div class="field"><label for="printBedZ">Baskı yüksekliği</label><div class="input-wrap"><input id="printBedZ" max="1000" min="80" type="number" value="250"/><span class="unit">mm</span></div></div>
 <div class="field"><label for="fitClearance">Geçme boşluğu (toplam)</label><div class="input-wrap"><input id="fitClearance" max="0.8" min="0.1" step="0.05" type="number" value="0.3"/><span class="unit">mm</span></div></div>
-<div class="field"><label for="mountScrew">Vida çapı</label><div class="input-wrap"><input id="mountScrew" max="5" min="2" step="0.1" type="number" value="3"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="wingJoinMode">Kanat dilim bağlantısı</label><select id="wingJoinMode"><option value="bolted" selected>Geçmeli ve vidalı</option><option value="bonded">Yapıştırmalı (önceki yöntem)</option></select></div>
+<div class="field"><label for="wingPin">Kanat sabitleme pimi çapı</label><div class="input-wrap"><input id="wingPin" max="5" min="2" step="0.1" type="number" value="3"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="wingSeatDepth">Kanat kökü oturma derinliği</label><div class="input-wrap"><input id="wingSeatDepth" max="12" min="4" step="1" type="number" value="8"/><span class="unit">mm</span></div></div>
+<div class="field"><label for="mountScrew">Dilim, kapak ve kuyruk vida çapı</label><div class="input-wrap"><input id="mountScrew" max="5" min="2" step="0.1" type="number" value="3"/><span class="unit">mm</span></div></div>
 <div class="field"><label for="mountNutFlat">Somun karşılıklı yüz mesafesi</label><div class="input-wrap"><input id="mountNutFlat" max="10" min="4" step="0.1" type="number" value="5.5"/><span class="unit">mm</span></div></div>
 <div class="field"><label for="mountNutHeight">Somun kalınlığı</label><div class="input-wrap"><input id="mountNutHeight" max="5" min="1.5" step="0.1" type="number" value="2.4"/><span class="unit">mm</span></div></div>
 <div class="field"><label for="hingePin">Menteşe metal pim çapı</label><div class="input-wrap"><input id="hingePin" max="3" min="1.5" step="0.5" type="number" value="2"/><span class="unit">mm</span></div></div>
@@ -567,6 +605,7 @@
 <div class="form-section">
 <div class="form-actions"><button class="btn" id="manufacturingPreview">Üretim önizlemesi</button><button class="btn btn-primary" id="manufacturingDownload">Tüm parçaları STL olarak indir (ZIP)</button></div>
 <p class="hint" id="manufacturingStatus" role="status">Önce küçük tolerans parçalarını basın. Motor taşıyıcısının yük, titreşim ve ısı dayanımı ayrıca doğrulanmalıdır.</p>
+<section id="manufacturingIssue" class="manufacturing-issue" role="alert" hidden=""></section>
 </div>
 <h3>Parçalı STL indirme</h3>
 <p class="hint">Her ZIP içinde baskı parçaları ayrı STL dosyalarıdır. Parçaların boyutunu yukarıdaki yazıcı ölçüleri belirler; bağlantı yuvaları ve vida delikleri korunur.</p>
@@ -604,8 +643,10 @@
 </div>
 <div class="toast" hidden="" id="toast" role="status"></div>
 <script src="/static/js/fuselage.js"></script>
+<script src="/static/js/manufacturing-help.js"></script>
 <script src="/static/js/assembly.js"></script>
 <script src="/static/js/app.js"></script>
+<script src="/static/js/projects.js"></script>
 <script src="/static/js/aircraftmodel.js"></script>
 <script src="/static/js/viewer3d.js"></script>
 <script src="/static/js/charts.js"></script>

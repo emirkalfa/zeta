@@ -58,10 +58,35 @@ function aircraftPanelSpecs(g, wingCoords, hCoords, vCoords) {
 }
 
 let manufacturingResult = null;
-let manufacturingOverlay = null;
+var manufacturingOverlay = null;
+let detailViewVisibility=null;
+let mountingDetailTargets=[];
 let manufacturingTimer=null, manufacturingRevision=0;
+let manufacturingRequestActive=null;
+// Keep native mesh generation single-flight. Cancelling fetch would not stop
+// the server's geometry work, so superseded previews wait and then disappear.
+async function requestManufacturing(mode,filter,stamp,revision=null) {
+  const key=mode+'|'+filter+'|'+stamp;
+  while(manufacturingRequestActive) {
+    const active=manufacturingRequestActive;
+    if(active.key===key) return active.promise;
+    try {await active.promise;} catch(e) { /* next request can still succeed */ }
+    if(revision!==null && revision!==manufacturingRevision)return null;
+  }
+  if(revision!==null && revision!==manufacturingRevision)return null;
+  const active={key};
+  active.promise=(async()=>{
+    const res=await fetch(`/api/manufacturing?mode=${mode}&part=${filter}`,{method:'POST',headers:{'Content-Type':'application/json'},body:stamp});
+    const data=mode==='zip' && res.ok?await res.blob():await res.json();
+    if(!res.ok)throw new Error(data.error||'Üretim hesabı tamamlanamadı.');
+    return data;
+  })();
+  manufacturingRequestActive=active;
+  try {return await active.promise;}
+  finally {if(manufacturingRequestActive===active)manufacturingRequestActive=null;}
+}
 function previewStatus(message) {
-  for(const id of ['manufacturingStatus','modelPreviewStatus']) {const el=$(id);if(el)el.textContent=message;}
+  for(const id of ['manufacturingStatus','modelPreviewStatus','fusePreviewStatus']) {const el=$(id);if(el)el.textContent=message;}
 }
 function scheduleManufacturingPreview() {
   clearTimeout(manufacturingTimer);
@@ -71,18 +96,18 @@ function scheduleManufacturingPreview() {
   manufacturingTimer=setTimeout(async()=>{
     try {
       const stamp=JSON.stringify(manufacturingPayload());
-      const res=await fetch('/api/manufacturing?mode=preview&part=all',{method:'POST',headers:{'Content-Type':'application/json'},body:stamp});
-      const data=await res.json();
+      const data=await requestManufacturing('preview','all',stamp,revision);
+      if(!data)return;
       if(revision!==manufacturingRevision || stamp!==JSON.stringify(manufacturingPayload()))return;
-      if(!res.ok)throw new Error(data.error||'STL önizlemesi oluşturulamadı.');
       manufacturingResult=data;showManufacturingPreview(data,false);
       previewStatus('STL ile aynı parçalar gösteriliyor. Turuncu parçalar sökülebilir motor kapaklarıdır.');
     } catch(e) {if(revision===manufacturingRevision)previewStatus('STL önizlemesi hazır değil: '+e.message);}
   },750);
 }
+const CAMERA_FIELDS=['cameraMount','cameraWidth','cameraHeight','cameraDepth','cameraScrew','cameraHoleX','cameraHoleY'];
 const MOTOR_FIELDS=['motorLayout','motorPattern','motorDiameter','motorLength','motorSpacingY','motorSpacingZ','motorBore','motorScrew','motorPlate','motorWire','propDiameter','propOffset','motorStation'];
 function motorMountSettings() {
-  return Object.fromEntries(MOTOR_FIELDS.map(id=>[id,['motorLayout','motorPattern'].includes(id)?$(id).value:Number($(id).value)]));
+  return Object.fromEntries(MOTOR_FIELDS.map(id=>[id,['motorLayout','motorPattern','wingJoinMode'].includes(id)?$(id).value:Number($(id).value)]));
 }
 function motorPreviewSpecs(g,settings,sections) {
   if(!settings || settings.motorLayout==='none')return [];
@@ -103,9 +128,10 @@ function motorPreviewSpecs(g,settings,sections) {
 function manufacturingPayload() {
   if (!checkGeom()) throw new Error('Önce Hesapla düğmesine basın.');
   const g=state.geometry;
-  const options={};
+  const options={wingJoinMode:$('wingJoinMode')?.value||'bolted'};
   Object.assign(options,motorMountSettings());
-  for (const [key,id] of Object.entries({bedX:'printBedX',bedY:'printBedY',bedZ:'printBedZ',wall:'wallThickness',clearance:'fitClearance',screw:'mountScrew',nutFlat:'mountNutFlat',nutHeight:'mountNutHeight',sparMain:'sparMainDia',sparRear:'sparRearDia',sparRearPosition:'sparRearPosition',ribSpacing:'ribSpacing',ribThickness:'ribThickness',hingePin:'hingePin',controlTravel:'controlTravel'})) options[key]=Number($(id).value);
+  for(const id of CAMERA_FIELDS)options[id]=Number($(id).value);
+  for (const [key,id] of Object.entries({bedX:'printBedX',bedY:'printBedY',bedZ:'printBedZ',wall:'wallThickness',clearance:'fitClearance',screw:'mountScrew',wingPin:'wingPin',wingSeatDepth:'wingSeatDepth',nutFlat:'mountNutFlat',nutHeight:'mountNutHeight',sparMain:'sparMainDia',sparRear:'sparRearDia',sparRearPosition:'sparRearPosition',ribSpacing:'ribSpacing',ribThickness:'ribThickness',hingePin:'hingePin',controlTravel:'controlTravel'})) options[key]=Number($(id).value);
   const sections=buildFuselageSections(g,g.fuse_type,state.airfoilCoords).sections;
   syncWingPlacement(g,sections);
   return {geometry:g, options, fuselage:sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000])), panels:aircraftPanelSpecs(g,state.airfoilCoords,state.tailCoords,state.vtailCoords||state.tailCoords)};
@@ -113,6 +139,7 @@ function manufacturingPayload() {
 
 function showManufacturingPreview(data,focus=true) {
   if (!scene) return;
+  resetMountDetail(false);
   if (manufacturingOverlay) {scene.remove(manufacturingOverlay);disposeModel(manufacturingOverlay);}
   manufacturingOverlay=new THREE.Group();
   for (const part of data.parts) {
@@ -120,8 +147,8 @@ function showManufacturingPreview(data,focus=true) {
     geo.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices.map(v=>v/1000),3));
     geo.setIndex(part.faces);geo.computeVertexNormals();
     const control=(data.manifest.controls||[]).find(c=>part.name===c.part||part.name.startsWith(c.part+'_'));
-    const color=control?({flap:0x3b7dd8,aileron:0xe8590c,elevator:0x2a9d8f,ruddervator:0x2a9d8f,rudder:0xd4a017}[control.kind]):part.name.includes('tail_center_joint')?0x2a9d8f:part.name.includes('_service_cover')?0xef9353:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
-    const mesh=new THREE.Mesh(geo,modelMaterial(color));mesh.userData.partName=part.name;
+    const color=part.name.includes('_join_')?0x9b85c4:control?({flap:0x3b7dd8,aileron:0xe8590c,elevator:0x2a9d8f,ruddervator:0x2a9d8f,rudder:0xd4a017}[control.kind]):part.name.includes('tail_center_joint')?0x2a9d8f:part.name.includes('_service_cover')?0xef9353:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
+    const mesh=new THREE.Mesh(geo,modelMaterial(color));mesh.material.flatShading=true;mesh.userData.partName=part.name;
     if(part.name.includes('_service_cover'))mesh.visible=$('motorCoverView').checked;
     manufacturingOverlay.add(mesh);
   }
@@ -135,6 +162,8 @@ function showManufacturingPreview(data,focus=true) {
     for(const c of controls){const option=document.createElement('option');option.value=c.part;option.textContent=controlLabel(c);select.append(option);}
     $('controlPreviewAngle').value='0';applyControlPreviewAngle();
   }
+  setupMountingDetails(data.manifest||{});
+  if(typeof updateFuseViewer==='function'&&typeof state!=='undefined')updateFuseViewer(state.geometry,state.airfoilCoords);
   if(!focus)return;
   switchTab('viewer');
   const box=new THREE.Box3().setFromObject(manufacturingOverlay), sphere=box.getBoundingSphere(new THREE.Sphere());
@@ -143,9 +172,67 @@ function showManufacturingPreview(data,focus=true) {
   notify('Gerçek üretim geometrisi gösteriliyor: kapak, delikler ve montaj yuvaları dahil.');
 }
 
+function makeMountingDetails(manifest) {
+  const targets=[];
+  const add=(label,part,parent,point,axis,category)=>{
+    if(!part||!Array.isArray(point)||point.length!==3||!Array.isArray(axis)||axis.length!==3)return;
+    targets.push({id:`detail-${targets.length}`,label,part,parent,point:point.map(Number),axis:axis.map(Number),category});
+  };
+  (manifest.hatch_bolts_mm||[]).forEach((p,i)=>add(`Gövde kapağı, vida deliği ${i+1}`, 'body','body',p,[0,1,0],'bolt'));
+  (manifest.interfaces||[]).forEach((j,i)=>add(`${j.parent} ↔ ${j.part}, ${j.fastener_type==='retaining_pin'?'kanat pimi':'bağlantı vidası'} ${i+1}`,j.part,j.parent,j.bolt_point_mm,j.bolt_axis,'bolt'));
+  (manifest.motors||[]).forEach(m=>{
+    const [x,y,z]=m.face_mm||[],axis=m.axis||[1,0,0];
+    if(![x,y,z].every(Number.isFinite))return;
+    (m.hole_centers_yz_mm||[]).forEach(([dy,dz],i)=>add(`${m.name}, motor vidası ${i+1} (Ø${Number(m.hole_diameter_mm).toFixed(1)} mm)`,m.parent,m.parent,[x,y+dy,z+dz],axis,'bolt'));
+    add(`${m.name}, motor mili deliği (Ø${Number(m.center_bore_mm).toFixed(1)} mm)`,m.parent,m.parent,[x,y,z],axis,'bore');
+    (m.service_screws?.positions_xz_mm||[]).forEach(([sx,sz],i)=>add(`${m.name}, servis kapağı vidası ${i+1}`,m.service_cover||m.parent,m.parent,[sx,y,sz],[0,1,0],'bolt'));
+  });
+  (manifest.cameras||[]).forEach(c=>(c.holes||[]).forEach((h,i)=>add(`Kamera yuvası, yan vida ${i+1} (Ø${c.hole_diameter_mm} mm)`,c.parent,c.parent,h.point_mm,h.axis,'bolt')));
+  (manifest.wing_segment_joints||[]).forEach(j=>(j.holes||[]).forEach((h,i)=>add(`Kanat dilim köprüsü ${j.seam} (${j.parent==='wing_right'?'sağ':'sol'}, köprü ${j.bridge.split('_').pop()}), vida ${i+1}`,j.bridge,j.parent,h.point_mm,h.axis,'bolt')));
+  (manifest.controls||[]).forEach(c=>add(`${controlLabel(c)}, menteşe pimi kanalı`,c.part,c.parent,c.hinge_point_mm,c.hinge_axis,'hinge'));
+  return targets;
+}
+
+function setupMountingDetails(manifest) {
+  const panel=$('mountDetailPanel'),select=$('mountDetailSelect');if(!panel||!select)return;
+  const targets=makeMountingDetails(manifest);select.replaceChildren();panel.hidden=!targets.length;
+  for(const t of targets){const option=document.createElement('option');option.value=t.id;option.textContent=t.label;select.append(option);}
+  mountingDetailTargets=targets;
+  const status=$('mountDetailStatus');if(status)status.textContent=targets.length?`${targets.length} gerçek delik/bağlantı noktası bulundu. Noktayı seçip Yakın plan'a basın.`:'Bu ayarda vida/bağlantı noktası bulunamadı. Motor bağlantıları için önce motor yerleşimi seçin.';
+}
+
+function focusMountingDetail() {
+  const t=mountingDetailTargets?.find(x=>x.id===$('mountDetailSelect')?.value);
+  if(!t||!manufacturingOverlay||!camera||!controls)return;
+  if(!detailViewVisibility)detailViewVisibility=new Map(manufacturingOverlay.children.filter(o=>o.userData.partName).map(o=>[o,o.visible]));
+  const isPart=(n,id)=>n===id||n.startsWith(id+'_');
+  const visibleName=n=>isPart(n,t.part)||(t.parent==='body'?isPart(n,'body'):isPart(n,t.parent));
+  manufacturingOverlay.traverse(mesh=>{if(mesh.userData.partName)mesh.visible=visibleName(mesh.userData.partName);});
+  const target=new THREE.Vector3(...t.point.map(v=>v/1000));viewTarget.copy(target);
+  // Frame a small area around the actual opening; keep a short orbit distance so mouse zoom still works.
+  viewDist=t.category==='hinge' ? .055 : .045;
+  setCameraDirection(t.axis);
+  controls.autoRotate=false;
+  const status=$('mountDetailStatus');if(status)status.textContent=`${t.label}, gerçek STL deliğine yakın plan.`;
+}
+
+function resetMountDetail(restoreCamera=true) {
+  if(detailViewVisibility&&manufacturingOverlay){
+    for(const [o,visible] of detailViewVisibility)if(o.parent)o.visible=visible;
+  }
+  detailViewVisibility=null;
+  if(restoreCamera&&manufacturingOverlay&&camera&&controls){
+    const box=new THREE.Box3().setFromObject(manufacturingOverlay),sphere=box.getBoundingSphere(new THREE.Sphere());
+    viewTarget.copy(sphere.center);
+    const halfV=THREE.MathUtils.degToRad(camera.fov/2),halfH=Math.atan(Math.tan(halfV)*camera.aspect);
+    viewDist=sphere.radius/Math.sin(Math.min(halfV,halfH))*1.05;setCameraDirection(HOME_VIEW);
+  }
+  const status=$('mountDetailStatus');if(status&&restoreCamera)status.textContent='Tüm gövde, kanat ve kuyruk parçaları gösteriliyor.';
+}
+
 function controlLabel(c){
   const kind={flap:'Flap',aileron:'Aileron',elevator:'Elevator',rudder:'Rudder',ruddervator:'V kuyruk kontrolü'}[c.kind]||c.kind;
-  return kind+(c.parent.endsWith('_right')?' — sağ':c.parent.endsWith('_left')?' — sol':'')+(c.segment==='inboard'?' / iç bölüm':c.segment==='outboard'?' / dış bölüm':'');
+  return kind+(c.parent.endsWith('_right')?', sağ':c.parent.endsWith('_left')?', sol':'')+(c.segment==='inboard'?' / iç bölüm':c.segment==='outboard'?' / dış bölüm':'');
 }
 function applyInternalStructureView(){
   if(!manufacturingOverlay)return;
@@ -171,6 +258,7 @@ function applyControlPreviewAngle(){
 }
 
 function invalidateManufacturingPreview() {
+  resetMountDetail(false);
   manufacturingResult=null;
   if (manufacturingOverlay && scene) {scene.remove(manufacturingOverlay);disposeModel(manufacturingOverlay);manufacturingOverlay=null;}
   if (wingGroup) wingGroup.visible=true;
@@ -181,35 +269,47 @@ function invalidateManufacturingPreview() {
 }
 
 async function runManufacturing(mode='preview',filter='all') {
+  clearTimeout(manufacturingTimer);
+  ++manufacturingRevision;
+  if(typeof showManufacturingIssue==='function')showManufacturingIssue('');
   const status=$('manufacturingStatus'), buttons=Array.from(document.querySelectorAll('#manufacturingPreview, #manufacturingDownload, .stl-list button'));
   buttons.forEach(b=>b.disabled=true);
   status.textContent='Parçalar oluşturuluyor; delikler, bağlantılar ve kapalı yüzeyler kontrol ediliyor…';
   try {
     const stamp=JSON.stringify(manufacturingPayload());
-    const res=await fetch(`/api/manufacturing?mode=${mode}&part=${filter}`,{method:'POST',headers:{'Content-Type':'application/json'},body:stamp});
-    if (!res.ok) {const err=await res.json();throw new Error(err.error||'Üretim hesabı tamamlanamadı.');}
+    const data=await requestManufacturing(mode,filter,stamp);
     if(stamp!==JSON.stringify(manufacturingPayload())) throw new Error('Hesaplama sırasında ölçüler değişti. Yeni ayarlarla yeniden üretin.');
     if (mode==='preview') {
-      manufacturingResult=await res.json();showManufacturingPreview(manufacturingResult);
+      manufacturingResult=data;showManufacturingPreview(manufacturingResult);
       status.textContent=manufacturingResult.summary;
     } else {
-      downloadBlob(await res.blob(),`zeta_${filter}_montajli_stl.zip`);
+      downloadBlob(data,`zeta_${filter}_montajli_stl.zip`);
       status.textContent='Parçalı STL paketi indirildi. ZIP dosyasını açın: her baskı parçası ayrı bir STL dosyasıdır. Önce küçük geçme deneme parçalarını basın.';
     }
-  } catch(e) {status.textContent=e.message;notify(e.message);}
+  } catch(e) {
+    status.textContent=e.message;notify(e.message);
+    if(typeof showManufacturingIssue==='function'){
+      showManufacturingIssue(e.message);switchTab('stl');
+      $('manufacturingIssue')?.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
+  }
   finally {buttons.forEach(b=>b.disabled=false);}
 }
 
+const MANUFACTURING_FIELDS=['wingJoinMode','printBedX','printBedY','printBedZ','fitClearance','mountScrew','wingPin','wingSeatDepth','mountNutFlat','mountNutHeight','wallThickness','sparMainDia','sparRearDia','sparRearPosition','ribSpacing','ribThickness','hingePin','controlTravel',...MOTOR_FIELDS,...CAMERA_FIELDS];
+function captureManufacturingSettings() {
+  return Object.fromEntries(MANUFACTURING_FIELDS.map(id=>[id,['motorLayout','motorPattern','wingJoinMode'].includes(id)?$(id).value:Number($(id).value)]));
+}
 function setupManufacturing() {
   $('manufacturingPreview').addEventListener('click',()=>runManufacturing('preview'));
   $('manufacturingDownload').addEventListener('click',()=>runManufacturing('zip'));
   let saved=null;try {saved=JSON.parse(store.get('zeta-manufacturing')||'null');} catch(e) { /* damaged local settings */ }
-  const ids=['printBedX','printBedY','printBedZ','fitClearance','mountScrew','mountNutFlat','mountNutHeight','wallThickness','sparMainDia','sparRearDia','sparRearPosition','ribSpacing','ribThickness','hingePin','controlTravel',...MOTOR_FIELDS];
-  const read=id=>['motorLayout','motorPattern'].includes(id)?$(id).value:Number($(id).value);
+  const ids=MANUFACTURING_FIELDS;
+  const read=id=>['motorLayout','motorPattern','wingJoinMode'].includes(id)?$(id).value:Number($(id).value);
   for (const id of ids) {
     const field=$(id);
     const validNumber=saved && Number.isFinite(saved[id]) && (!field.min || saved[id]>=Number(field.min)) && (!field.max || saved[id]<=Number(field.max));
-    if(saved && (validNumber || (['motorLayout','motorPattern'].includes(id) && Array.from(field.options).some(o=>o.value===saved[id])))) field.value=saved[id];
+    if(saved && (validNumber || (['motorLayout','motorPattern','wingJoinMode'].includes(id) && Array.from(field.options).some(o=>o.value===saved[id])))) field.value=saved[id];
     $(id).addEventListener('change',()=>{
       invalidateManufacturingPreview();store.set('zeta-manufacturing',JSON.stringify(Object.fromEntries(ids.map(k=>[k,read(k)]))));
       if(state.geometry && MOTOR_FIELDS.includes(id)) {
@@ -230,5 +330,8 @@ function setupManufacturing() {
   $('controlPreviewAngle')?.addEventListener('input',applyControlPreviewAngle);
   $('internalStructureView')?.addEventListener('change',applyInternalStructureView);
   $('controlPreviewSelect')?.addEventListener('change',()=>{$('controlPreviewAngle').value='0';applyControlPreviewAngle();});
+  $('focusMountDetail')?.addEventListener('click',focusMountingDetail);
+  $('mountDetailSelect')?.addEventListener('change',focusMountingDetail);
+  $('resetMountDetail')?.addEventListener('click',()=>resetMountDetail(true));
 }
-window.addEventListener('DOMContentLoaded',setupManufacturing);
+// Initialized by app.js after persistent settings have been loaded.

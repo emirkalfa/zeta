@@ -52,6 +52,10 @@ with sync_playwright() as pw:
     page.screenshot(path=str(OUT/'03-grafikler.png'),full_page=True)
     page.locator('button.sidebar-link[data-tab="viewer"]').click()
     page.wait_for_function("document.querySelector('#modelPreviewStatus').textContent.includes('STL ile aynı')",timeout=120000)
+    assert page.evaluate("manufacturingResult.manifest.wing_join_mode==='bolted' && manufacturingResult.manifest.wing_segment_joints.length>0")
+    page.evaluate("()=>{const t=mountingDetailTargets.find(t=>t.label.startsWith('Kanat dilim köprüsü'));document.querySelector('#mountDetailSelect').value=t.id;focusMountingDetail();viewDist=.12;setCameraDirection(t.axis);}")
+    page.screenshot(path=str(OUT/'16-kanat-vida-koprusu.png'))
+    page.locator('#resetMountDetail').click()
     assert page.locator('#controlPreviewPanel').is_visible()
     assert page.locator('#controlPreviewSelect option').count()>=6
     page.locator('#controlPreviewAngle').fill('20');page.locator('#controlPreviewAngle').dispatch_event('input')
@@ -74,6 +78,9 @@ with sync_playwright() as pw:
     manifest=json.loads(archive.read('manifest.json'))
     assert len(manifest['controls'])>=6 and len(manifest['wing_root_fairings'])==2
     assert 'hinge_fit_moving.stl' in archive.namelist()
+    assert manifest['wing_join_mode']=='bolted' and manifest['wing_segment_joints']
+    for joint in manifest['wing_segment_joints']:
+        assert all(n+'.stl' in archive.namelist() for n in [joint['bridge'],*joint['segments']])
     with page.expect_download(timeout=120000) as control_download:
         page.get_by_role('button',name='Kontrol parçaları (ZIP)',exact=True).click()
     control_item=control_download.value;control_item.save_as(str(OUT/control_item.suggested_filename))
