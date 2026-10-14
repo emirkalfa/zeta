@@ -330,6 +330,18 @@ function addMotorHardware(group,motors) {
   const references=new THREE.Group();references.userData.motorHardware=true;
   references.visible=typeof $==='function' && $('motorHardwareView') ? $('motorHardwareView').checked : true;
   for(const m of motors) {
+    if(m.out_axis){
+      const assembly=new THREE.Group();assembly.userData.vtolPart=m.parent;
+      const axis=new THREE.Vector3(...m.out_axis).normalize(),face=new THREE.Vector3(...m.face_mm).multiplyScalar(.001);
+      const length=m.motor_length_mm/1000,radius=m.motor_diameter_mm/2000;
+      const motor=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,length,32),new THREE.MeshStandardMaterial({color:0xe6b388,transparent:true,opacity:.7}));
+      motor.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),axis);motor.position.copy(face).addScaledVector(axis,length/2);assembly.add(motor);
+      const propCenter=new THREE.Vector3(...m.prop_center_mm).multiplyScalar(.001),propRadius=m.prop_diameter_mm/2000;
+      const prop=new THREE.Mesh(new THREE.BoxGeometry(propRadius*2,.012,.002),modelMaterial(0x34424d));
+      prop.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),axis);prop.position.copy(propCenter);assembly.add(prop);
+      const circle=new THREE.Mesh(new THREE.RingGeometry(propRadius-.0008,propRadius,64),new THREE.MeshBasicMaterial({color:0xe6b388,side:THREE.DoubleSide,transparent:true,opacity:.45}));
+      circle.quaternion.copy(prop.quaternion);circle.position.copy(propCenter);assembly.add(circle);references.add(assembly);continue;
+    }
     const [x,y,z]=m.face_mm.map(v=>v/1000),r=m.motor_diameter_mm/2000,l=m.motor_length_mm/1000;
     const material=new THREE.MeshStandardMaterial({color:0xef9353,transparent:true,opacity:.65,roughness:.5});
     const motor=new THREE.Mesh(new THREE.CylinderGeometry(r,r,l,32),material);
@@ -341,6 +353,31 @@ function addMotorHardware(group,motors) {
     circle.rotation.y=Math.PI/2;circle.position.copy(prop.position);references.add(circle);
   }
   group.add(references);
+}
+
+function addVtolServoHardware(group,joints){
+  const refs=new THREE.Group();refs.userData.motorHardware=true;
+  refs.visible=$('motorHardwareView')?.checked??true;
+  for(const joint of joints){
+    if(!joint.servo_center_mm)continue;
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(...joint.servo_mm.map(v=>v/1000)),modelMaterial(0x3c4651));
+    mesh.position.set(...joint.servo_center_mm.map(v=>v/1000));refs.add(mesh);
+    const side=joint.servo_output_axis[2]<0?1:-1;
+    const badge=new THREE.Mesh(new THREE.BoxGeometry(joint.servo_mm[0]*.00055,joint.servo_mm[1]*.0004,.001),modelMaterial(0xc97a9a));
+    badge.position.copy(mesh.position);badge.position.z+=side*(joint.servo_mm[2]/2000+.0006);refs.add(badge);
+  }
+  group.add(refs);
+}
+
+function addCarbonBoomHardware(group,tube){
+  if(!tube)return;
+  const refs=new THREE.Group();refs.userData.motorHardware=true;
+  refs.visible=$('motorHardwareView')?.checked??true;
+  const start=new THREE.Vector3(...tube.start_mm).multiplyScalar(.001),end=new THREE.Vector3(...tube.end_mm).multiplyScalar(.001);
+  const axis=end.clone().sub(start).normalize(),center=start.clone().add(end).multiplyScalar(.5);
+  const material=modelMaterial(0x3c4651);
+  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(tube.outer_diameter_mm/2000,tube.outer_diameter_mm/2000,tube.length_mm/1000,48,1,true),material);
+  mesh.position.copy(center);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),axis);refs.add(mesh);group.add(refs);
 }
 
 function disposeModel(group) {

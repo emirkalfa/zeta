@@ -32,3 +32,14 @@ test('changing wing position automatically recalculates and retains the current 
   radios[2].change();await new Promise(resolve=>setImmediate(resolve));
   assert.equal(c.calls,1);assert.deepEqual(Array.from(c.tabs),['viewer']);
 });
+test('Penta dimensions and pusher hardware automatically recalculate and retain the page',async()=>{
+ const nodes={};
+ const document={getElementById(id){return nodes[id]??={disabled:false,addEventListener(type,fn){this[type]=fn;}};},querySelectorAll(){return [];},querySelector(){return {dataset:{tab:'input'}};}};
+ const c=vm.createContext({document,window:{addEventListener(){}},calls:0,tabs:[],exportSlicedWing(){},exportSlicedTail(){},viewerToggleRotate(){},viewerReset(){},toggleFuselage(){}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../static/js/app.js'),'utf8'),c);
+ vm.runInContext("state.geometry={};state.fusePreset='vtol5';calculateAll=async()=>calls++;switchTab=tab=>tabs.push(tab);setupEventListeners();",c);
+ for(const id of ['wingspan','motorDiameter','motorLength','propDiameter','propOffset']){
+  nodes[id].change();await new Promise(resolve=>setImmediate(resolve));
+ }
+ assert.equal(c.calls,5);assert.deepEqual(Array.from(c.tabs),Array(5).fill('input'));
+});

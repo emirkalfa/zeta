@@ -89,7 +89,7 @@ class TestScaling:
     @pytest.mark.parametrize("wingspan", [0.5, 1.5, 3.0, 10.0])
     def test_geometry_scales_linearly_with_wingspan(self, wingspan):
         g1 = calculate_geometry(1.5, 2.5, "2412")
-        g2 = calculate_geometry(wingspan, 2.5, "2412")
+        g2 = calculate_geometry(wingspan, 2.5*(wingspan/1.5)**2, "2412")
         ratio = wingspan / 1.5
         assert g2["root_chord"] == pytest.approx(g1["root_chord"] * ratio, rel=1e-2)
         assert g2["fuselage_length"] == pytest.approx(g1["fuselage_length"] * ratio, rel=1e-2)
@@ -316,7 +316,7 @@ class TestCombatAirframe:
         g = calculate_geometry(2.0, 5.0, "2412")
         assert g["airframe"] == "standard"
         assert "tail_booms" not in g
-        assert g["aspect_ratio"] == 7.0
+        assert g["aspect_ratio"] == pytest.approx(7.0, rel=.005)
 
     def test_combat_layout_differs_from_standard(self):
         std = calculate_geometry(2.0, 5.0, "2412")

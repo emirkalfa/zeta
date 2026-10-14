@@ -51,7 +51,7 @@ def assert_stl(content):
 def test_tail_assembly_and_package(coords,tail):
     data=request_data(coords,tail)
     parts,manifest,rings=generate(data)
-    body=next(p.solid for p in parts if p.name=='body');lid=next(p.solid for p in parts if p.name=='hatch')
+    body=next(p.solid for p in parts if p.name=='body');lid=next(p.solid for p in parts if p.name=='hatch_front')+next(p.solid for p in parts if p.name=='hatch_rear')
     assert (body^lid).volume()<1e-5
     # Part-to-parent interference is not allowed at assembled positions.
     named={p.name:p.solid for p in parts}
@@ -82,7 +82,7 @@ def test_tail_assembly_and_package(coords,tail):
 def test_fuselage_families(coords,preset):
     parts,report,rings=generate(request_data(coords,preset=preset))
     assert (parts[0].solid^parts[1].solid).volume()<1e-5
-    assert len(report['hatch_bolts_mm'])==4
+    assert len(report['hatch_bolts_mm'])==8
 
 
 def test_invalid_settings_fail_before_export(coords):
@@ -114,7 +114,7 @@ def test_manufacturing_http_api(coords):
     assert bad.status_code==400 and bad.json['error']
     data=request_data(coords)
     result=client.post('/api/manufacturing',json=data)
-    assert result.status_code==200
+    assert result.status_code==200,result.get_data(as_text=True)[:1000]
     assert any(p['name'].startswith('hatch') for p in result.json['parts'])
     result=client.post('/api/manufacturing?mode=zip&part=fuselage',json=data)
     assert result.status_code==200 and result.mimetype=='application/zip'
@@ -208,6 +208,10 @@ def test_large_aircraft_zip_fits_without_rescaling(coords,tail,preset,combat):
         from backend.manufacturing import box
         for joint in report.get('wing_segment_joints',[]):
             if joint['parent']==original.name:
+                b=np.array(joint['support_bounds_world_mm'])
+                removed=removed-box((b[:3]-.03).tolist(),(b[3:]+.03).tolist())
+        for joint in report.get('wing_root_braces',[]):
+            if original.name=='body' or joint['parent']==original.name:
                 b=np.array(joint['support_bounds_world_mm'])
                 removed=removed-box((b[:3]-.03).tolist(),(b[3:]+.03).tolist())
         assert removed.volume()<max(.1,original.solid.volume()*.001)

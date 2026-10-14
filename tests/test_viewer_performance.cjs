@@ -23,3 +23,12 @@ test('scene cleanup disposes shared resources once including shadow maps',()=>{
   vm.runInContext('disposeViewerScene(root)',ctx);
   assert.equal(geometries,1);assert.equal(materials,1);assert.equal(shadows,1);
 });
+
+test('recalculating releases both old WebGL contexts instead of accumulating them',()=>{
+  const ctx=vm.createContext({THREE,window:{removeEventListener(){}},document:{getElementById:()=>null}});
+  vm.runInContext(source,ctx);
+  let released=0,disposed=0;
+  ctx.oldRenderer={dispose(){disposed++;},forceContextLoss(){released++;},domElement:{}};
+  vm.runInContext('renderer=oldRenderer;disposeViewer();fuseViewerRenderer=oldRenderer;disposeFuseViewer()',ctx);
+  assert.equal(disposed,2);assert.equal(released,2);
+});

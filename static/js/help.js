@@ -1,6 +1,8 @@
 /* Contextual help: original explanations + traceable primary sources. */
 (() => {
   const sources = {
+    quadPlane:['ArduPilot · QuadPlane yerleşimi','https://ardupilot.org/plane/docs/quadplane-building.html'],
+    tailSizing:['CODE Lab · Kuyruk hacmi ve aerodinamik merkez mesafesi','https://computationaldesignlab.github.io/aircraft-design/tail_sizing.html'],
     lift: ['NASA · Kaldırma denklemi', 'https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/lift-equation/'],
     drag: ['NASA · İndüklenmiş sürükleme ve açıklık oranı', 'https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/induced-drag-coefficient/'],
     profile: ['NASA · NACA profil geometrisi', 'https://ntrs.nasa.gov/citations/19970008124'],
@@ -13,6 +15,9 @@
     method: ['ZETA · Yöntemler, varsayımlar ve denetim', '/static/references.html'],
   };
   const entries = {
+    aircraftFamily:['Penta: kanat ölçüsüne göre otomatik boyutlanan kısa ekipman gövdesi ve çift bom. Üst, orta ve alt kanat konumu seçilebilir; dört kaldırma rayı kanadı takip eder. Gövde boyu açıklık, kök veteri, en az 4 boy/en oranı ve motorun sığmasıyla belirlenir. Bu oranlar ZETA ön tasarım tercihleridir, evrensel havacılık kuralı değildir. Kuyruk alanları kanat alanı ve gerçek aerodinamik merkez mesafesine göre hacim katsayılarıyla hesaplanır. Beşinci motor kısa gövdenin arkasındadır; seçilen motor ve pervane ölçüsüne göre kuyruk açıklığı korunur.',['quadPlane','tailSizing','method']],
+    triaTailVh:['Tria otomatik V-kuyruğunun yatay hacim hedefi. Vh = etkin yatay kuyruk alanı × aerodinamik merkezler arası mesafe / (kanat alanı × ortalama veter). 0,45 ZETA başlangıç tasarım tercihidir; bu model için deneyle doğrulanmış katsayı değildir. Artırmak kuyruk alanını büyütür. 35° V-kuyrukta yatay etkin alan toplam alanın cos²(35°) katıdır. Elle girilen kuyruk ölçüleri korunur.',['tailSizing','method']],
+    triaTailVv:['Tria otomatik V-kuyruğunun dikey hacim hedefi. Vv = etkin dikey kuyruk alanı × aerodinamik merkezler arası mesafe / (kanat alanı × açıklık). 0,03 ZETA başlangıç tasarım tercihidir; uçuş onayı değildir. İki kuyruk yüzeyi toplam alan olarak bir kez sayılır. 35° V-kuyrukta dikey etkin alan toplam alanın sin²(35°) katıdır. Boyutlandırma iki hacim hedefini birlikte karşılar.',['tailSizing','method']],
     wingPin:['Her kanat yarısında bir adet metal sabitleme pimi bulunur. Profil biçimli yuva kanadı oturtur; pim çıkmasını tutar. Başlı ve uçtan emniyet klipsli pim kullanın. Girilen çapın üzerine geçme boşluğu eklenir. Metal pim basılmaz; boyu gerçek gövde kalınlığına ve klipse göre seçilir.',[]],
     wingSeatDepth:['Gövdeye birleşik profil yuvasının kanat kökünü sardığı uzunluk. Varsayılan 8 mm. İç kesit kanat kökü biçimindedir; konik kanadın sökülebilmesi için yuva boyunca daralmaz. Gerçek baskıda geçme boşluğunu ve yük altında oturmayı kontrol edin.',[]],
     cameraMount:['Tüm gövdelerde burun altında açık kamera taşıyıcısı oluşturur. Gövde STL’sine birleşiktir. Kamera aşağıdan takılır; iki yan vida kameranın metal dişlerine girer. Ön pervane görüntüye girebilir. Kamera, lens ve kablo açıklığını gerçek donanımla kontrol edin.',[]],
@@ -47,7 +52,7 @@
     nLimit: ['Yapının taşıdığı kuvvetin ağırlığa oranı. 4 g, ağırlığın dört katı yük demektir. Bu giriş bir dayanım testi değildir; hesap sadece dönüş eğrisini bu sınırla kısıtlar.', ['stability','method']],
     targetEndurance: ['Hedeflenen en az seyir süresi, dakika. %10 yakınlık sınırda gösterilir; hedef karşılandı sayılmaz.', ['endurance','method']],
     targetTurnRate: ['Hedeflenen sürekli dönüş hızı, derece/saniye. Güç, stall ve girilen yapısal g sınırı birlikte değerlendirilir.', ['power','method']],
-    targetStall: ['Göreviniz için kabul ettiğiniz en yüksek stall hızı. Vs = √(2mg / (ρ S CLmax)). 15 m/s tek başına “uçamaz” anlamına gelmez; kalkış ve iniş koşullarıyla değerlendirilir.', ['lift','method']],
+    targetStall: ['Otomatik modda kanat alanının alt sınırını belirler: S = 2mg / (ρ Vs² CLmax). Ağırlık artınca gerektiğinde veter büyür; seçilen açıklık ve manuel ölçüler korunur. Mevcut planform alanı daha büyükse küçültülmez. Deniz seviyesi yoğunluğu 1,225 kg/m³, seçilen Reynolds sayısı ve tahmini CLmax kullanılır; gerçek polar ve uçuş testi gerekir. Vs = √(2mg / (ρ S CLmax)). 15 m/s tek başına “uçamaz” anlamına gelmez; kalkış ve iniş koşullarıyla değerlendirilir.', ['lift','method']],
     motorLayout: ['Tek motor gövdede, çift motor iki kanatta montaj oluşturur. Savaşan İHA tek motoru arkadan iticidir. Motor ve pervane satın alınan parçadır; ZIP yalnız montaj taşıyıcılarını içerir.', ['method']],
     motorPattern: ['Çapraz düzen iki karşılıklı delik çifti; dikdörtgen düzen dört köşe deliğidir. Aralıkları motorun kendi teknik çiziminden veya kumpasla ölçerek girin. Model bilinmediği için üretici ölçüsü varsayılamaz.', ['method']],
     motorDiameter: ['Motorun dönen dış gövdesinin uçtan uca çapı. Savaşan İHA’da tek arka motorun gövde sonu ve plakası bu çapa uyarlanır. Vida düzeni bu dairenin içine sığmalıdır.', ['method']],

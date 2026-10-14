@@ -17,7 +17,7 @@ def rotate_about(solid, point, axis, degrees):
     return solid.transform(np.column_stack([rot,point-rot@point]).tolist())
 
 
-def install_control_surfaces(g,specs,assemblies,frames,wall,gap,pin=2,travel=25):
+def install_control_surfaces(g,specs,assemblies,frames,wall,gap,pin=2,travel=25,auto_root_splices=False,splice_chord_limit=500,root_splice_clearance=40):
     from backend.manufacturing import (ManufacturingError,box,cylinder,profile,
                                        panel_frame,local_transform)
     report=[]
@@ -28,6 +28,9 @@ def install_control_surfaces(g,specs,assemblies,frames,wall,gap,pin=2,travel=25)
         section=profile(spec['coords'],chord)
         full=local_transform(section.extrude(length,scale_top=[tip/chord]*2),mat)
         trim=frames[owner][1]
+        root_margin=14
+        if spec['kind']=='wing' and auto_root_splices and chord>splice_chord_limit:
+            root_margin=root_splice_clearance # room for four-screw chordwise root splices
         if spec['kind']=='wing':
             controls=[(key,definitions.get(key,{})) for key in ['flap','aileron']]
         else:
@@ -38,7 +41,7 @@ def install_control_surfaces(g,specs,assemblies,frames,wall,gap,pin=2,travel=25)
             reserve=(boom['diameter']*500+18)/abs(mat[2,2])
             divided=[]
             for key,setting in controls:
-                lo=max(trim+14,length*float(setting.get('eta_start',.08 if key=='flap' else .55)))
+                lo=max(trim+root_margin,length*float(setting.get('eta_start',.08 if key=='flap' else .55)))
                 hi=min(length-22,length*float(setting.get('eta_end',.42 if key=='flap' else .95)))
                 if hi<center-reserve or lo>center+reserve:divided.append((key,setting));continue
                 segments=[('inboard',lo,min(hi,center-reserve)),('outboard',max(lo,center+reserve),hi)]
@@ -47,7 +50,7 @@ def install_control_surfaces(g,specs,assemblies,frames,wall,gap,pin=2,travel=25)
                 divided.extend(usable)
             controls=divided
         for key,setting in controls:
-            start=max(trim+14,length*float(setting.get('eta_start',.12)))
+            start=max(trim+root_margin,length*float(setting.get('eta_start',.12)))
             end=min(length-22,length*float(setting.get('eta_end',.78 if key=='rudder' else .90)))
             if end-start<28:
                 raise ManufacturingError(f'{owner}: menteşeli {key} için en az 28 mm serbest açıklık gerekir. Kuyruğu/kanadı büyütün.')
@@ -100,15 +103,34 @@ def install_control_surfaces(g,specs,assemblies,frames,wall,gap,pin=2,travel=25)
                     barrels.append({'moving':is_moving,'start_mm':pa.tolist(),'end_mm':pb.tolist()})
             # Integrated horn: 2 mm linkage hole, independent of a servo brand.
             station=(start+end)/2
+            # Keep a T-tail horn off the central printer cut plane.
+            if g.get('tail_type')=='ttail' and owner.startswith('tail_horizontal_'):
+                station+=min(7.3,(end-start)*.04)
             hy=y(station);c=chord+slope*station
             horn_height=max(12,float(np.interp(1-ratio,*upper.T))*c-hy+10)
             offset=max(radius+wall*4,horn_height*math.tan(math.radians(travel))+gap+5)
             if c*ratio<offset+4:
                 raise ManufacturingError(f'{name}: bağlantı kolu için kontrol veteri çok küçük. Veteri büyütün veya hareket açısını azaltın.')
             hx=h(station)+offset
-            horn=box([hx-3,hy-wall,station-wall],[hx+3,hy+horn_height,station+wall])
-            link=cylinder(1,wall*2+2,[hx,hy+horn_height-3,station-wall-1],[0,0,1])
-            moving=moving+local_transform(horn-link,mat)
+            link_points=[]
+            thickness=max(4,wall*3)
+            base_half=min(7,offset-radius-gap-.5,c*ratio-offset-.5)
+            tip_half=min(3.5,base_half)
+            outline=md.CrossSection([[[hx-base_half,hy-wall],[hx+base_half,hy-wall],
+                [hx+tip_half,hy+horn_height-2],[hx+tip_half-1,hy+horn_height],
+                [hx-tip_half+1,hy+horn_height],[hx-tip_half,hy+horn_height-2]]])
+            outline=outline.offset(-.6,circular_segments=24).offset(.6,circular_segments=24)
+            horn=outline.extrude(thickness).translate([0,0,station-thickness/2])
+            # Internal spreader follows the real airfoil instead of a flat
+            # pad floating above a swept/cambered wing.
+            spreader=md.CrossSection.circle(1,48).scale([base_half,6]).extrude(horn_height+wall)
+            spreader=spreader.rotate([-90,0,0]).translate([hx,hy-wall,station])
+            moving+=(local_transform(spreader,mat)^full^mask(start,end))
+            for down in [3,7]:
+                point=[hx,hy+horn_height-down,station]
+                horn-=cylinder(1,thickness+2,[point[0],point[1],station-thickness/2-1],[0,0,1])
+                link_points.append((mat[:,:3]@point+mat[:,3]).tolist())
+            moving=moving+local_transform(horn,mat)
             # Bound only material that could rotate ahead of the hinge plane.
             # A circular clearance envelope and axial end planes are invariant
             # under rotation, avoiding hundreds of repeated full-mesh cuts.
@@ -149,7 +171,9 @@ def install_control_surfaces(g,specs,assemblies,frames,wall,gap,pin=2,travel=25)
             report.append({'part':name,'parent':owner,'kind':key,'hinge_point_mm':a.tolist(),
                 'hinge_axis':axis.tolist(),'pin_diameter_mm':pin,'pin_hole_mm':pin+gap,
                 'pin_length_mm':float(np.linalg.norm(p1-p0)+6),'pin_entry_mm':p1.tolist(),
-                'span_start_mm':start,'span_end_mm':end,'travel_deg':[-travel,travel],
-                'checked_angles_deg':angles,'link_hole_mm':2,'clearance_radius_mm':clear_radius,
+                'root_margin_mm':root_margin,'span_start_mm':start,'span_end_mm':end,'travel_deg':[-travel,travel],
+                'checked_angles_deg':angles,'link_hole_mm':2,'link_holes_mm':link_points,'link_axis':mat[:,2].tolist(),
+                'horn_thickness_mm':thickness,'horn_base_width_mm':2*base_half,'horn_style':'rounded_tapered_spreader',
+                'clearance_radius_mm':clear_radius,
                 'segment':setting.get('segment'),'pin_group':owner+'_'+key,'knuckles':barrels})
     return report

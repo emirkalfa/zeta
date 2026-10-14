@@ -4,6 +4,7 @@ import numpy as np
 from backend.manufacturing import number,box,cylinder,ManufacturingError,Part
 
 def motor_sized_fuselage(data):
+    if data['geometry'].get('fuse_preset') in ('vtol','vtol5'):return data
     if not data['geometry'].get('tail_booms') or data.get('options',{}).get('motorLayout')!='single':return data
     radius=number(data['options'],'motorDiameter',28,10,100)/2
     rings=np.asarray(data['fuselage'],dtype=float).copy()
@@ -30,6 +31,7 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
     bore=number(options,'motorBore',8,3,50)
     screw=number(options,'motorScrew',3,2,6)
     thickness=number(options,'motorPlate',5,3,12)
+    if data['geometry'].get('fuse_preset')=='vtol5':thickness=max(10,thickness)
     wire=number(options,'motorWire',6,3,15)
     prop=number(options,'propDiameter',152,60,800)
     prop_offset=number(options,'propOffset',8,0,100)
@@ -82,6 +84,10 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
         else:
             pod_length=back-x
             pod=cylinder(radius,pod_length,face,[1,0,0])
+            from backend.wing_blend import motor_wing_transition
+            spec=next(p for p in data['panels'] if p['name']==parent)
+            leading=(np.asarray(spec['root'])+(np.asarray(spec['tip'])-spec['root'])*station)*1000
+            pod+=motor_wing_transition(spec,leading,station,radius,y,back)
             inner=cylinder(radius-2,pod_length-thickness-3,[x+thickness,y,z],[1,0,0])
             pod=pod-inner
             cable=cylinder(wire/2,radius*2+4,[back-8,y,z-radius-2],[0,0,1])
@@ -121,7 +127,7 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
                        'prop_offset_mm':prop_offset,
                        'station_fraction':station if layout=='twin' else None,
                        'back_x_mm':back,
-                       'pattern':pattern,
+                       'pattern':pattern,'smooth_wing_transition':parent!='body',
                        'service_cover':name+'_service_cover' if parent!='body' else None,
                        'service_screws':{'diameter_mm':3,'nut_flat_mm':5.5,'positions_xz_mm':fasteners,'axis':[0,1,0]} if parent!='body' else None})
     fixed_parts=[body,lid,*assemblies.values()]

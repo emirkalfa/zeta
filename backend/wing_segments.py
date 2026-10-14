@@ -1,6 +1,6 @@
 """Recessed, removable splice bridges for printable fixed-wing tiles.
 
-Each seam has four screws in two narrow keyed bridges or one wider bridge. Nuts load from the lower skin; drivers approach from the upper skin.
+Each seam has four screws in two narrow keyed bridges, one wider bridge, or one longer narrow bridge with two screws on each side. Nuts load from the lower skin; drivers approach from the upper skin.
 The original spar bores, root hardware and control travel are exclusion zones.
 These are geometric checks, not a strength or flight certification.
 """
@@ -11,7 +11,38 @@ import manifold3d as md
 import numpy as np
 
 
-def segmented_wing(part, spec, manifest, all_parts, cutters):
+def segmented_wing(part,spec,manifest,all_parts,cutters):
+    from backend.manufacturing import ManufacturingError
+    plans=[(0.,0.,0)]
+    if manifest.get('design_mode','auto')=='auto':
+        plans += [(phase,0.,0) for phase in [-.08,.08,-.14,.14]]
+        plans += [(phase,shift,extra) for phase,shift,extra in [(-.08,-20,1),(-.14,20,1),(0,-25,1),(0,25,1)]]
+        plans += [(phase,shift,extra) for phase,shift,extra in [(-.20,0,1),(.20,0,1),(-.25,-35,1),(-.25,35,1),(-.32,0,1),(-.32,-35,2),(-.32,35,2)]]
+    last=None;precision_retry_added=False
+    for plan_index,(phase,shift,extra) in enumerate(plans):
+        trial={**manifest,'wing_segment_joints':list(manifest.get('wing_segment_joints',[])),
+               'wing_secondary_contacts':list(manifest.get('wing_secondary_contacts',[])),
+               '_wing_plan':(phase,shift,extra)}
+        try:
+            result=_segmented_wing_plan(part,spec,trial,all_parts,cutters)
+            manifest['wing_segment_joints']=trial['wing_segment_joints']
+            manifest['wing_secondary_contacts']=trial.get('wing_secondary_contacts',[])
+            if (phase,shift,extra)!=(0.,0.,0):
+                manifest.setdefault('automatic_split_adjustments',[]).append({'part':part.name,'chord_shift_fraction':phase,'span_shift_mm':shift,'extra_span_tiles':extra})
+            return result
+        except ManufacturingError as exc:
+            last=exc
+            precision_error=any(word in str(exc) for word in ['STL hassasiyeti onarımı','açık veya çoklu kenar','sıfır alanlı'])
+            if precision_error and manifest.get('design_mode','auto')=='auto' and not precision_retry_added:
+                # Small span offsets avoid a float32 coincidence without
+                # repeating identical chord-only plans or adding more tiles.
+                plans[plan_index+1:plan_index+1]=[(0.,s,0) for s in [-.37,.37,-1.1,1.1]]
+                precision_retry_added=True
+            if not any(word in str(exc) for word in ['engelsiz kalınlık','bağlantı ağına','dilim planı','STL hassasiyeti onarımı','açık veya çoklu kenar','sıfır alanlı']):raise
+    raise last
+
+
+def _segmented_wing_plan(part, spec, manifest, all_parts, cutters):
     from backend.manufacturing import (Part, ManufacturingError, box, cylinder,
         profile, local_transform, orthogonal_print, printable_precision, check,
         connected_solids)
@@ -38,9 +69,13 @@ def segmented_wing(part, spec, manifest, all_parts, cutters):
         raise error('somun ağız ölçüsü vida deliğinin çevresinde yeterli yatak bırakmıyor')
 
     # Plan all tiles first: no late anonymous split may destroy a joint.
-    nx=1;nz=max(1,math.ceil((bounds[5]-bounds[2])/min(max(bed)-12,200)))
+    phase,span_shift,extra=manifest.get('_wing_plan',(0.,0.,0))
+    adaptive_penta=manifest.get('design_mode','auto')=='auto' and any(m.get('name','').startswith('vtol5_') for m in manifest.get('motors',[]))
+    nx=1;nz=max(1,math.ceil((bounds[5]-bounds[2])/min(max(bed)-12,200)))+extra
     for attempt in range(18):
         xs=np.linspace(bounds[0],bounds[3],nx+1);zs=np.linspace(bounds[2],bounds[5],nz+1)
+        if nx>1:xs[1:-1]+=phase*(bounds[3]-bounds[0])
+        if nz>1:zs[1:-1]+=span_shift
         # A chordwise seam must leave room for its bridge on either side of a
         # continuous spar. Shift the cutting plane, rather than filling the bore.
         for i in range(1,nx):
@@ -63,11 +98,38 @@ def segmented_wing(part, spec, manifest, all_parts, cutters):
                         local^box([-10000,-10000,value],[10000,10000,zs[i+1]])]
                 if all(sum(c.volume()>.001 for c in connected_solids(h))==1 for h in halves):
                     zs[i]=value;break
+        # Keep splice screws and their lower nut-driver access away from the
+        # Penta lift-rail clamps; moving a seam is preferable to omitting bolts.
+        anchors=[]
+        for motor in manifest.get('motors',[]):
+            if motor.get('clamp_part')==part.name and motor.get('name','').startswith('vtol5_'):
+                anchors.extend(float((inv[:,:3]@np.asarray(point)+inv[:,3])[2]) for point in motor.get('clamp_bolt_points_mm',[]))
+        for i in range(1,nz):
+            if anchors and any(abs(zs[i]-anchor)<35 for anchor in anchors):
+                candidates=[a+sign*35.1 for a in anchors for sign in [-1,1]]
+                legal=[z for z in candidates if z-zs[i-1]>=40 and zs[i+1]-z>=40 and all(abs(z-a)>=35 for a in anchors)]
+                if legal:zs[i]=min(legal,key=lambda z:abs(z-zs[i]))
         xs[1:-1]=np.round(xs[1:-1],2);zs[1:-1]=np.round(zs[1:-1],2)
         tiles={};failed=[]
-        for ix in range(nx):
-            for iz in range(nz):
-                region=box([xs[ix],-10000,zs[iz]],[xs[ix+1],10000,zs[iz+1]])
+        for iz in range(nz):
+            row=local^box([bounds[0],-10000,zs[iz]],[bounds[3],10000,zs[iz+1]])
+            if row.is_empty():continue
+            end=float(row.bounding_box()[3])
+            row_nx=max(1,math.ceil((end-bounds[0])/((bounds[3]-bounds[0])/nx))) if adaptive_penta else nx
+            row_xs=np.linspace(bounds[0],end,row_nx+1) if adaptive_penta else xs.copy()
+            if adaptive_penta and row_nx>1:
+                displacement=np.clip(phase,-.4/row_nx,.4/row_nx)*(end-bounds[0])
+                row_xs[1:-1]=np.round(row_xs[1:-1]+displacement,2)
+            if adaptive_penta:
+                for i in range(1,row_nx):
+                    nominal=row_xs[i];reach=min(30,(end-bounds[0])/row_nx*.2)
+                    alternatives=sorted(np.linspace(nominal-reach,nominal+reach,61),key=lambda x:abs(x-nominal))
+                    for value in alternatives:
+                        if row_xs[i-1]+25<value<row_xs[i+1]-25 and all(abs(value-chord*c['chord_position'])>c['hole_diameter_mm']/2+max(14.,flat+6)+max(2.,wall)+1 for c in manifest.get('spar_channels',[]) if c['part']==part.name):
+                            row_xs[i]=round(float(value),2);break
+            row_xs[-1]=bounds[3]
+            for ix in range(row_nx):
+                region=box([row_xs[ix],-10000,zs[iz]],[row_xs[ix+1],10000,zs[iz+1]])
                 solid=local^region
                 if solid.is_empty():continue
                 tiles[ix,iz]={'solid':solid,'region':region}
@@ -91,6 +153,22 @@ def segmented_wing(part, spec, manifest, all_parts, cutters):
         except ManufacturingError:continue
         for key in keys:del tiles[key]
         tiles[0,iz]={'solid':solid,'region':region}
+    # Non-uniform chord plans can leave an unnecessary narrow leading tile.
+    # Merge adjacent chord neighbours when their actual combined solid fits;
+    # preserve the same holes, controls and strict printer dimensions.
+    for iz in (range(nz) if adaptive_penta else []):
+        changed=True
+        while changed:
+            changed=False;keys=sorted(key for key in tiles if key[1]==iz)
+            for left,right in zip(keys,keys[1:]):
+                aa=np.array(tiles[left]['region'].bounding_box());bb=np.array(tiles[right]['region'].bounding_box())
+                if abs(aa[3]-bb[0])>.001:continue
+                region=box([aa[0],-10000,aa[2]],[bb[3],10000,aa[5]])
+                solid=local^region
+                try:orthogonal_print(world(solid),bed)
+                except ManufacturingError:continue
+                tiles[left]={'solid':solid,'region':region};del tiles[right]
+                changed=True;break
     tiles=dict(sorted(tiles.items(),key=lambda item:(item[0][1],item[0][0])))
     for index,tile in enumerate(tiles.values(),1):
         tile['name']=part.name if len(tiles)==1 else f'{part.name}_{index:02d}of{len(tiles):02d}'
@@ -117,7 +195,9 @@ def segmented_wing(part, spec, manifest, all_parts, cutters):
     bridges=[];reports=[];occupied=[]
     width=max(12.,flat+2*wall+3)
     half_length=max(14.,flat+6)
+    base_half_length=half_length
     pitch=half_length-6
+    offsets=[-pitch,pitch]
     thickness=max(3.,screw*.9)
     margin=max(2.,wall)
     narrow_width=width
@@ -153,7 +233,7 @@ def segmented_wing(part, spec, manifest, all_parts, cutters):
         # Circular physical holes: never shear drill shapes with the panel.
         drill_tools=[];nuts=[];holes=[]
         up=mat[:,1]/np.linalg.norm(mat[:,1])
-        for offset,row in itertools.product([-pitch,pitch],rows):
+        for offset,row in itertools.product(offsets,rows):
             cx,cz=(x+row,z+offset) if axis==2 else (x+offset,z+row)
             top=mat[:,:3]@np.array([cx,max(tops)+2,cz])+mat[:,3]
             bottom=mat[:,:3]@np.array([cx,min(bottoms)-2,cz])+mat[:,3]
@@ -197,7 +277,14 @@ def segmented_wing(part, spec, manifest, all_parts, cutters):
             else:continue
             lo=max(ba[along_axis],bb[along_axis]);hi=min(ba[along_axis+3],bb[along_axis+3])
             if hi-lo>1:seams.append((axis,cut,lo,hi,first,second))
+    secondary=[]
     for seam_index,(axis,cut,lo,hi,a,b) in enumerate(seams,1):
+        if adaptive_penta and axis==2 and hi-lo<narrow_width+2*margin:
+            # Staggered chord cuts create small T-junction contacts, not a
+            # load-carrying splice. Both tiles must still be joined through
+            # the four-screw graph verified below; no tile may escape it.
+            secondary.append({'parent':part.name,'segments':[a['name'],b['name']],'cut_mm':float(cut),'overlap_mm':float(hi-lo),'type':'secondary_T_contact'})
+            continue
         # Ignore tiles which are neighbours in the grid but share no material.
         low=[-10000]*3;high=[10000]*3;low[axis]=cut-.1;high[axis]=cut+.1
         along_axis=0 if axis==2 else 2
@@ -208,13 +295,19 @@ def segmented_wing(part, spec, manifest, all_parts, cutters):
         success=False
         # Two narrow bridges are preferred. A single wider keyed bridge with
         # four screws serves a narrow tile without removing the second fastener pair.
-        for wide in (False,True):
+        for strategy in ('paired','wide','long'):
+            wide=strategy=='wide'
+            half_length=base_half_length
+            offsets=[-pitch,pitch]
             a['solid'],b['solid']=original_a,original_b
             del bridges[checkpoint[0]:];del reports[checkpoint[1]:];del occupied[checkpoint[2]:]
             spacing=flat+gap+2
             width=narrow_width+spacing if wide else narrow_width
             rows=[-spacing/2,spacing/2] if wide else [0.]
-            required=1 if wide else 2
+            required=1 if wide or strategy=='long' else 2
+            if strategy=='long':
+                step=max(6.,(flat+gap+6)/2)
+                offsets=[-3*step,-step,step,3*step];half_length=3*step+6
             chosen=[]
             samples=np.linspace(lo+width/2+margin,hi-width/2-margin,49)
             samples=[samples[i] for pair in zip(range(25),range(48,24,-1)) for i in pair]+[samples[24]]
@@ -228,15 +321,26 @@ def segmented_wing(part, spec, manifest, all_parts, cutters):
                 bridges.append((name,plate));occupied.append(reinforcement)
                 reports.append({'id':name,'parent':part.name,'bridge':name,
                     'segments':[a['name'],b['name']],'seam':seam_index,'axis_local':axis,
-                    'cut_mm':float(cut),'screw_diameter_mm':screw,'nut_flat_mm':flat,
+                    'cut_mm':float(cut),'layout':strategy,'screw_diameter_mm':screw,'nut_flat_mm':flat,
                     'nut_height_mm':nut_height,'clearance_mm':gap,'holes':holes,
                     'support_bounds_world_mm':list(world(reinforcement).bounding_box()),
                     'assembly':'bridge_from_upper_skin; nuts_from_lower_skin; screws_from_upper_skin'})
                 if len(chosen)==required:break
             if len(chosen)==required:
                 success=True;break
-        width=narrow_width;rows=[0.]
-        if not success:raise error(f'{seam_index}. birleşimde dört vida için yeterli engelsiz kalınlık yok')
+        width=narrow_width;rows=[0.];half_length=base_half_length;offsets=[-pitch,pitch]
+        if not success:
+            ba=np.asarray(a['region'].bounding_box());bb=np.asarray(b['region'].bounding_box())
+            staggered=axis==2 and (abs(ba[0]-bb[0])>.001 or abs(ba[3]-bb[3])>.001)
+            if adaptive_penta and staggered:
+                # This is an additional T-contact between staggered rows.
+                # Preserve all primary chord and aligned span splices. Accept
+                # only if the complete four-screw graph below joins all tiles.
+                a['solid'],b['solid']=original_a,original_b
+                del bridges[checkpoint[0]:];del reports[checkpoint[1]:];del occupied[checkpoint[2]:]
+                secondary.append({'parent':part.name,'segments':[a['name'],b['name']],'cut_mm':float(cut),'overlap_mm':float(hi-lo),'type':'secondary_T_contact'})
+                continue
+            raise error(f'{seam_index}. birleşimde dört vida için yeterli engelsiz kalınlık yok')
 
     # No tile can silently escape with only a butt face and no fastening path.
     names={t['name'] for t in tiles.values()}
@@ -258,4 +362,5 @@ def segmented_wing(part, spec, manifest, all_parts, cutters):
         result.append(Part(name,printed,family=part.family,assembled=solid,
             print_to_world=np.column_stack([invrot,-invrot@transform[:,3]])))
     manifest.setdefault('wing_segment_joints',[]).extend(reports)
+    manifest.setdefault('wing_secondary_contacts',[]).extend(secondary)
     return result

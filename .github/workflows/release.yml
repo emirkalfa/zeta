@@ -60,7 +60,11 @@ jobs:
           flags=""
           # 2.1.0-rc.1 gibi ön sürümler "latest" olarak işaretlenmez
           case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" release/* \
-            --title "ZETA ${GITHUB_REF_NAME#v}" \
-            --notes-file artifacts/release-notes/release-notes.md \
-            --verify-tag $flags
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* \
+              --title "ZETA ${GITHUB_REF_NAME#v}" \
+              --notes-file artifacts/release-notes/release-notes.md \
+              --verify-tag $flags
+          fi

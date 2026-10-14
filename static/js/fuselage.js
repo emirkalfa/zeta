@@ -1,5 +1,18 @@
 /* ZETA original fuselage families. Dimensions are normalized, never imported meshes. */
 const FUSELAGE_PRESETS = {
+  vtol5: {
+    name:'Penta VTOL',tag:'Dört kaldırma motoru · bir itici motor',
+    description:'Kanat ve motor ölçüsüne otomatik uyarlanan kısa gövde, seçilebilir kanat konumu ve pürüzsüz merkez kanat geçişi. Çift bom, dört kaldırma motoru ve bir arka itici motor.',
+    exponent:2.5,width:1.3,height:1.4,
+    stations:[[0,.20,.25,0],[.08,.52,.56,.02],[.22,.88,.92,.04],[.38,1,1,.03],[.56,.95,.88,0],[.72,.78,.72,0],[.87,.57,.59,0],[1,.45,.50,0]],
+  },
+  vtol: {
+    name:'Tria VTOL',tag:'İki döner ön motor · sabit arka motor',
+    description:'Sabit ve alçak gövde profili, orta kanat yuvası, yumuşak merkez kanat geçişi ve karbon kuyruk borusu. Gövde ölçüleri ve kanat yüksekliği değiştirilemez.',
+    exponent:2.2,width:1.4,height:1.6,
+    stations:[[0,.035,.05,0],[.06,.58,.62,0],[.18,.94,.95,.04],[.30,1,1,.04],
+      [.43,.9,.85,.02],[.55,.48,.48,0],[.65,.2,.25,0],[.8,.17,.22,0],[1,.13,.18,0]],
+  },
   combat: {
     name: 'Savaşan İHA', tag: 'Çift bom · arkadan itici motor',
     description: 'Kısa ekipman gövdesi, geniş arka motor plakası ve iki kuyruk bomu.',
@@ -62,6 +75,8 @@ function fuseInterpolate(keys, x, prop) {
 
 function presetFuseKeys(geom, id) {
   const preset = FUSELAGE_PRESETS[id] || FUSELAGE_PRESETS.atlas;
+  if(id==='vtol5')return preset.stations.map(([t,w,h,cy])=>({t:t*(geom.fuselage_length||1),w:w*(geom.fuselage_max_width||.18),h:h*(geom.fuselage_max_height||.14),cy:cy*(geom.fuselage_max_height||.14)}));
+  if(id==='vtol')return preset.stations.map(([t,w,h,cy])=>({t:t*1.2,w:w*.17,h:h*.11,cy:cy*.11}));
   const width = geom.fuselage_max_width * preset.width * (geom.fuse_width_scale || 1);
   const height = geom.fuselage_max_height * preset.height * (geom.fuse_height_scale || 1);
   return preset.stations.map(([t, w, h, cy]) => ({
@@ -69,13 +84,13 @@ function presetFuseKeys(geom, id) {
   }));
 }
 
-function loftFuselage(keys, exponent = 2) {
+function loftFuselage(keys, exponent = 2, nLong = 120) {
   // Sort/deduplicate legacy custom stations before interpolation.
   const ordered = [...new Map(keys.filter(s => [s.t, s.w, s.h].every(Number.isFinite))
     .map(s => [s.t, { ...s, w: Math.max(.0001, s.w), h: Math.max(.0001, s.h) }])).values()]
     .sort((a, b) => a.t - b.t);
   if (ordered.length < 2) return { sections: [], nCirc: 64, totalLen: 0 };
-  const nCirc = 64, nLong = 120;
+  const nCirc = 64;
   const start = ordered[0].t, end = ordered[ordered.length - 1].t;
   // Include the exact key stations, preserving dimensions and joins in STL slices.
   const positions = [...new Set([...ordered.map(s => s.t), ...Array.from({length: nLong + 1}, (_, i) => start + (end - start) * i / nLong)]
@@ -97,10 +112,26 @@ function loftFuselage(keys, exponent = 2) {
 
 function libraryFuselageSections(geom) {
   const id = FUSELAGE_PRESETS[geom.fuse_preset] ? geom.fuse_preset : 'atlas';
-  return motorSizedFuselageSections(geom,loftFuselage(presetFuseKeys(geom, id), FUSELAGE_PRESETS[id].exponent));
+  const result=loftFuselage(presetFuseKeys(geom,id),FUSELAGE_PRESETS[id].exponent,id==='vtol5'?127:120);
+  if(id==='vtol5'){
+    const keys=presetFuseKeys(geom,id), length=geom.fuselage_length||1;
+    const roofKeys=keys.map((k,i)=>({...k,top:[.25,.36,.44,.46,.44,.40,.35,.50][i]*(geom.fuselage_max_height||.14)/2}));
+    const smooth=u=>{u=Math.max(0,Math.min(1,u));return 6*u**5-15*u**4+10*u**3;};
+    for(const ring of result.sections){const x=ring[0].x,t=x/length,cy=fuseInterpolate(keys,x,'cy');
+      const roof=fuseInterpolate(roofKeys,x,'top')/(fuseInterpolate(keys,x,'h')/2);
+      const u=Math.max(0,Math.min(1,(t-.80)/.20)), blend=smooth(u);
+      const diameter=(geom.motor_mount?.motorDiameter||geom.penta_motor_diameter||28)/1000;
+      for(const p of ring){if(p.y>cy)p.y=cy+(p.y-cy)*roof;
+        const radius=Math.hypot(p.y,p.z), target=diameter/(2*Math.max(radius,1e-12));
+        p.y=p.y*(1-blend)+p.y*target*blend;p.z=p.z*(1-blend)+p.z*target*blend;
+      }
+    }
+  }
+  return motorSizedFuselageSections(geom,result);
 }
 
 function motorSizedFuselageSections(geom,result) {
+  if(['vtol','vtol5'].includes(geom.fuse_preset))return result;
   const motor=geom.motor_mount;
   if(!geom.tail_booms || motor?.motorLayout!=='single' || !(motor.motorDiameter>0) || !result.sections.length)return result;
   const sections=result.sections,end=sections[sections.length-1],radius=motor.motorDiameter/2000;

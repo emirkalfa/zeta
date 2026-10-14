@@ -124,3 +124,44 @@ html[data-theme="dark"] .stat:nth-child(4n){background:var(--pastel-blue)}
 .project-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 #projectManager input, #projectManager select { max-width:100%; min-width:0; }
 #projectLibraryStatus { font-size:.85rem; overflow-wrap:anywhere; margin-top:12px; }
+
+/* Group parameters and present honest indeterminate production progress. */
+.production-status{margin:12px 0 18px;padding:12px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text-secondary)}
+.production-status p{margin:0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.production-status[data-state="busy"]{background:var(--pastel-blue)}
+.production-status[data-state="ready"]{background:var(--pastel-mint);color:var(--text)}
+.production-status[data-state="error"]{background:#f7e3e5;border-color:#c7838b;color:#713c43}
+[data-theme="dark"] .production-status[data-state="error"]{background:#4a363b;border-color:#9d737b;color:#f0c7cc}
+.production-progress{height:6px;margin-top:10px;background:var(--border);border-radius:12px;overflow:hidden}
+.production-progress span{display:block;width:35%;height:100%;background:var(--primary);border-radius:12px;animation:production-sweep 1.5s ease-in-out infinite alternate}
+@keyframes production-sweep{from{transform:translateX(0)}to{transform:translateX(180%)}}
+@media(prefers-reduced-motion:reduce){.production-progress span{animation:none;width:100%;opacity:.5}}
+.vtol-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px;align-items:start}
+.vtol-option-group{border:1px solid var(--border);border-radius:12px;background:var(--bg);padding:16px}
+.vtol-option-group .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+.vtol-option-group:first-child{grid-column:1/-1;background:var(--pastel-blue)}
+.vtol-option-group:first-child .form-grid{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.analysis-scope{border-top:1px solid var(--border);padding-top:16px;margin-top:16px;color:var(--text-secondary)}
+.project-save-row{margin-top:16px;display:flex;align-items:center;flex-wrap:wrap;gap:12px;border-top:1px solid var(--border);padding-top:16px}
+#paramForm>.form-actions{position:sticky;bottom:12px;z-index:5;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 4px 18px #0001}
+#paramForm>.form-actions .btn-primary{min-width:150px}
+.toggle-row{display:inline-flex;margin:5px 16px 12px 0;gap:8px;color:var(--text-secondary);font-size:13px}
+.legend{padding:10px 0;gap:18px;color:var(--text-secondary);font-size:12px}
+@media(max-width:760px){.vtol-groups{grid-template-columns:1fr}.vtol-option-group .form-grid{grid-template-columns:1fr}.vtol-option-group:first-child .form-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.vtol-option-group{padding:14px}}
+
+#vtolSettingsPanel,.configuration-card{grid-column:1/-1}
+
+.configuration-card .field.wide{grid-column:auto}
+@media(min-width:761px){.configuration-card .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* One viewport, independent navigation and content scrollports. */
+html,body{height:100%;overflow:hidden}
+#app{height:100vh;height:100dvh;min-height:0;overflow:hidden;align-items:stretch}
+#content{height:100%;min-height:0;overflow-y:auto;overflow-x:hidden;justify-content:flex-start;overflow-anchor:none}
+#content>.tab-pane{flex:1 0 auto;margin-top:0;margin-bottom:0}
+#content>.tab-pane:not(.active){display:none!important}
+#sidebar{position:relative;top:auto;flex-shrink:0}
+@media(max-width:760px){
+ #sidebar{position:relative;top:auto;flex:0 0 auto}
+ #content{height:auto;flex:1 1 0;min-height:0}
+}

@@ -78,7 +78,7 @@ test('3D meshes use server STL vertices and split cover visibility',()=>{
   const THREE=require('../static/vendor/three.min.js');
   const ctx=vm.createContext({THREE,window:{addEventListener(){}},scene:new THREE.Scene(),
     wingGroup:new THREE.Group(),tailGroup:new THREE.Group(),fuseGroup:new THREE.Group(),
-    $:id=>id==='motorCoverView'?{checked:false}:null,MODEL_COLORS:{fuselage:0xaaaaaa,airframe:0xbbbbbb},
+    $:id=>id==='serviceHatchPanel'?{}:id==='motorCoverView'?{checked:false}:null,MODEL_COLORS:{fuselage:0xaaaaaa,airframe:0xbbbbbb},
     modelMaterial:color=>new THREE.MeshBasicMaterial({color}),addMotorHardware(){}});
   vm.runInContext(source,ctx);
   ctx.data={parts:[{name:'motor_wing_right_service_cover_01of02',vertices:[0,0,0,100,0,0,0,100,0],faces:[0,1,2]}],manifest:{motors:[]}};
@@ -104,7 +104,7 @@ test('typing motor diameter updates geometry and the secondary viewer immediatel
 
 test('control preview rotates exported pieces around the physical pin and resets the previous selection',()=>{
   const THREE=require('../static/vendor/three.min.js');
-  const nodes={controlPreviewPanel:{},controlPreviewAngle:{value:'0'},controlPreviewValue:{},
+  const nodes={serviceHatchPanel:{},controlPreviewPanel:{},controlPreviewAngle:{value:'0'},controlPreviewValue:{},
     controlPreviewSelect:{value:'',replaceChildren(){this.value='';},append(o){if(!this.value)this.value=o.value;}}};
   const ctx=vm.createContext({THREE,window:{addEventListener(){}},document:{createElement:()=>({})},
     scene:new THREE.Scene(),wingGroup:new THREE.Group(),tailGroup:new THREE.Group(),fuseGroup:new THREE.Group(),
@@ -129,7 +129,7 @@ test('control preview rotates exported pieces around the physical pin and resets
 
 test('mounting detail list exposes every hatch, interface, motor, service-cover and hinge opening',()=>{
   const ctx=vm.createContext({window:{addEventListener(){}}});vm.runInContext(source,ctx);
-  const manifest={hatch_bolts_mm:[[1,2,3],[4,5,6]],
+  const manifest={service_hatches:[{part:'hatch_front',bolt_points_mm:[[1,2,3]]},{part:'hatch_rear',bolt_points_mm:[[4,5,6]]}],
     interfaces:[{part:'wing_right',parent:'body',bolt_point_mm:[10,20,30],bolt_axis:[0,1,0]}],
     motors:[{name:'motor_right',parent:'wing_right',face_mm:[100,200,300],axis:[1,0,0],hole_centers_yz_mm:[[-8,0],[8,0]],hole_diameter_mm:3.3,center_bore_mm:8.3,service_cover:'motor_right_service_cover',service_screws:{positions_xz_mm:[[150,280],[150,320]]}}],
     controls:[{part:'wing_right_flap',parent:'wing_right',kind:'flap',hinge_point_mm:[200,0,300],hinge_axis:[0,0,1]}]};

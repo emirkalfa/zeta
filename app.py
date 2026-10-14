@@ -202,15 +202,17 @@ def get_airfoil(airfoil_id):
 
 @app.route('/api/manufacturing', methods=['POST'])
 def api_manufacturing():
-    from backend.manufacturing import generate, preview, package, ManufacturingError
+    from backend.manufacturing import ManufacturingError
+    from backend.manufacturing_service import manufacturing_service
     if request.content_length and request.content_length > 8_000_000:
         return jsonify(error='Model verisi çok büyük.'), 413
     try:
-        parts, manifest, rings = generate(request.get_json())
+        data=request.get_json()
+        mode=request.args.get('mode','preview')
         if request.args.get('mode') == 'zip':
-            content = package(parts, manifest, rings, request.args.get('part', 'all'))
+            content = manufacturing_service.result(data,'zip',request.args.get('part','all'))
             return Response(content, mimetype='application/zip', headers={'Content-Disposition': 'attachment; filename=zeta_montajli_stl.zip'})
-        return jsonify(preview(parts, manifest, rings))
+        return jsonify(manufacturing_service.result(data,mode))
     except (ManufacturingError, ValueError, KeyError, TypeError, OverflowError) as e:
         return jsonify(error=str(e)), 400
 
@@ -241,6 +243,12 @@ def api_calculate():
                               man_fuse_length=data.get('man_fuse_length'),
                               man_fuse_width=data.get('man_fuse_width'),
                               airframe=data.get('airframe', 'standard'),
+                              penta_pusher_clearance=data.get('penta_pusher_clearance',.078),
+                              penta_motor_diameter=data.get('penta_motor_diameter',28),
+                              tria_tail_vh=data.get('tria_tail_vh',.45),
+                              tria_tail_vv=data.get('tria_tail_vv',.03),
+                              target_stall_speed=data.get('target_stall_speed',12),
+                              reynolds_number=data.get('reynolds_number',200000),
                                )
     cg_pct = data.get('cg_percent')
     if cg_pct is not None:

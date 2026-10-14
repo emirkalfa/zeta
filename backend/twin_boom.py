@@ -21,7 +21,7 @@ def vtail_end_fairing(g,x,y,z,radius,wall):
     return skin,{'start_x_mm':start,'end_x_mm':end,'start_radius_mm':radius,
                  'end_radius_mm':wall,'wall_mm':wall,'closed_aft_end':True}
 
-def prepare_booms(g,assemblies,frames,cuts,wall,gap,screw,nf,nh):
+def prepare_booms(g,assemblies,frames,cuts,wall,gap,screw,nf,nh,tail_floor_mm=None):
     b=g['tail_booms'];r=float(b['diameter'])*500
     if r<wall+3:raise ManufacturingError('Kuyruk bomu iç bağlantı için çok ince.')
     x0=float(b['x_start'])*1000;x1=float(b['x_end'])*1000
@@ -43,13 +43,21 @@ def prepare_booms(g,assemblies,frames,cuts,wall,gap,screw,nf,nh):
                        'screw_diameter_mm':screw,'nut_flat_mm':nf,'segment_spigot_mm':12,'tail_fairing':fairing})
     if g['tail_type']=='conventional':
         x=(float(g['tail_x_pos'])+float(g['htail_chord'])*.4)*1000
-        bridge=box([x-5,y-r-5,-by],[x+5,y-r-1,by])
-        bridge=bridge+box([x-22,y-r-4,-22],[x+22,y+6,22])
+        top=min(y-r-1,tail_floor_mm-wall-gap if tail_floor_mm is not None else y-r-1)
+        bottom=top-max(4,2*wall)
+        # Keep a continuous spine below the real stabilizer envelope, including
+        # large chords. Root-seat cuts must not sever the boom-to-boom beam.
+        bridge=box([x-5,bottom,-by],[x+5,top,by])
+        bridge=bridge+box([x-22,bottom if tail_floor_mm is not None else y-r-4,-22],[x+22,y+6,22])
         for sign in [1,-1]:
             z=sign*by
             collar=cylinder(r+3,16,[x-8,y,z],[1,0,0])-cylinder(r+gap/2,18,[x-9,y,z],[1,0,0])
             drill=cylinder((screw+gap)/2,2*r+12,[x,y-r-6,z],[0,1,0])
             nut=cylinder((nf+gap)/math.sqrt(3),nh+gap,[x,y-r-3-.01,z],[0,1,0],sides=6)
+            if tail_floor_mm is not None:
+                web=box([x-5,bottom,z-8],[x+5,y-r+2,z+8])
+                web-=cylinder(r+gap/2,18,[x-9,y,z],[1,0,0])
+                bridge=bridge+web
             bridge=(bridge+collar)-drill-nut
             name='boom_'+('right' if sign>0 else 'left')
             cuts[name].append(drill)

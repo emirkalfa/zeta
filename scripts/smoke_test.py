@@ -95,9 +95,33 @@ def main():
             archive=zipfile.ZipFile(io.BytesIO(body))
             report=json.loads(archive.read('manifest.json'))
             assert status==200 and report['parts']
+            if payload.get('geometry',{}).get('fuse_preset')=='vtol':
+                assert len(report['motors'])==3 and len(report['vtol_joints'])==2
+                assert all(f.get('blended') for f in report['wing_root_fairings'])
+                assert any(p['file'].startswith('vtol_rear_clamp') for p in report['parts'])
+                assert all(j['mechanism']=='compact_direct_servo' for j in report['vtol_joints'])
+                if report.get('body_segment_joints'):
+                    for j in report['body_segment_joints']:
+                        assert len(j['holes'])==2
+                        assert j['bridge']+'.stl' in archive.namelist()
+                        assert all(n+'.stl' in archive.namelist() for n in j['segments'])
+                assert report['carbon_boom']['purchased']
+                assert any(p['file'].startswith('vtol_tail_carrier') for p in report['parts'])
+                assert not any(p['file'].startswith('carbon_tail_tube') for p in report['parts'])
+                for side in ['right','left']:
+                    assert any(p['file'].startswith('vtol_wing_'+side+'_servo_cover') for p in report['parts'])
+            if payload.get('geometry',{}).get('fuse_preset')=='vtol5':
+                assert len(report['motors'])==5 and len(report['booms'])==2
+                assert not report['vtol_joints']
+                assert sum(m.get('out_axis')==[0,1,0] for m in report['motors'])==4
+                for side in ['right','left']:
+                    assert any(p['file'].startswith('vtol5_'+side+'_rail') for p in report['parts'])
             if payload.get('options',{}).get('cameraMount'):
                 assert len(report['cameras'])==1
                 assert len(report['cameras'][0]['holes'])==2
+            for j in report.get('wing_root_braces',[]):
+                assert len(j['holes'])==2
+                assert all(n+'.stl' in archive.namelist() for n in [j['bridge'],*j['segments']])
             wings=[j for j in report['interfaces'] if j['part'] in ('wing_right','wing_left')]
             assert len(wings)==2 and all(j['pin_count']==1 for j in wings)
             if payload.get('options',{}).get('wingJoinMode')=='bolted':

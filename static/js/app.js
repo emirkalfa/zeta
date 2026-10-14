@@ -148,11 +148,18 @@ function switchTab(tabId) {
     link.classList.toggle('active', active);
     if (active) {
       link.setAttribute('aria-current', 'page');
-      link.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      // Scroll only the navigation strip; scrollIntoView can move its ancestors.
+      const nav = link.closest('#sidebar-nav');
+      if (nav) {
+        if (window.innerWidth <= 760) nav.scrollLeft = Math.max(0, link.parentElement.offsetLeft - nav.offsetLeft - 8);
+        else nav.scrollTop = Math.max(0, link.parentElement.offsetTop - nav.offsetTop - 8);
+      }
     }
     if (!active) link.removeAttribute('aria-current');
   });
-  window.scrollTo(0, 0);
+  const content = $('content');
+  if (content) content.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   // Gizliyken 0×0 ölçülen 3D sahneler görünür olunca yeniden boyutlansın
   window.dispatchEvent(new Event('resize'));
   if (tabId === 'fuse' && typeof fitFuseViewerToModel === 'function') {
@@ -208,7 +215,9 @@ function setupFuseLibrary() {
     state.fusePreset = button.dataset.preset;
     setRadio('fuse_type', 'conventional');
     if (state.geometry) state.geometry.fuse_type = 'conventional';
-    if(state.fusePreset==='combat' || previous==='combat') {
+    if(state.fusePreset==='vtol')setRadio('tail_type','vtail');
+    if(state.fusePreset==='vtol5'){setRadio('tail_type','conventional');$('motorLayout').value='single';}
+    if(['combat','vtol','vtol5'].includes(state.fusePreset) || ['combat','vtol','vtol5'].includes(previous)) {
       setRadio('mission_profile',state.fusePreset==='combat'?'competition':'general');
       updateMissionProfile();
       if(state.fusePreset==='combat' && $('motorLayout').value==='none') {
@@ -231,7 +240,7 @@ function setupFuseLibrary() {
     }
   });
   $('fuseCustomBtn').addEventListener('click', () => {
-    if (!state.geometry) return;
+    if (!state.geometry || state.fusePreset==='vtol') return;
     if (state.fusePreset !== 'custom') {
       state.fuseSections = presetFuseKeys(state.geometry, state.fusePreset);
       state.fuseSectionExponent = FUSELAGE_PRESETS[state.fusePreset].exponent;
@@ -248,6 +257,7 @@ function setupFuseLibrary() {
 }
 
 function syncFuseLibrary() {
+  if(typeof syncVtolPanel==='function')syncVtolPanel();
   const custom = state.fusePreset === 'custom';
   const preset = FUSELAGE_PRESETS[state.fusePreset];
   document.querySelectorAll('[data-preset]').forEach(button => {
@@ -255,7 +265,7 @@ function syncFuseLibrary() {
   });
   $('fuse-model-name').textContent = custom ? 'Özgün gövde' : preset.name;
   $('fuse-model-description').textContent = custom ? 'Kesitleri aşağıdan değiştirin. Her düzenleme iki 3D görünüme ve gövde çıktısına yansır.' : preset.description;
-  $('fuse-preset-controls').hidden = custom;
+  $('fuse-preset-controls').hidden = custom||['vtol','vtol5'].includes(state.fusePreset);
   $('fuse-custom-details').hidden = !custom;
   $('fuseWidthScale').value = Math.round(state.fuseWidthScale * 100);
   $('fuseHeightScale').value = Math.round(state.fuseHeightScale * 100);
@@ -265,6 +275,7 @@ function syncFuseLibrary() {
     const keys = custom ? state.fuseSections : presetFuseKeys(state.geometry, state.fusePreset);
     const dims = [['Uzunluk', Math.max(...keys.map(s => s.t)) - Math.min(...keys.map(s => s.t))],
       ['Azami genişlik', Math.max(...keys.map(s => s.w))], ['Azami yükseklik', Math.max(...keys.map(s => s.h))]];
+    if(state.fusePreset==='vtol')dims[0]=['Sabit ana gövde uzunluğu',.672];
     $('fuse-dimensions').innerHTML = dims.map(([label, value]) => `<div><dt>${label}</dt><dd>${Math.round(value * 1000)} <span>mm</span></dd></div>`).join('');
   }
 }
@@ -356,6 +367,7 @@ function updateFuselageViews() {
 async function init() {
   store.ready=store.load();
   await store.ready;
+  setupVtol();
   setupManufacturing();
   setupTheme();
   setupSidebar();
@@ -454,6 +466,7 @@ function restoreProject() {
   let data;
   try { data = JSON.parse(store.get('zeta-project')); } catch (e) { return; }
   if (!data || !data.wingspan) return;
+  if(typeof restoreVtolSettings==='function')restoreVtolSettings(data);
   if($('projectName'))$('projectName').value=data.project_name||'';
   setRadio('mode',data.mode||'auto');
   $('manual-inputs').hidden=(data.mode||'auto')!=='manual';
@@ -493,6 +506,8 @@ function restoreProject() {
 function saveProject() {
   if(window.projectOpening)return;
   store.set('zeta-project', JSON.stringify({
+    vtol:typeof vtolSettings==='function'?vtolSettings():undefined,
+    vtolLayoutVersion:3,
     project_name:$('projectName')?.value||'',
     mode:radioValue('mode','auto'),
     manual:Object.fromEntries(MANUAL_FIELDS.map(id=>[id,$('man_'+id).value])),
@@ -539,7 +554,7 @@ function updateCGDisplay() {
 
 function setupEventListeners() {
   $('paramForm').addEventListener('submit', (e) => { e.preventDefault(); calculateAll(); });
-  document.querySelectorAll('input[name="wing_pos"]').forEach(input=>input.addEventListener('change',()=>{
+  const recalculatePlacement=()=>{
     if(!state.geometry)return;
     const request=++wingPlacementRequest;
     const previous=document.querySelector('.tab-pane.active')?.dataset.tab||'input';
@@ -549,7 +564,12 @@ function setupEventListeners() {
       await calculateAll();if(request===wingPlacementRequest)switchTab(previous);
     };
     recalculate();
-  }));
+  };
+  document.querySelectorAll('input[name="wing_pos"]').forEach(input=>input.addEventListener('change',recalculatePlacement));
+  for(const id of ['wingspan','weight','targetStall','motorDiameter','motorLength','propDiameter','propOffset',...MANUAL_FIELDS.filter(f=>['root_chord','tip_chord','sweep','dihedral'].includes(f)).map(f=>'man_'+f)]){
+    $(id)?.addEventListener('change',()=>{if(state.fusePreset==='vtol5')recalculatePlacement();});
+  }
+  document.querySelectorAll('input[name="wing_shape"]').forEach(input=>input.addEventListener('change',()=>{if(state.fusePreset==='vtol5')recalculatePlacement();}));
   $('cgSlider').addEventListener('input', updateCGDisplay);
   document.querySelectorAll('input[name="mode"]').forEach(input => {
     input.addEventListener('change', () => {
@@ -610,17 +630,20 @@ async function calculateAll() {
     showFormError('Motor gücü ve batarya enerjisi sıfırdan büyük olmalı.');
     return;
   }
-  const competition = radioValue('mission_profile', 'general') === 'competition' || state.fusePreset==='combat';
+  const competition = !['vtol','vtol5'].includes(state.fusePreset) && (radioValue('mission_profile', 'general') === 'competition' || state.fusePreset==='combat');
   if(competition && fuse_type!=='manual')state.fusePreset='combat';
 
   const body = {
     wingspan, weight, airfoil_code, tail_type, fuse_type, manual_mode,
+    target_stall_speed: Number($('targetStall').value), reynolds_number,
     wing_shape: radioValue('wing_shape', 'tapered'),
     wing_position: radioValue('wing_pos', 'mid'),
     cg_percent: parseInt($('cgSlider').value) || 25,
     // Yarışma profili ayrı bir gövde yerleşimi kullanır (çift bom, itici pervane)
-    airframe: competition ? 'combat' : 'standard',
+    airframe: state.fusePreset==='vtol'?'vtol_fixed':state.fusePreset==='vtol5'?'vtol5_fixed':competition ? 'combat' : 'standard',
   };
+  if(state.fusePreset==='vtol5'){body.penta_pusher_clearance=(Number($('motorLength').value)+Number($('propOffset').value)+Math.max(40,.15*Number($('propDiameter').value)))/1000;body.penta_motor_diameter=Number($('motorDiameter').value);}
+  if(state.fusePreset==='vtol'){body.tria_tail_vh=Number($('triaTailVh').value);body.tria_tail_vv=Number($('triaTailVv').value);}
   if (manual_mode) {
     for (const f of MANUAL_FIELDS) {
       const manualValue = parseFloat($('man_' + f).value);
@@ -674,6 +697,8 @@ async function calculateAll() {
     state.geometry.fuse_sections = state.fuseSections.map(s => ({ ...s }));
     syncFuseLibrary();
     state.geometry.motor_mount=motorMountSettings();
+    if(state.fusePreset==='vtol'){state.geometry.motor_mount={motorLayout:'none'};state.geometry.vtol=vtolSettings();}
+    if(state.fusePreset==='vtol5'){state.geometry.motor_mount.motorLayout='single';state.geometry.vtol=vtolSettings();}
     syncWingPlacement(state.geometry,buildFuselageSections(state.geometry,fuse_type,state.airfoilCoords).sections);
     saveProject();
 
@@ -743,7 +768,7 @@ function displayResults(geom) {
       ['Uç veter', (geom.htail_tip_chord || 0).toFixed(3), 'm'],
       ['Daralma oranı', geom.htail_taper, ''],
       ['Alan', geom.htail_area, 'm²'],
-      ['Kuyruk kolu', geom.htail_arm, 'm'],
+      ['Kuyruk kolu', geom.effective_tail_arm ?? geom.htail_arm, 'm'],
       ['X pozisyonu', geom.tail_x_pos, 'm'],
       ['Kuyruk tipi', (geom.tail_booms?{conventional:'H kuyruk (ikiz fin)',ttail:'Π kuyruk (üst köprü)',vtail:'Ters V kuyruk'}:TAIL_TYPE_LABELS)[geom.tail_type] || 'Konvansiyonel', ''],
     ]],
@@ -774,7 +799,7 @@ function displayResults(geom) {
       ['Her bir yüzeyin alanı',geom.vtail_panel_area,'m²'],
       ['Yatay etkin alan',geom.htail_effective_area,'m²'],
       ['Dikey etkin alan',geom.vtail_effective_area,'m²'],
-      ['Kuyruk kolu',geom.htail_arm,'m'],
+      ['Kuyruk kolu',geom.effective_tail_arm ?? geom.htail_arm,'m'],
     ]];
   }
 

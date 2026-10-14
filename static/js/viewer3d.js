@@ -1016,13 +1016,17 @@ function buildFuseViewerFuselage(geom, wingCoords) {
   if(production?.parts?.length){
     for(const part of production.parts){
       if(!showAircraft&&!/^(body|hatch)(_|$)/.test(part.name))continue;
-      const geometry=new THREE.BufferGeometry();
+      let geometry=new THREE.BufferGeometry();
       geometry.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices.map(v=>v/1000),3));
       geometry.setIndex(part.faces);geometry.computeVertexNormals();
+      if(production.manifest.fixed_vtol_body&&(part.name.startsWith('body')||/^wing_(right|left)(?:$|_\d)/.test(part.name)))geometry=creaseShellNormals(geometry);
       const color=part.name.includes('_join_')?0x9b85c4:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
-      const mesh=new THREE.Mesh(geometry,modelMaterial(color));mesh.material.flatShading=true;mesh.userData.partName=part.name;
+      const mesh=new THREE.Mesh(geometry,modelMaterial(color));mesh.material.flatShading=!(part.name.startsWith('body')||/^wing_(right|left)(?:$|_\d)/.test(part.name));mesh.userData.partName=part.name;
       fuseViewerGroup.add(mesh);
     }
+    if(showAircraft&&['vtol','vtol5'].includes(geom.fuse_preset))addMotorHardware(fuseViewerGroup,production.manifest.motors||[]);
+    if(showAircraft&&production.manifest?.vtol_joints?.length)addVtolServoHardware(fuseViewerGroup,production.manifest.vtol_joints);
+    if(showAircraft&&production.manifest?.carbon_boom)addCarbonBoomHardware(fuseViewerGroup,production.manifest.carbon_boom);
   }else{
   fuseViewerGroup.add(buildFuselageGroup(geom, geom.fuse_type, wingCoords));
   if (showAircraft && fuseViewerWingGrid) fuseViewerGroup.add(buildWingGroup(geom, fuseViewerWingGrid));
@@ -1042,6 +1046,7 @@ function updateFuseViewer(geom, wingCoords) {
   if (!fuseViewerRunning || !fuseViewerGroup) return;
   buildFuseViewerFuselage(geom, wingCoords);
   fitFuseViewerToModel();
+  if(typeof applyVtolTilt==='function')applyVtolTilt();
 }
 
 function animateFuseViewer() {
@@ -1057,6 +1062,7 @@ function disposeFuseViewer() {
   if (fuseViewerScene) disposeViewerScene(fuseViewerScene);
   if (fuseViewerRenderer) {
     fuseViewerRenderer.dispose();
+    fuseViewerRenderer.forceContextLoss?.();
     const c = document.getElementById('fuse-three-container');
     if (c && fuseViewerRenderer.domElement.parentNode === c) c.removeChild(fuseViewerRenderer.domElement);
     if (fuseViewerRenderer._onResize) window.removeEventListener('resize', fuseViewerRenderer._onResize);
@@ -1072,6 +1078,7 @@ function disposeViewer() {
   if (scene) disposeViewerScene(scene);
   if (renderer) {
     renderer.dispose();
+    renderer.forceContextLoss?.();
     const c = document.getElementById('three-container');
     if (c && renderer.domElement.parentNode === c) c.removeChild(renderer.domElement);
   }

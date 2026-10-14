@@ -77,12 +77,17 @@ def welded_mesh_closed(vertices,faces):
     _,inverse=np.unique(vertices,axis=0,return_inverse=True)
     faces=inverse[faces]
     edges=np.concatenate([faces[:,[0,1]],faces[:,[1,2]],faces[:,[2,0]]])
-    _,counts=np.unique(np.sort(edges,axis=1),axis=0,return_counts=True)
+    # Encode unordered vertex pairs as integers; numeric sorting avoids
+    # repeated structured row comparisons without changing the edge test.
+    low=edges.min(axis=1).astype(np.uint64);high=edges.max(axis=1).astype(np.uint64)
+    _,counts=np.unique(low*np.uint64(len(vertices))+high,return_counts=True)
     return np.all(counts==2)
 
 
 def printable_precision(solid,name):
     """Weld sub-micron CSG slivers that collapse in float32 STL coordinates."""
+    if solid.status()!=md.Error.NoError or solid.is_empty():
+        raise ManufacturingError(f'{name}: geçerli baskı hacmi oluşturulamadı.')
     mesh=solid.to_mesh();v=np.asarray(mesh.vert_properties)[:,:3];f=np.asarray(mesh.tri_verts)
     t=v[f];area=np.linalg.norm(np.cross(t[:,1]-t[:,0],t[:,2]-t[:,0]),axis=1)
     if np.min(area)>=1e-10 and welded_mesh_closed(v,f):return solid
@@ -210,26 +215,44 @@ def make_fuselage(data, wall, clearance, screw, nutflat, nuth):
         for z in [-hz,hz]:
             order=np.argsort(top[:,2]);tops.append(float(np.interp(z,top[order,2],top[order,1])))
     seat=min(tops)-max(3,wall*2)
-    cutter=box([x0-clearance,seat,-hz-clearance],[x1+clearance,10000,hz+clearance])
-    lid_region=box([x0+clearance,seat+clearance,-hz+clearance],[x1-clearance,10000,hz-clearance])
-    body=shell-cutter;lid=shell^lid_region
-    # Lugs below the opening, with corresponding thickened lid bosses above.
-    holes=[];boss= max(6,nutflat/2+2)
-    for x in [x0+boss+2,x1-boss-2]:
-        for z in [-hz+boss+2,hz-boss-2]:
-            lug=cylinder(boss,10,[x,seat-10,z],[0,1,0])
-            arm=box([x-boss,seat-9,-width if z<0 else z-boss],[x+boss,seat-3,z+boss if z<0 else width])
-            body=body+((lug+arm)^outer)
-            lid=lid+(cylinder(boss,100,[x,seat+clearance,z],[0,1,0])^outer^lid_region)
-            bore=cylinder((screw+clearance)/2,200,[x,seat-100,z],[0,1,0])
-            body=body-bore-nut_cut(x,seat-7,z,nutflat+clearance,nuth+clearance)
-            lid=lid-bore
-            holes.append([x,seat,z])
-    check(body,'body');check(lid,'hatch')
+    middle=(x0+x1)/2;bridge=max(8,wall*4)
+    body=shell;lid=md.Manifold();cutter=md.Manifold();holes=[]
+    boss=max(6,nutflat/2+2)
+    for index,(a,b) in enumerate([(x0,middle-bridge/2),(middle+bridge/2,x1)]):
+        local_tops=[]
+        for ring in rings[(rings[:,0,0]>=a)&(rings[:,0,0]<=b)]:
+            top=ring[ring[:,1]>ring[:,1].mean()];order=np.argsort(top[:,2])
+            local_tops.extend(float(np.interp(z,top[order,2],top[order,1])) for z in [-hz,hz])
+        seat=min(local_tops)-max(3,wall*2)
+        if b-a<24:raise ManufacturingError('İki servis kapağı için gövde boyunu artırın.')
+        opening=box([a-clearance,seat,-hz-clearance],[b+clearance,10000,hz+clearance])
+        region=box([a+clearance,seat+clearance,-hz+clearance],[b-clearance,10000,hz-clearance])
+        cap=shell^region;body-=opening;cutter+=opening
+        # Continuous lower rim supports the cap edges, not only screw corners.
+        rim=box([a-3,seat-3,-hz-3],[b+3,seat,hz+3])-box([a+3,seat-4,-hz+3],[b-3,seat+1,hz-3])
+        body+=rim^outer
+        for x in [a+boss+2,b-boss-2]:
+            for z in [-hz+boss+2,hz-boss-2]:
+                lug=cylinder(boss,10,[x,seat-10,z],[0,1,0])
+                arm=box([x-boss,seat-9,-width if z<0 else z-boss],[x+boss,seat-3,z+boss if z<0 else width])
+                body+=((lug+arm)^outer)
+                cap+=(cylinder(boss,100,[x,seat+clearance,z],[0,1,0])^outer^region)
+                bore=cylinder((screw+clearance)/2,200,[x,seat-100,z],[0,1,0])
+                body=body-bore-nut_cut(x,seat-7,z,nutflat+clearance,nuth+clearance)
+                cap-=bore;holes.append([x,seat,z])
+        cap=printable_precision(cap,'hatch_front' if index==0 else 'hatch_rear');lid+=cap
+    check(body,'body')
     return body,lid,outer,rings,holes,cutter,inner
 
 
 def generate(data):
+    if data.get('geometry',{}).get('fuse_preset') in ('vtol','vtol5'):
+        from backend.fixed_vtol import normalize
+        data=normalize(data)
+    if data.get('geometry',{}).get('fuse_preset')=='vtol5':
+        if not data['geometry'].get('tail_booms'):
+            raise ManufacturingError('Beş motorlu VTOL için çift bom geometrisi gerekli; Penta VTOL modelini seçip yeniden hesaplayın.')
+        data={**data,'options':{**data.get('options',{}),'motorLayout':'single'}}
     from backend.motor_mounts import motor_sized_fuselage
     data=motor_sized_fuselage(data)
     from backend.wing_placement import place_wing_assembly
@@ -249,13 +272,19 @@ def generate(data):
     wing_join=options.get('wingJoinMode','bonded')
     if wing_join not in ('bolted','bonded'):raise ManufacturingError('Kanat dilim bağlantısı türü geçersiz.')
     body,lid,outer,rings,hatch_holes,hatch_opening,cavity_rings=make_fuselage(data,wall,gap,screw,nf,nh)
-    specs=data['panels']
+    specs=[dict(p) for p in data['panels']]
+    data={**data,'panels':specs}
     if not 3<=len(specs)<=10: raise ManufacturingError('Kanat / kuyruk yüzeyleri eksik.')
     assemblies={};frames={};notes=[];interfaces=[];spar_channels=[];root_fairings=[];root_fairing_union=md.Manifold();cuts={'body':[hatch_opening]};body_obstacles=[]
     booms=[]
+    carbon_boom=None
+    if g.get('fuse_preset')=='vtol':
+        from backend.carbon_boom import prepare_carbon_boom
+        body,carbon_boom=prepare_carbon_boom(body,outer,data,assemblies,frames,cuts)
     if g.get('tail_booms'):
         from backend.twin_boom import prepare_booms
-        booms=prepare_booms(g,assemblies,frames,cuts,wall,gap,screw,nf,nh)
+        tail_floor=min(float(p['root'][1])*1000+min(np.asarray(profile(p['coords'],float(p['chord'])*1000).to_polygons()[0])[:,1]) for p in data['panels'] if 'horizontal' in p['name']) if g.get('fuse_preset')=='vtol5' else None
+        booms=prepare_booms(g,assemblies,frames,cuts,wall,gap,screw,nf,nh,tail_floor)
     # Vertical fins first: T-tail horizontal sockets are fused to their parent fin.
     specs=sorted(specs,key=lambda p: ('horizontal' in p['name'],p['kind']!='wing'))
     pending=specs.copy();specs=[];available={'body',*assemblies.keys()}
@@ -279,6 +308,16 @@ def generate(data):
             local_body=outer.transform(np.column_stack([inverse,-inverse@mat[:,3]]).tolist())
             embedded=local_body^panel
             trim=round(float(embedded.bounding_box()[5]),2)+.35 if not embedded.is_empty() else 20
+            if g.get('fuse_preset')!='vtol':
+                # A high/low wing intersects a narrow body section; reserve
+                # the complete body width so its seat cannot cut back into
+                # a wider skin station above or below the airfoil.
+                zone=local_body^box([-chord*.2,-10000,0],[chord,10000,length])
+                if not zone.is_empty():trim=max(trim,round(float(zone.bounding_box()[5]),2)+.35)
+            # All wing positions use the same broad, fixed center blend.
+            trim+=min(80,length*.11)
+        elif parent=='vtol_tail_carrier':
+            trim=carbon_boom['outer_diameter_mm']/2+10.5
         elif (parent=='body' or fin_parent or parent=='tail_bridge') and abs(mat[2,2])>.5:
             # A short central tail saddle prevents the two insertion tabs colliding.
             trim=20
@@ -296,6 +335,18 @@ def generate(data):
             for z in np.arange(trim+8,length-wall,rib):
                 shell=shell+(panel^box([-10000,-10000,z], [10000,10000,min(z+rt,length)]))
             panel=shell
+        flush_seat=spec['kind']=='wing'
+        if flush_seat:
+            # Recess the removable skin under the fixed root cuff. The cuff
+            # follows the original airfoil instead of adding an outside ridge.
+            tongue_scale=1+(tip/chord-1)*(trim+wing_seat+wall*3)/length
+            tongue_outer=section.offset(-(wall+gap)/tongue_scale,circular_segments=24)
+            tongue_inner=section.offset(-(2*wall+gap)/tongue_scale,circular_segments=24)
+            tongue=tongue_outer.extrude(length,scale_top=[tip/chord]*2)
+            if tongue_inner.area()>.01:
+                tongue-=tongue_inner.extrude(length,scale_top=[tip/chord]*2)
+            tongue= tongue ^ box([-10000,-10000,trim],[10000,10000,trim+wing_seat+wall*3])
+            panel=panel.trim_by_plane([0,0,1],trim+wing_seat+gap/2)+tongue
         # Root beam carries a rectangular male key; socket/nut holder belong to the parent.
         cx=chord*float(spec.get('mountChordFraction',.25 if fin_parent and g.get('tail_booms') else .85 if fin_parent else .4))
         keyw=min(chord*(.13 if fin_parent else .22),20 if fin_parent else 32)
@@ -307,7 +358,11 @@ def generate(data):
         beam=box([cx-keyw/2,-keyh/2,root],[cx+keyw/2,keyh/2,root+9])
         panel=panel+key+beam
         sleeve=box([cx-keyw/2-3,-keyh/2-3,root-depth-3],[cx+keyw/2+3,keyh/2+3,root])
-        female=box([cx-keyw/2-gap/2,-keyh/2-gap/2,root-depth-gap],[cx+keyw/2+gap/2,keyh/2+gap/2,root+gap])
+        # The wing key/beam continues through the recessed cuff. Reserve its
+        # complete insertion length, including the outboard beam, otherwise a
+        # cambered airfoil cuff intersects the key and blocks brace placement.
+        socket_end=root+9+gap if flush_seat else root+gap
+        female=box([cx-keyw/2-gap/2,-keyh/2-gap/2,root-depth-gap],[cx+keyw/2+gap/2,keyh/2+gap/2,socket_end])
         # Flared mouth guides insertion without loosening the deeper seating faces.
         lead=1.5
         mouth=md.CrossSection.square([keyw+gap,keyh+gap],center=True).extrude(
@@ -344,6 +399,9 @@ def generate(data):
             if inset.area()>.01:
                 hollow=inset.extrude(max(.1,saddle_length-wall*2),scale_top=[saddle_scale]*2)
                 stub=stub-hollow
+            from backend.wing_blend import blended_root
+            stub=blended_root(section,inset,chord,tip/chord,length,saddle_length,wall,gap,1.0,
+                              body_profile=rings if g.get('vtol_fixed_body') else None,frame=mat,roof_blend=.60 if g.get('fuse_preset')=='vtol5' else .75)
             cavity_body=mesh_solid(cavity_rings,cavity_rings[0][:,[1,2]])
             saddle=local_transform(stub,mat)-cavity_body
             # Profile seat embraces the root, with a single cross-pin for retention.
@@ -360,6 +418,14 @@ def generate(data):
             seat_void=root_section.offset(gap/2,circular_segments=24).extrude(
                 wing_seat+gap+1).translate([0,0,trim-gap/2])
             mating_envelope=mating_envelope+seat_void
+            if flush_seat:
+                collar=section.extrude(length,scale_top=[tip/chord]*2)^box(
+                    [-10000,-10000,collar_start],[10000,10000,collar_length])
+                seat_void=root_section.offset(-wall-gap/2,circular_segments=24).extrude(
+                    wing_seat+gap+1).translate([0,0,trim-gap/2])
+                mating_envelope=section.offset(gap/2,circular_segments=24).extrude(
+                    length,scale_top=[tip/chord]*2).trim_by_plane([0,0,1],collar_length+gap/2)
+                mating_envelope+=seat_void
             saddle=saddle+local_transform(collar,mat)
             # The hollow root fairing crosses the fuselage skin. Union its
             # inboard overlap into the body so the two printable solids do
@@ -368,6 +434,7 @@ def generate(data):
             root_fairings.append({'part':name,'parent':'body','root_plane_mm':trim,
                                  'fixed_plane_mm':saddle_length,'seam_mm':gap/2,
                                  'seat_depth_mm':wing_seat,'seat_end_mm':collar_length})
+            root_fairings[-1].update(blended=True,blend_length_mm=saddle_length,flush_seat=True,body_profile_blend=bool(g.get('vtol_fixed_body')))
         cuts.setdefault(parent,[]).extend([world_female,world_drill,world_nut,local_transform(mating_envelope,mat)])
         world_panel=local_transform(panel,mat)
         if parent=='body':
@@ -469,7 +536,7 @@ def generate(data):
             interfaces[-1].update(fastener_type='retaining_pin',pin_count=1,
                                  pin_diameter_mm=wing_pin,hole_diameter_mm=wing_pin+gap,
                                  seat_depth_mm=wing_seat)
-    if not root_fairing_union.is_empty():
+    if not root_fairing_union.is_empty() and g.get('fuse_preset')!='vtol5':
         body=body+root_fairing_union
     from backend.motor_mounts import install_motor_mounts
     if booms:
@@ -488,11 +555,34 @@ def generate(data):
     from backend.tail_joints import install_tail_center_joint
     center_parts=install_tail_center_joint(g,specs,assemblies,cuts,interfaces,gap,screw,nf,nh)
     motor_service_parts=[]
-    body,motor_obstacles,motor_cuts,motors=install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,motor_service_parts)
+    vtol_joints=[]
+    hover_report=None
+    if g.get('fuse_preset')=='vtol':
+        from backend.vtol_mounts import install_vtol
+        body,vtol_parts,motors,vtol_joints,motor_obstacles=install_vtol(body,assemblies,data,outer,gap,cuts)
+        motor_service_parts.extend(vtol_parts);motor_cuts=[]
+        from backend.hover_balance import hover_balance
+        hover_report=hover_balance(g,motors)
+        notes+=['Tria karbon kuyruk borusu satın alınır, STL parçası değildir. Gövde yuvasına belirtilen uzunluk kadar sokun, gövde ve kuyruk taşıyıcısının dış kulaklarındaki iki M3 vida/somunla sıkın. Arka motor üst eyer ve alt kelepçeyi boruya dört M3 vida/somunla bağlayın. Boru delinmez; bağlantı kayması, dönmesi, ezilmesi ve baskı dayanımı gerçek boru ve yükle denenmelidir. Kuyruk kökleri ayrı taşıyıcının profil yuvalarına geçer ve vidalanır.']
+        notes+=['VTOL prototipi: ön iki motor bağımsız pivotlu, arka motor sabit dikeydir. Ön taşıyıcı açıları dikeyden -20 ile 90 derece arasındadır. Uçuş kontrolcüsü, servo torku, itki, ağırlık merkezi ve geçiş uçuşu doğrulanmış değildir.',
+                'VTOL ön mekanizması kompakt doğrudan servo düzenidir. Sabit yan gövde kanat taşıyıcısına dört M3 vida ve alttan erişilen somunla bağlanır. Pivotta metal mil/vida, pul ve emniyetli somun kullanın. Servo yan servis bölmesine oturur; iki Ø2.4 mm kasa deliğinden bağlanır. Motor taşıyıcısının dört deliği satın alınan metal servo koluna vidalanır; basılı spline/diş yoktur. Kol delik yarıçapını ve vida çapını gerçek kola göre ayarlayın. Servis kapağında dört M2 vida ve içeriden erişilen somun cepleri bulunur. Kabloya dönüş boyunca serbest pay bırakın. Servo/motor/pervane ve metal bağlantılar STL değildir.',
+                'VTOL arka motor üst eyer ve alt kelepçe ile karbon boruya bağlanır. İki hizalama geçmesini oturtun, dört M3 vidayı üstten ve altıgen somunları alttaki ceplerden takın; eşit ve kademeli sıkın. Boruyu ezmeden tutuşu gerçek donanımla doğrulayın. Motor vidalarına üst taşıyıcının açık yanlarından erişilir. Vida boyunu gerçek baskı ve donanıma göre seçin. STL ölçüleri mekanik prototip içindir; yük ve gerçek donanımla hareket testi gerektirir.',
+                'VTOL hareket kontrolü -20 ile 90 derece arasında 5 derece aralıklarla örneklenir; sürekli hareket, kablo, servo kolu ve itme çubuğu çarpışma doğrulaması değildir. Referans: https://ardupilot.org/plane/docs/guide-tilt-rotor.html']
+    else:
+        body,motor_obstacles,motor_cuts,motors=install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,motor_service_parts)
+        if g.get('fuse_preset')=='vtol5':
+            from backend.quad_vtol import install_quad_lift
+            lift_parts,lift_motors=install_quad_lift(body,assemblies,data,gap,cuts,motors)
+            motor_service_parts.extend(lift_parts);motors.extend(lift_motors)
+            notes+=['Beş motorlu VTOL: dört sabit dikey kaldırma motoru ve bir arka itici motor. Sağ/sol kaldırma rayları dört M3 vida ve alttan somunla kanada bağlanır; boru kanalları korunur. Ray dilimleri hizalanıp yapıştırılır. Motor vidalarına taşıyıcıların yan açıklıklarından erişilir. Motorlar/pervaneler satın alınır. İtki, ağırlık merkezi, ray dayanımı, titreşim ve geçiş uçuşu fiziksel olarak doğrulanmamıştır.']
     body_obstacles.extend(motor_obstacles);cuts['body'].extend(motor_cuts)
     from backend.camera_mounts import install_camera_mount
     body,camera_obstacles,cameras=install_camera_mount(body,outer,data,wall,gap)
     body_obstacles.extend(camera_obstacles)
+    from backend.landing_gear import install_landing_mounts
+    body,landing_mounts=install_landing_mounts(body,data,gap,cuts)
+    if landing_mounts and landing_mounts['layout']=='tricycle_wheel_mounts':notes+=['Üç tekerli iniş takımı için gövde altında bir ön merkez ve ağırlık merkezinin arkasında iki ana bağlantı yuvası bulunur. Her yuvada iki M3 geçme deliği ve içeriden erişilen altıgen somun cepleri vardır. Ön vida aralığı 20 mm, ana bağlantı aralığı 34 mm. Teker, mil ve harici taşıyıcılar STL değildir. Gerçek donanım, teker açıklığı, ağırlık merkezi ve iniş yükü ayrıca doğrulanır.']
+    elif landing_mounts:notes+=['Gövde altında iki ön ve bir arka merkez bağlantı yuvası bulunur. Ayaklar haricen temin edilir; STL paketinde ayak yoktur. Her yuvada iki M3 vida geçme deliği ve gövde içinden yerleştirilen altıgen somun cepleri bulunur. Ön vida aralığı 20 mm, arka 34 mm. Harici ayağın yüksekliği, pervane boşluğu, ağırlık merkezi ve iniş yükü gerçek donanımla doğrulanır.']
     # Adding the next socket/rib or motor pod must never fill existing bores.
     for owner,tools in cuts.items():
         if owner=='body':
@@ -501,17 +591,26 @@ def generate(data):
             for tool in tools:assemblies[owner]=assemblies[owner]-tool
     from backend.control_joints import install_control_surfaces
     controls=install_control_surfaces(g,specs,assemblies,frames,wall,gap,
-        hinge_pin,control_travel)
+        hinge_pin,control_travel,auto_root_splices=g.get('fuse_preset')=='vtol5' and options.get('designMode','auto')=='auto',splice_chord_limit=2*max(bed),root_splice_clearance=max(80,2*(nf+2*wall+3)+4*wall+4))
     for owner,tools in cuts.items():
         if owner in assemblies:
             for tool in tools:assemblies[owner]=assemblies[owner]-tool
-    parts=[Part('body',body,0,family='body'),Part('hatch',lid,0,family='hatch')]+motor_service_parts+center_parts
+    split_x=float(rings[0,0,0]+.28*(rings[-1,0,0]-rings[0,0,0]))
+    front_lid=lid^box([-10000,-10000,-10000],[split_x,10000,10000])
+    rear_lid=lid^box([split_x,-10000,-10000],[10000,10000,10000])
+    parts=[Part('body',body,0,family='body'),Part('hatch_front',front_lid,0,family='hatch'),Part('hatch_rear',rear_lid,0,family='hatch')]+motor_service_parts+center_parts
     for name,solid in assemblies.items():
         mat,trim,kind=frames[name]
         parts.append(Part(name,solid,0 if name.startswith('boom_') else 2,mat,kind))
     for p in parts:
-        p.solid=p.solid.as_original().set_tolerance(.02).simplify(.02)
-        p.solid=printable_precision(p.solid,p.name)
+        original=p.solid
+        simplified=original.as_original().set_tolerance(.02).simplify(.02)
+        try:
+            p.solid=printable_precision(simplified,p.name)
+        except ManufacturingError:
+            # Simplification may collapse a thin Boolean edge at STL precision.
+            # Keep the unmodified geometry if its exported topology validates.
+            p.solid=printable_precision(original,p.name)
         check(p.solid,p.name)
     notes += ['Her kanat yarısı profil biçimli gövde yuvasına oturur ve tek metal pimle tutulur. Başlı, uçtan emniyet klipsli pim kullanın; düz ve emniyetsiz çubuk kullanmayın. Pim ve klips STL paketine dahil değildir. Karbon borular kanat içi takviyedir. Gerçek baskıda oturma ve yük testi yapın.',
               'Ölçüler örnek ayarlardır. Yazıcı / malzeme için tolerans kuponunu basın.',
@@ -520,12 +619,13 @@ def generate(data):
               'Gövde dilimleri iç bilezikle hizalanır. Dilim birleştirmeleri yapıştırılır; uçuş öncesi yük testi gerekir.',
               ('Sabit kanat dilimleri iki dar veya tek geniş geçmeli köprü ve toplam dört vida ile birleşir. Köprüleri üstten, somunları alttan takın. Boru kanalları korunur. Kapak, kuyruk ve hareketli yüzey dilimleri yapıştırılır.' if wing_join=='bolted' else 'Kanat, kapak, kuyruk ve hareketli yüzey dilimleri yapıştırılarak birleştirilir. Kanat boru kanalları hizalamayı sağlar; bu modda dilim köprüleri üretilmez.'),
               'Flap, aileron, elevator ve rudder/ruddervator ayrı STL parçalarıdır. Menteşeler satın alınan metal pin/dişli çubukla birleşir. Pim başını kök girintisine oturtup uçtan somunla sabitleyin; basılı diş yoktur. Kontrol kolundaki Ø2 mm bağlantıya servo itme çubuğunu takın. Servo boyutuna uygun yatak, elektrik bağlantısı ve nötr/son konum ayarı gerçek donanımla yapılır.',
+              'Flap ve aileron kumanda kolları geniş iç tabanlı ve yuvarlatılmıştır. İki Ø2 mm delikten gerçek servo kolu ve itme çubuğu hareketine uygun olanı seçin. Delik seçimi mekanik oranı değiştirir; her iki uçta sıkışma, servo sınırı ve gerçek donanım boşluğu fiziksel olarak doğrulanır.',
               'Bu kontrol uçuşa elverişlilik veya malzeme dayanımı onayı değildir.']
     if cameras:notes+=['Burun altı kamera yuvası gövde STL parçasına dahildir. Kamera aşağıdan yerleştirilir; iki yan geçme deliğinden kameranın metal dişlerine vidalanır. Ölçüler kamera kasası içindir; lens, kablo ve vida boyunu gerçek donanımla kontrol edin. Önde pervane varsa görüşe girebilir.']
     if motors:notes+=['Motorlar ve pervaneler satın alınır; STL yalnız bağlantı taşıyıcılarını içerir. Vida boyunu motor üreticisine göre seçin; sargılara değmemelidir. Girilen ölçüleri gerçek motorla doğrulayın. Motor vidaları motorun metal dişlerine girer; plastik plakada geçme delikleri vardır.']
     if booms:notes+=['Savaşan İHA: bom kökleri kanat soketlerine girer ve enine vida/somunla tutulur. Bom dilimlerinin iç geçmelerini hizalayıp yapıştırın. Ayrı kuyruk köklerini yuvalarına takıp vidalayın. Yatay kuyruk köprüsünü iki bom üzerindeki vida/somunla sabitleyin. İtici motor arka gövde plakası üzerinden monte edilir; gövde dilimlerini yapıştırmadan önce vidalarını içeriden takın.']
     if center_parts:notes+=['Kuyruk orta birleştirme parçası tail_center_joint ayrı STL olarak verilir. İki kuyruk ucunun anahtarlarını bu parçaya geçirin; iki vida ve somunla sabitleyin. Ters V tepesindeki yüzeyler orta düzleme göre birleşir; serbest uçlar birbirine yapıştırılarak bağlantısız bırakılmaz.']
-    return parts,{'bed_mm':bed,'wing_join_mode':wing_join,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'wing_position_offset_mm':float(g['wing_position_offset'])*1000,'hatch_bolts_mm':hatch_holes,'interfaces':interfaces,'spar_channels':spar_channels,'controls':controls,'wing_root_fairings':root_fairings,'motors':motors,'cameras':cameras,'booms':booms,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'part_cuts':cuts,'obstacles':body_obstacles,'wing_specs':{s['name']:s for s in specs if s['kind']=='wing'},'assembly_parts':parts}
+    return parts,{'bed_mm':bed,'fixed_vtol_body':g.get('vtol_fixed_body',False),'design_mode':options.get('designMode','auto'),'wing_join_mode':wing_join,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'wing_position_offset_mm':float(g['wing_position_offset'])*1000,'hatch_bolts_mm':hatch_holes,'service_hatches':[{'part':'hatch_front','bolt_points_mm':hatch_holes[:4]},{'part':'hatch_rear','bolt_points_mm':hatch_holes[4:]}],'interfaces':interfaces,'spar_channels':spar_channels,'controls':controls,'wing_root_fairings':root_fairings,'motors':motors,'vtol_joints':vtol_joints,'cameras':cameras,'booms':booms,'carbon_boom':carbon_boom,'hover_balance':hover_report,'landing_mounts':landing_mounts,'notes':notes},{'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'part_cuts':cuts,'obstacles':body_obstacles,'wing_specs':{s['name']:s for s in specs if s['kind']=='wing'},'assembly_parts':parts}
 
 
 def orthogonal_print(solid,bed,with_transform=False):
@@ -630,6 +730,7 @@ def printable_parts(parts,manifest,rings):
     wing_specs=rings.get('wing_specs',{})
     assembly_parts=rings.get('assembly_parts',parts)
     manifest['wing_segment_joints']=[]
+    manifest['body_segment_joints']=[]
     obstacles=rings.get('obstacles',[])
     cavity_rings=rings['cavity'];cutters=rings['cuts'];rings=rings['outer']
     bed=manifest['bed_mm'];wall=manifest['wall_mm'];gap=manifest['clearance_mm'];result=[]
@@ -715,6 +816,11 @@ def printable_parts(parts,manifest,rings):
                 inverse=print_transform[:,:3].T
                 world=np.column_stack([inverse,-inverse@print_transform[:,3]])
                 result.append(Part(splitname,printpiece,family=p.family,assembled=fragment,print_to_world=world))
+    if manifest.get('carbon_boom'):
+        from backend.body_braces import neck_braces
+        result=neck_braces(result,manifest)
+    from backend.root_braces import root_braces
+    result=root_braces(result,manifest,wing_specs,rings,part_cuts)
     return result
 
 
@@ -726,8 +832,8 @@ def binary_stl(solid):
     return b'ZETA mm manifold validated'.ljust(80,b'\0')+struct.pack('<I',len(f))+arr.tobytes()
 
 
-def preview(parts,manifest,rings):
-    printed=printable_parts(parts,manifest,rings)
+def preview(parts,manifest,rings,printed=None):
+    if printed is None:printed=printable_parts(parts,manifest,rings)
     meshes=[]
     for part in printed:
         mesh=part.solid.to_mesh()
@@ -736,11 +842,12 @@ def preview(parts,manifest,rings):
     return {'parts':meshes,'manifest':manifest,'summary':f'{len(printed)} STL parçası montaj konumunda gösteriliyor; delikler, kapaklar ve dilim bağlantıları dahil.'}
 
 
-def package(parts,manifest,rings,filter='all'):
+def package(parts,manifest,rings,filter='all',printed=None):
     control_names={c['part'] for c in manifest.get('controls',[])}
     selected=[p for p in parts if filter=='all' or (filter=='controls' and p.name in control_names) or (filter=='fuselage' and p.family in ['body','hatch']) or p.family==filter]
     if not selected: raise ManufacturingError('İstenen parça bulunamadı.')
-    printed=printable_parts(selected,manifest,rings)
+    if printed is None:printed=printable_parts(parts,manifest,rings)
+    printed=[p for p in printed if filter=='all' or (filter=='controls' and any(p.name==n or p.name.startswith(n+'_') for n in control_names)) or (filter=='fuselage' and p.family in ['body','hatch']) or p.family==filter]
     manifest=dict(manifest)
     manifest['motors']=[m for m in manifest.get('motors',[]) if m['parent'] in {p.name for p in selected}]
     manifest['controls']=[c for c in manifest.get('controls',[]) if c['part'] in {p.name for p in selected}]
@@ -768,16 +875,23 @@ def package(parts,manifest,rings,filter='all'):
                 z.writestr(label+'.stl',binary_stl(orthogonal_print(solid,manifest['bed_mm'])))
         z.writestr('manifest.json',json.dumps(manifest,ensure_ascii=False,indent=2))
         text='ZETA MONTAJ VE BASKI\n\nModel boyutu korunur; parçalar yazıcı hacmine göre otomatik bölünür. Dosya adındaki split numaraları ek bölümleri gösterir. Vidalı kanat modunda köprü eşleştirmelerini aşağıda izleyin. Yapıştırmalı modda ve diğer parçaların ek kesimlerinde düz yüzeyleri hizalayıp yapıştırın. Önizlemedeki montaj konumlarını izleyerek bu yüzeyleri hizalayıp yapıştırın.\n\n'+ '\n'.join(manifest['notes'])+'\n\n'
+        for joint in manifest.get('body_segment_joints',[]):
+            text+=f"{joint['bridge']}: {' + '.join(joint['segments'])} boru girişindeki arka gövde dilimini önündeki ana gövde dilimine bağlar. Alt dış ceplere somunları yerleştirin. Uzun köprüyü gövdenin içinden birleşimin iki yanına oturtup iç taraftan iki M{joint['screw_diameter_mm']:g} vida ile sabitleyin. Vida boyunu gerçek baskıdaki sıkma uzunluğuna göre seçin; yapıştırma yüzey sızdırmazlığı için ek olarak kullanılabilir. Karbon boru delinmez.\n"
+        for joint in manifest.get('wing_root_braces',[]):
+            text+=f"{joint['bridge']}: {' + '.join(joint['segments'])} arasındaki gövde-kanat kök birleşimini içeriden bağlar. Alt dış ceplere somunları yerleştirin; köprüyü kök açıklığından içerideki yuvasına yerleştirin; üstteki erişim deliklerinden iki M{joint['screw_diameter_mm']:g} vida ile sıkın. Kanadı sökmek için bu vidaları ve mevcut kök pimini çıkarın. Vida boyunu gerçek baskıdaki sıkma uzunluğuna göre seçin.\n"
         for joint in manifest.get('wing_segment_joints',[]):
             text+=f"{joint['bridge']}: {' + '.join(joint['segments'])} parçalarının ortak üst yuvasına yerleştirin. {len(joint['holes'])} adet M{joint['screw_diameter_mm']:g} vida üstten, aynı sayıda {joint['nut_flat_mm']:g} mm ağız / {joint['nut_height_mm']:g} mm kalınlık somun alttan takılır. Vida boyunu basılan parça ve gerçek donanımla doğrulayın. Önce tüm köprüleri gevşek takıp hizalayın, sonra sıkın.\n"
         for control in manifest['controls']:
             text+=f"{control['part']}: ayrı {control['kind']} parçası. Metal pim/mil Ø{control['pin_diameter_mm']:g} mm; delik Ø{control['pin_hole_mm']:g} mm; gerekli mil boyu yaklaşık {control['pin_length_mm']:.1f} mm. İzin verilen geometrik hareket ±{control['travel_deg'][1]:g}°. Pim, vida ve somunlar satın alınır.\n"
             text+='Dilimli kontrol parçalarını hizalayıp yapıştırın. Sabit ve hareketli menteşe gözlerini sırayla hizalayın; pimi uç taraftan geçirin. Kök başını/somununu girintiye oturtup diğer uçta uygun somunla sabitleyin. Gövdeye takmadan önce pim erişimini tamamlayın. Ø2 mm kontrol kolu deliğine servo itme çubuğunu bağlayın. Bomun iki yanındaki flap bölümleri aynı eksende tek mil paylaşır; kollarını gerçek servo yerleşimine göre kumanda edin.\n'
         for motor in manifest['motors']:
+            if motor.get('out_axis'):
+                text+=f"{motor['name']}: dikey referans konumlu VTOL tablası; motor çapı {motor['motor_diameter_mm']:g} mm, motor uzunluğu {motor['motor_length_mm']:g} mm, vida geçme deliği {motor['hole_diameter_mm']:g} mm, merkez açıklığı {motor['center_bore_mm']:g} mm.\n"
+                continue
             label=('Gövde arkası / itici motor' if motor['axis'][0]<0 else 'Gövde burnu') if motor['parent']=='body' else {'wing_right':'Sağ kanat','wing_left':'Sol kanat'}.get(motor['parent'],motor['parent'])
             text+=f"{label} motor montajı: motor Ø{motor['motor_diameter_mm']:g} × {motor['motor_length_mm']:g} mm; plaka {motor['plate_thickness_mm']:g} mm; vida geçme deliği Ø{motor['hole_diameter_mm']:g} mm; orta delik Ø{motor['center_bore_mm']:g} mm.\n"
             text+='Motor vidalarını gövdenin/taşıyıcının içinden plakaya geçirin. Gövde motorunu dilimleri yapıştırmadan önce monte edin. Ayrı kablo deliğinden kabloları geçirin; motor metal dişine giren vida boyunu üretici ölçüsüyle kontrol edin.\n'
             if motor.get('service_cover'):text+='Kanat motoru: alt servis kapağını çıkarın, içeriden motor vidalarını takıp sıkın. Kapak yuvalarına iki M3 altıgen somun yerleştirin; kapağı iki M3 vida ile sabitleyin. Kapak ayrı STL parçasıdır. Vida boyunu basılan kapağa göre seçin.\n'
-        text+='1. fit_test_key ve fit_test_socket dosyalarını basın. Menteşe içeren pakette hinge_fit_fixed ve hinge_fit_moving kuponlarını da basıp gerçek metal pimle deneyin. Sıkı/geçmeyen veya gevşek sonuçta uygulamadaki geçme boşluğunu değiştirin.\n2. STL dosyaları mm birimindedir; her parça Z=0 tabanına yerleştirilmiştir. Destek, brim ve katman ayarlarını dilimleyicide kontrol edin.\n3. Gövde numaraları burundan kuyruğa ilerler. İç bilezikler sonraki parçada hizalama sağlar; bu birleşimleri yapıştırın.\n4. Kapakta dört vida deliği vardır; karşı somunlar gövde içinden erişilir.\n5. Kanadı gövdedeki profil yuvasına oturtup tek metal pim ve emniyet klipsiyle sabitleyin. Kuyruk anahtarlarını karşı soketlerine takın; vida ve somunlarla bağlayın.\n6. Metal pimleri ve gerçek servo/motor donanımını monte edin. Mekanik hareket, yük ve titreşim testlerini gerçek basılı parçalarla doğrulayın.\n'
+        text+='1. fit_test_key ve fit_test_socket dosyalarını basın. Menteşe içeren pakette hinge_fit_fixed ve hinge_fit_moving kuponlarını da basıp gerçek metal pimle deneyin. Sıkı/geçmeyen veya gevşek sonuçta uygulamadaki geçme boşluğunu değiştirin.\n2. STL dosyaları mm birimindedir; her parça Z=0 tabanına yerleştirilmiştir. Destek, brim ve katman ayarlarını dilimleyicide kontrol edin.\n3. Gövde numaraları burundan kuyruğa ilerler. İç bilezikler sonraki parçada hizalama sağlar; bu birleşimleri yapıştırın.\n4. İki bağımsız servis kapağının her birinde dört vida deliği ve sürekli alt oturma çerçevesi vardır; karşı somunlara gövde içinden erişilir.\n5. Kanadı gövdedeki profil yuvasına oturtup tek metal pim ve emniyet klipsiyle sabitleyin. Kuyruk anahtarlarını karşı soketlerine takın; vida ve somunlarla bağlayın.\n6. Metal pimleri ve gerçek servo/motor donanımını monte edin. Mekanik hareket, yük ve titreşim testlerini gerçek basılı parçalarla doğrulayın.\n'
         z.writestr('MONTAJ.txt',text)
     return buf.getvalue()
