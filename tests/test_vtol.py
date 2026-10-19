@@ -96,8 +96,8 @@ def test_blended_center_keeps_detachable_wings_and_open_channels(vtol_model):
         panel=next(p for p in data['panels'] if p['name']==channel['part'])
         mat,_=panel_frame(panel)
         seam=next(j['root_trim_mm'] for j in manifest['interfaces'] if j['part']==channel['part'])
-        p=mat[:,:3]@np.array([panel['chord']*1000*channel['chord_position'],channel['center_offset_mm'],seam])+mat[:,3]
-        probe=cylinder(channel['hole_diameter_mm']/2-.1,24,p-mat[:,2]*12,mat[:,2])
+        from tests.test_manufacturing import channel_probe
+        probe=channel_probe(channel,seam-12,seam+12,inset=.1)
         assert ((named['body']+named[channel['part']])^probe).volume()<.1
 
 
@@ -200,7 +200,7 @@ def assert_flush_cuffs(data,parts,manifest):
     from backend.fixed_vtol import normalize
     from backend.wing_placement import place_wing_assembly
     from backend.motor_mounts import motor_sized_fuselage
-    if data['geometry'].get('fuse_preset')=='vtol':data=normalize(data)
+    if data['geometry'].get('fuse_preset') in ('vtol','vtol5'):data=normalize(data)
     data=place_wing_assembly(motor_sized_fuselage(data))
     body=next(p.solid for p in parts if p.name=='body')
     for fairing in manifest['wing_root_fairings']:
@@ -257,6 +257,8 @@ def test_reinforced_motor_and_root_supports_all_wing_shapes(coords,shape):
         assert j['wing_pad_thickness_mm']==14
         assert j['wing_support_width_mm']['root']==90
     for j in manifest['wing_root_braces']:
+        assert j['thickness_mm']>=5 and j['width_mm']>=16
+        assert j['boss_diameter_mm']>=14
         assert len(j['holes'])==2 and len(set(j['segments']))==2
         assert j['segments'][0].startswith('body')
         assert j['segments'][1].startswith(j['parent'])
@@ -273,6 +275,6 @@ def test_reinforced_motor_and_root_supports_all_wing_shapes(coords,shape):
         spec=next(p for p in data['panels'] if p['name']==c['part'])
         mat,_=panel_frame(spec)
         seam=next(j['root_trim_mm'] for j in manifest['interfaces'] if j['part']==c['part'])
-        center=mat[:,:3]@np.array([spec['chord']*1000*c['chord_position'],c['center_offset_mm'],seam])+mat[:,3]
-        probe=cylinder(c['hole_diameter_mm']/2-.1,24,center-mat[:,2]*12,mat[:,2])
+        from tests.test_manufacturing import channel_probe
+        probe=channel_probe(c,seam-12,seam+12,inset=.1)
         assert sum((p.assembled^probe).volume() for p in printed if p.name.startswith(c['part']) or p.name.startswith('body'))<.1

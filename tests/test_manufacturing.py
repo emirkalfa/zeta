@@ -34,6 +34,14 @@ def request_data(coords,tail='conventional',preset='atlas',combat=False,wing_sha
     return data
 
 
+def channel_probe(channel,start_span=0,end_span=None,inset=.05):
+    from backend.manufacturing import cylinder
+    axis=np.asarray(channel['axis']);scale=channel['path_scale']
+    origin=np.asarray(channel['start_mm'])+axis*start_span*scale
+    end_span=channel['reach_from_center_mm'] if end_span is None else end_span
+    return cylinder(channel['hole_diameter_mm']/2-inset,(end_span-start_span)*scale,origin,axis)
+
+
 def assert_stl(content):
     count=int.from_bytes(content[80:84],'little');assert len(content)==84+50*count
     dtype=np.dtype([('normal','<f4',(3,)),('vertices','<f4',(3,3)),('attr','<u2')])
@@ -156,7 +164,7 @@ def test_tapered_wing_channels_stop_before_the_thin_edge(coords,shape):
     parts,manifest,rings=generate(data)
     rear=[s for s in manifest['spar_channels'] if s['chord_position']==.55]
     assert len(rear)==2
-    assert all(s['reach_from_center_mm']<750 for s in rear)
+    assert all(s['reach_from_center_mm']<panel_frame(rings['wing_specs'][s['part']])[1] for s in rear)
     assert all(s['wing_insertion_length_mm']>0 for s in rear)
     archive=zipfile.ZipFile(io.BytesIO(package(parts,manifest,rings)))
     for name in archive.namelist():

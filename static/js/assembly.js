@@ -77,7 +77,7 @@ async function requestManufacturing(mode,filter,stamp,revision=null) {
   const active={key};
   active.promise=(async()=>{
     const res=await fetch(`/api/manufacturing?mode=${mode}&part=${filter}`,{method:'POST',headers:{'Content-Type':'application/json'},body:stamp});
-    const data=mode==='zip' && res.ok?await res.blob():await res.json();
+    const data=(mode==='zip' || mode==='stl') && res.ok?await res.blob():await res.json();
     if(!res.ok)throw new Error(data.error||'Üretim hesabı tamamlanamadı.');
     return data;
   })();
@@ -140,7 +140,7 @@ function manufacturingPayload() {
   if(['vtol','vtol5'].includes(g.fuse_preset)&&typeof vtolSettings==='function')Object.assign(options,vtolSettings());
   if(g.fuse_preset==='vtol5')options.motorLayout='single';
   for(const id of CAMERA_FIELDS)options[id]=Number($(id).value);
-  for (const [key,id] of Object.entries({bedX:'printBedX',bedY:'printBedY',bedZ:'printBedZ',wall:'wallThickness',clearance:'fitClearance',screw:'mountScrew',wingPin:'wingPin',wingSeatDepth:'wingSeatDepth',nutFlat:'mountNutFlat',nutHeight:'mountNutHeight',sparMain:'sparMainDia',sparRear:'sparRearDia',sparRearPosition:'sparRearPosition',ribSpacing:'ribSpacing',ribThickness:'ribThickness',hingePin:'hingePin',controlTravel:'controlTravel'})) options[key]=Number($(id).value);
+  for (const [key,id] of Object.entries({bedX:'printBedX',bedY:'printBedY',bedZ:'printBedZ',wall:'wallThickness',clearance:'fitClearance',screw:'mountScrew',wingPin:'wingPin',wingSeatDepth:'wingSeatDepth',nutFlat:'mountNutFlat',nutHeight:'mountNutHeight',sparMain:'sparMainDia',sparRear:'sparRearDia',sparRearPosition:'sparRearPosition',sparMainPosition:'sparMainPosition',ribSpacing:'ribSpacing',ribThickness:'ribThickness',hingePin:'hingePin',controlTravel:'controlTravel'})) options[key]=Number($(id).value);
   const sections=buildFuselageSections(g,g.fuse_type,state.airfoilCoords).sections;
   syncWingPlacement(g,sections);
   return {geometry:g, options, fuselage:sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000])), panels:aircraftPanelSpecs(g,state.airfoilCoords,state.tailCoords,state.vtailCoords||state.tailCoords)};
@@ -250,6 +250,12 @@ function makeMountingDetails(manifest) {
   };
   (manifest.service_hatches||[]).forEach((h,index)=>h.bolt_points_mm.forEach((p,i)=>add(`${index?'Arka':'Ön'} servis kapağı, vida ${i+1}`,h.part,'body',p,[0,1,0],'bolt')));
   (manifest.interfaces||[]).forEach((j,i)=>add(`${j.parent} ↔ ${j.part}, ${j.fastener_type==='retaining_pin'?'kanat pimi':'bağlantı vidası'} ${i+1}`,j.part,j.parent,j.bolt_point_mm,j.bolt_axis,'bolt'));
+  (manifest.spar_channels||[]).forEach(c=>{
+    if(!c.start_mm||!c.axis)return;
+    const root=(manifest.interfaces||[]).find(j=>j.part===c.part)?.root_trim_mm||0;
+    const point=c.start_mm.map((v,i)=>v+c.axis[i]*root*c.path_scale);
+    add(`${c.part==='wing_right'?'Sağ':'Sol'} ${c.role==='rear'?'arka':'ana'} karbon kanalı (Ø${Number(c.hole_diameter_mm).toFixed(1)} mm, %${Math.round(c.chord_position*100)})`,c.part,c.part,point,c.axis.map(v=>-v),'bore');
+  });
   (manifest.motors||[]).forEach(m=>{
     const [x,y,z]=m.face_mm||[],axis=m.axis||[1,0,0];
     if(![x,y,z].every(Number.isFinite))return;
@@ -269,7 +275,7 @@ function makeMountingDetails(manifest) {
     (j.servo_mount_holes_mm||[]).forEach((p,i)=>add(`${j.parent}, servo kasa vidası ${i+1}`,j.parent,j.parent,p,servoAxis,'bolt'));
     (j.cover_holes_mm||[]).forEach((p,i)=>add(`${j.cover_part}, kapak vidası ${i+1}`,j.cover_part,j.parent,p,servoAxis,'bolt'));
   });
-  (manifest.wing_segment_joints||[]).forEach(j=>(j.holes||[]).forEach((h,i)=>add(`Kanat dilim köprüsü ${j.seam} (${j.parent==='wing_right'?'sağ':'sol'}, köprü ${j.bridge.split('_').pop()}), vida ${i+1}`,j.bridge,j.parent,h.point_mm,h.axis,'bolt')));
+  (manifest.wing_segment_joints||[]).forEach(j=>(j.holes||[]).forEach((h,i)=>add(`Kanat iç geçme kilidi ${j.seam} (${j.parent==='wing_right'?'sağ':'sol'}), vida ${i+1}`,j.bridge,j.parent,h.point_mm,h.axis,'bolt')));
   (manifest.wing_root_braces||[]).forEach(j=>(j.holes||[]).forEach((h,i)=>add(`Kanat kök desteği (${j.parent==='wing_right'?'sağ':'sol'}), vida ${i+1}`,j.bridge,j.parent,h.point_mm,h.axis,'bolt')));
   (manifest.body_segment_joints||[]).forEach(j=>(j.holes||[]).forEach((h,i)=>add(`Gövde boru giriş köprüsü, vida ${i+1}`,j.bridge,'body',h.point_mm,h.axis,'bolt')));
   if(manifest.carbon_boom){
@@ -366,7 +372,7 @@ async function runManufacturing(mode='preview',filter='all') {
   clearTimeout(manufacturingTimer);
   ++manufacturingRevision;
   if(typeof showManufacturingIssue==='function')showManufacturingIssue('');
-  const status=$('manufacturingStatus'), buttons=Array.from(document.querySelectorAll('#manufacturingPreview, #manufacturingDownload, .stl-list button'));
+  const status=$('manufacturingStatus'), buttons=Array.from(document.querySelectorAll('#manufacturingPreview, #manufacturingDownload, #simulationDownload, .stl-list button'));
   buttons.forEach(b=>b.disabled=true);
   previewStatus('STL hazırlanıyor: parçalar ve bağlantılar kontrol ediliyor.','busy');
   try {
@@ -376,6 +382,9 @@ async function runManufacturing(mode='preview',filter='all') {
     if (mode==='preview') {
       manufacturingResult=data;showManufacturingPreview(manufacturingResult);
       previewStatus(`Detaylı model hazır. ${data.parts.length} baskı parçası.`,'ready');
+    } else if(mode==='stl') {
+      downloadBlob(data,'zeta_simulasyon_mm.stl');
+      previewStatus('Montajlı model tek STL dosyası olarak indirildi. Birim: mm.','ready');
     } else {
       downloadBlob(data,`zeta_${filter}_montajli_stl.zip`);
       previewStatus('STL paketi indirildi. ZIP içinde parçalar ve montaj kılavuzu var.','ready');
@@ -390,12 +399,13 @@ async function runManufacturing(mode='preview',filter='all') {
   finally {buttons.forEach(b=>b.disabled=false);}
 }
 
-const MANUFACTURING_FIELDS=['wingJoinMode','printBedX','printBedY','printBedZ','fitClearance','mountScrew','wingPin','wingSeatDepth','mountNutFlat','mountNutHeight','wallThickness','sparMainDia','sparRearDia','sparRearPosition','ribSpacing','ribThickness','hingePin','controlTravel',...MOTOR_FIELDS,...CAMERA_FIELDS];
+const MANUFACTURING_FIELDS=['wingJoinMode','printBedX','printBedY','printBedZ','fitClearance','mountScrew','wingPin','wingSeatDepth','mountNutFlat','mountNutHeight','wallThickness','sparMainDia','sparRearDia','sparRearPosition','sparMainPosition','ribSpacing','ribThickness','hingePin','controlTravel',...MOTOR_FIELDS,...CAMERA_FIELDS];
 function captureManufacturingSettings() {
   return Object.fromEntries(MANUFACTURING_FIELDS.map(id=>[id,['motorLayout','motorPattern','wingJoinMode'].includes(id)?$(id).value:Number($(id).value)]));
 }
 function setupManufacturing() {
   $('manufacturingPreview').addEventListener('click',()=>runManufacturing('preview'));
+  $('simulationDownload').addEventListener('click',()=>runManufacturing('stl'));
   $('manufacturingDownload').addEventListener('click',()=>runManufacturing('zip'));
   let saved=null;try {saved=JSON.parse(store.get('zeta-manufacturing')||'null');} catch(e) { /* damaged local settings */ }
   const ids=MANUFACTURING_FIELDS;

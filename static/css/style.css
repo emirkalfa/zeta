@@ -488,7 +488,7 @@ input[type="range"]::-moz-range-thumb {
 /* ─── Stat row & spec tables (Ölçüler) ─── */
 .stat-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -995,3 +995,7 @@ footer a:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition: none !important; }
 }
+
+/* Keep result values and their units together on narrow screens. */
+.measurement-value { white-space: nowrap; }
+.stat-value .unit { font-size: .62em; }

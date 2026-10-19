@@ -3,7 +3,7 @@ import numpy as np
 from backend.manufacturing import mesh_solid, profile
 
 
-def blended_root(section, inset, chord, taper, length, end, wall, gap, height_gain=1.0,body_profile=None,frame=None,roof_blend=.75):
+def blended_root(section, inset, chord, taper, length, end, wall, gap, height_gain=1.0,body_profile=None,frame=None,roof_blend=.75,seat_end=None,return_outer=False):
     def loft(cross_section, stop, inset_mm=0):
         penta=body_profile is not None and roof_blend<.75
         use_body=body_profile is not None and not (penta and inset_mm)
@@ -31,10 +31,11 @@ def blended_root(section, inset, chord, taper, length, end, wall, gap, height_ga
             blend=1-(6*u**5-15*u**4+10*u**3)
             scale=1+(taper-1)*z/length
             xy=polygon.copy()*scale
-            # Blend the leading shoulder into the pod without lengthening
-            # the trailing edge into the rear motor's carbon-tube bay.
-            chord_fraction=np.clip(xy[:,0]/(chord*scale),0,1)
-            xy[:,0]-=.20*chord*scale*blend*(1-chord_fraction)**2
+            # Keep the fixed body transition on the actual wing planform.
+            # Extending the leading edge independently creates a second lip
+            # in front of the wing, even though the outboard cuff is flush.
+            # Only height blends into the pod; the existing quintic fade
+            # reaches the unchanged airfoil with zero slope at the cuff.
             xy[:,1]*=1+(height_gain-1)*blend
             if use_body:
                 wx=frame[0,0]*xy[:,0]+frame[0,2]*z+frame[0,3]
@@ -52,10 +53,12 @@ def blended_root(section, inset, chord, taper, length, end, wall, gap, height_ga
             rings.append(np.column_stack([xy,np.full(len(xy),z)]))
         rings=np.asarray(rings)
         return mesh_solid(rings,rings[0][:,:2])
-    root=loft(section,end)
+    stop=end if seat_end is None else seat_end
+    outer=loft(section,stop)
+    root=outer
     if inset.area()>.01:
-        root-=loft(inset,max(wall,end-wall*2),wall)
-    return root
+        root-=loft(inset,max(wall,stop-wall*2),wall)
+    return (root,outer) if return_outer else root
 
 
 def motor_wing_transition(spec, leading, station, radius, center_y, back, wall=2):

@@ -1,5 +1,36 @@
 # Changelog
 
+## [3.5.37] - 2026-10-19
+- Geometrik ölçü kartlarında sayı ve birimler düz metin olarak oluşturulur; hassasiyetleri tutarlıdır ve dar ekranlarda birlikte kalır. Eksik veya geçersiz sayılar çizgiyle gösterilir.
+- Önizleme, ZIP ve tek STL istekleri arasında geçişte doğrulanmış montaj/dilim bilgilerinin önbellekte kaybolması giderildi.
+- Tek STL (mm) simülasyon dışa aktarımı, kesişen dış kabukları iç yüzey bırakmadan birleştirir; baskı ZIP paketi ayrı tutulur.
+- İç kanat geçmeleri, güçlendirilmiş kök bağlantıları, ayarlanabilir karbon kanalları ve ortak kapak/gövde yüzeyi geliştirmeleri GitHub sürümüne dahil edildi.
+- Ölçülerin masaüstü/telefon gösterimi, önbellek sıralaması ve simülasyon çıktısı için regresyon kontrolleri eklendi.
+
+## [3.5.34]
+- Servis kapakları ve yuvaları, kanat kökü eklenmiş ortak gövde dış yüzeyinden kesilir. Özellikle yüksek kanatta eski dar gövdeden üretilen kapağın kök geçişi altında kalması giderildi.
+- Kapak çevresindeki gövde kabuğu ortak yüzeyden yeniden oluşturulur; karbon boru kesimleri, iç kanat boşlukları ve montaj yuvaları korunur.
+- Kapak ve yanındaki gövde arasında gerçek yüzey yüksekliği ölçümüyle süreklilik testi eklendi.
+
+## [3.5.33]
+- Gövdenin sabit kanat kök geçişindeki fazladan ön omuz kaldırıldı; geçiş gerçek kanat planformunu izler.
+- Kök geçişi ve kanat yuvasının dış yüzeyi tek sürekli loft olarak oluşturulur; üst üste binen cidarlar kaldırıldı. İç bağlantılar, sökme boşluğu ve karbon kanalları korunur.
+
+## [3.5.32]
+- Ana ve arka karbon boru kanalları, konik kanadın kök ve uç veter oranlarını izleyen düz hatlara hizalandı; arka kanalın kökten kısa mesafede bitmesi giderildi. Kanat cidarı ve hareketli yüzey menteşe boşlukları korunur.
+- Ana borunun kök konumu ayarlanabilir; iki kanalın çap ve konum değerleri STL geometrisine ve yakın plan seçicisine aktarılır. Eski proje dosyalarına yalnız eksik yeni alan için %28 başlangıcı eklenir.
+- Boru/kök pimi çakışması engellenir. Gerçek STL dosyalarındaki delikler ve flap/aileron hareket boşlukları tüm model ailelerinde kontrol edilir.
+
+## [3.5.31]
+- Servis kapaklarının düz yatağına ek olarak gövdenin gerçek iç tavan eğrisini izleyen alt bindirme eklendi; kapak çevresinden içeri bakan derin açıklıklar kapatıldı. Geçme boşluğu, bağımsız sökme ve sekiz montaj vidası korunur.
+- Son gövde kesiminde bindirmenin silinmesi önlendi. Tüm altı gövde ailesi, kanat türleri ve seçilebilir konumlar için montajlı tavan örtüşme testi eklendi.
+
+## [3.5.30]
+- Penta V-kuyrukta alt sınır hesabının boş liste hatası giderildi; yatay ve V yüzeylerin gerçek dünya geometrisi kullanılır.
+- Vidalı sabit kanat dilimleri, parçayla bütünleşik iç geçme dilleri ve karşı yuvalarla birleşir. Her ana birleşimde dört kilitleme vidası; ayrı dilim köprüsü yoktur. Karbon boru kanalları korunur.
+- Gerçek kanat birleşiminden kesilmiş erkek/dişi baskı numuneleri STL paketine eklendi.
+- Gövde-kanat kök iç bağlantısı en az 5 mm kalınlığa ve 16 mm genişliğe çıkarıldı; vida yatakları genişletildi. Kullanıcı parametreleri ve proje dosyası biçimi korunur.
+
 ## [3.5.29]
 - Uzun servis kapağı, arada sabit gövde köprüsü bulunan iki bağımsız kısa kapağa ayrıldı. Her kapakta dört vida, somun yuvası ve sürekli oturma çerçevesi bulunur. Önizlemede kapaklar ayrı gizlenebilir; ZIP içinde ayrı STL olarak verilir.
 

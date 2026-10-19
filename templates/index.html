@@ -581,18 +581,19 @@
 <div class="input-wrap"><input id="ribThickness" max="4" min="1" step="0.1" type="number" value="1.6"/><span class="unit">mm</span></div>
 </div>
 <div class="field">
-<label for="sparMainDia">Ana spar deliği</label>
+<label for="sparMainDia">Ana karbon boru delik çapı</label>
 <div class="input-wrap"><input id="sparMainDia" max="50" min="0" step="0.1" type="number" value="6.2"/><span class="unit">mm</span></div>
-<small class="hint">Veterin %28'inde. 0 = yok</small>
+<small class="hint">0 = kanal kapalı. Konumu aşağıdan ayarlanır.</small>
 </div>
 <div class="field">
-<label for="sparRearDia">Arka spar deliği</label>
+<label for="sparRearDia">Arka karbon boru delik çapı</label>
 <div class="input-wrap"><input id="sparRearDia" max="50" min="0" step="0.1" type="number" value="4.2"/><span class="unit">mm</span></div>
 <small class="hint">0 = yok. Kanal hareketli parçanın menteşesinden önce sonlanır.</small>
 </div>
-<div class="field"><label for="sparRearPosition">Arka boru kök konumu</label><div class="input-wrap"><input id="sparRearPosition" min="50" max="62" step="1" type="number" value="55"/><span class="unit">% veter</span></div></div>
+<div class="field"><label for="sparMainPosition">Ana boru kök konumu</label><div class="input-wrap"><input id="sparMainPosition" min="15" max="45" step="1" type="number" value="28"/><span class="unit">% veter</span></div></div>
+<div class="field"><label for="sparRearPosition">Arka boru kök konumu</label><div class="input-wrap"><input id="sparRearPosition" min="35" max="62" step="1" type="number" value="55"/><span class="unit">% veter</span></div></div>
 </div>
-<small class="hint">Delik çapını kendi borunuzun ölçüsüne göre girin. Her kanat yarısı kendi ekseninde boru taşır. Duvar kalınlığı 0,8–4 mm olmalıdır.</small>
+<small class="hint">Delik çapını borunuzun dış çapı ve istediğiniz geçme payının toplamı olarak girin. Her kanat yarısı kendi ekseninde boru taşır. Duvar kalınlığı 0,8–4 mm olmalıdır.</small>
 </div>
 </div>
 <div class="form-section">
@@ -618,6 +619,9 @@
 <div class="production-status" data-state="idle"><p id="manufacturingStatus" role="status">STL üretimi için önce modeli hesaplayın.</p><div class="production-progress" role="progressbar" aria-label="STL hazırlama durumu" hidden><span></span></div></div>
 <section id="manufacturingIssue" class="manufacturing-issue" role="alert" hidden=""></section>
 </div>
+<h3>Simülasyon için tek STL</h3>
+<p class="hint">Modelin yalnızca dış geometrisi tek STL dosyasına aktarılır. İç boşluklar, vida yuvaları, karbon kanalları, nervürler ve baskı bağlantıları eklenmez. Kanat ve kuyruk yüzeyleri kapalı dış zarf olarak birleştirilir. Birim: mm (metre kullanan simülasyonlarda ölçek 0.001).</p>
+<div class="form-actions"><button class="btn btn-primary" id="simulationDownload">Simülasyon için tek STL indir</button></div>
 <h3>Parçalı STL indirme</h3>
 <p class="hint">Her ZIP içinde baskı parçaları ayrı STL dosyalarıdır. Parçaların boyutunu yukarıdaki yazıcı ölçüleri belirler; bağlantı yuvaları ve vida delikleri korunur.</p>
 <div class="stl-list">
@@ -644,7 +648,7 @@
 <button class="btn" id="stlFuseConv"><i class="ph ph-download-simple"></i> Parçalı STL indir (ZIP)</button>
 </div>
 </div>
-<p class="stl-note">ZIP dosyasını açıp içindeki STL dosyalarını ayrı ayrı dilimleyiciye aktarın. Örneğin <code>wing_right_01of04.stl</code> dört sağ kanat parçasının ilkidir. Gövdede numaralar burundan kuyruğa, kanatta kökten uca ilerler. Ayrı kapak da pakettedir. Parça ek yerleri yapıştırılır; kanat ve kuyruk kökleri yuvalarına takılarak vidalanır.</p>
+<p class="stl-note">ZIP dosyasını açıp içindeki STL dosyalarını ayrı ayrı dilimleyiciye aktarın. Örneğin <code>wing_right_01of04.stl</code> dört sağ kanat parçasının ilkidir. Gövdede numaralar burundan kuyruğa, kanatta kökten uca ilerler. Ayrı kapak da pakettedir. Vidalı kanat modunda dilimler iç geçmelerle kenetlenip vidalanır; diğer dilimlerin montaj yöntemi ZIP içindeki MONTAJ.txt dosyasında belirtilir.</p>
 </section>
 <!-- Footer -->
 <footer>

@@ -20,6 +20,7 @@ function validateProjectFile(data){
   for(const key of ['mode','wing_shape','wing_position','tail_type','fuse_type','mission_profile'])
     if(data.project[key]!==undefined && (typeof data.project[key]!=='string'||!/^[a-z_]+$/.test(data.project[key])))throw new Error('Proje seçenekleri geçersiz.');
   if(!data.manufacturing||typeof data.manufacturing!=='object'||Array.isArray(data.manufacturing))throw new Error('Üretim ayarları eksik.');
+  data={...data,manufacturing:{sparMainPosition:28,...data.manufacturing}};
   for(const id of MANUFACTURING_FIELDS){
     const value=data.manufacturing[id],field=$(id);
     if(value===undefined)throw new Error('Proje dosyasında eksik ayar: '+id);
@@ -36,7 +37,7 @@ async function refreshProjects(selected){
   if(selected)select.value=String(selected);
 }
 async function openProject(data){
-  validateProjectFile(data);
+  data=validateProjectFile(data);
   // Keep the currently edited design before replacing the working draft.
   await projectAPI('/api/designs',projectSnapshot(('Otomatik yedek: '+($('projectName').value||'Adsız tasarım')).slice(0,100)));
   await store.flush();
@@ -81,7 +82,7 @@ function setupProjects(){
     try{
       if(file.size>400000)throw new Error('Proje dosyası çok büyük.');
       let data;try{data=JSON.parse(await file.text());}catch(e){throw new Error('Dosya okunamadı. Bir ZETA proje dosyası seç.');}
-      validateProjectFile(data);
+      data=validateProjectFile(data);
       await projectAPI('/api/designs',data);
       await openProject(data);
     }finally{$('projectFile').value='';}

@@ -50,6 +50,6 @@ def test_spar_bores_follow_camber_and_keep_a_physical_round_section(coords,code)
     for channel in report['spar_channels']:
         p=next(p for p in placed['panels'] if p['name']==channel['part']);mat,_=panel_frame(p)
         root=next(i['root_trim_mm'] for i in report['interfaces'] if i['part']==p['name'])
-        origin=mat[:,:3]@np.array([p['chord']*1000*channel['chord_position'],channel['center_offset_mm'],root+1])+mat[:,3]
-        probe=cylinder(channel['hole_diameter_mm']*.45,channel['reach_from_center_mm']-root-2,origin,mat[:,2])
+        from tests.test_manufacturing import channel_probe
+        probe=channel_probe(channel,root+1,channel['reach_from_center_mm']-1,inset=channel['hole_diameter_mm']*.05)
         assert (named[p['name']]^probe).volume()<.02

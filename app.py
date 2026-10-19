@@ -209,6 +209,9 @@ def api_manufacturing():
     try:
         data=request.get_json()
         mode=request.args.get('mode','preview')
+        if mode == 'stl':
+            content = manufacturing_service.result(data,'stl')
+            return Response(content, mimetype='model/stl', headers={'Content-Disposition': 'attachment; filename=zeta_simulasyon_mm.stl'})
         if request.args.get('mode') == 'zip':
             content = manufacturing_service.result(data,'zip',request.args.get('part','all'))
             return Response(content, mimetype='application/zip', headers={'Content-Disposition': 'attachment; filename=zeta_montajli_stl.zip'})

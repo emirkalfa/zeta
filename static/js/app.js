@@ -732,6 +732,24 @@ async function calculateAll() {
 const WING_POSITION_LABELS = { low: 'Alçak', mid: 'Orta', high: 'Yüksek' };
 const TAIL_TYPE_LABELS = { conventional: 'Konvansiyonel', ttail: 'T-tail', vtail: 'V-tail' };
 
+// Keep measurement text separate from markup, including copied values.
+function measurementValue(value, unit = '', decimals = null) {
+  const result = document.createElement('span');
+  result.className = 'measurement-value num';
+  const number = document.createElement('span');
+  number.className = 'measurement-number';
+  number.textContent = value == null || (typeof value === 'number' && !Number.isFinite(value))
+    ? '—' : typeof value === 'number' && decimals !== null ? value.toFixed(decimals) : String(value);
+  result.append(number);
+  if (unit) {
+    const suffix = document.createElement('span');
+    suffix.className = 'unit';
+    suffix.textContent = unit;
+    result.append(document.createTextNode(' '), suffix);
+  }
+  return result;
+}
+
 function displayResults(geom) {
   const manualFuse = geom.fuse_type === 'manual' && geom.fuse_sections;
   const fuse = manualFuse ? {
@@ -745,10 +763,10 @@ function displayResults(geom) {
   };
 
   const summary = [
-    ['Kanat alanı', geom.wing_area, 'm²'],
-    ['Açıklık oranı', geom.aspect_ratio, ''],
-    ['MAC', geom.mac, 'm'],
-    ['Kanat yüklemesi', (geom.weight / geom.wing_area).toFixed(2), 'kg/m²'],
+    ['Kanat alanı', geom.wing_area, 'm²', 4],
+    ['Açıklık oranı', geom.aspect_ratio, '', 3],
+    ['MAC', geom.mac, 'm', 3],
+    ['Kanat yüklemesi', geom.weight / geom.wing_area, 'kg/m²', 2],
   ];
 
   const groups = [
@@ -822,23 +840,37 @@ function displayResults(geom) {
     ]]);
   }
 
-  const unitHtml = unit => unit ? ` <span class="unit">${escapeHtml(unit)}</span>` : '';
+  $('results-summary').replaceChildren(...summary.map(([label, value, unit, decimals]) => {
+    const stat = document.createElement('div');
+    stat.className = 'stat';
+    const heading = document.createElement('div');
+    heading.className = 'stat-label';
+    heading.textContent = label;
+    const content = document.createElement('div');
+    content.className = 'stat-value';
+    content.append(measurementValue(value, unit, decimals));
+    stat.append(heading, content);
+    return stat;
+  }));
 
-  $('results-summary').innerHTML = summary.map(([label, value, unit]) =>
-    `<div class="stat">
-      <div class="stat-label">${escapeHtml(label)}</div>
-      <div class="stat-value num">${escapeHtml(String(value))}${unitHtml(unit)}</div>
-    </div>`
-  ).join('');
-
-  $('results-grid').innerHTML = groups.map(([title, rows]) =>
-    `<section class="spec-group">
-      <h3>${escapeHtml(title)}</h3>
-      <dl>${rows.map(([label, value, unit]) =>
-        `<div><dt>${escapeHtml(label)}</dt><dd class="num">${escapeHtml(String(value))}${unitHtml(unit)}</dd></div>`
-      ).join('')}</dl>
-    </section>`
-  ).join('');
+  $('results-grid').replaceChildren(...groups.map(([title, rows]) => {
+    const section = document.createElement('section');
+    section.className = 'spec-group';
+    const heading = document.createElement('h3');
+    heading.textContent = title;
+    const list = document.createElement('dl');
+    for (const [label, value, unit] of rows) {
+      const row = document.createElement('div');
+      const term = document.createElement('dt');
+      term.textContent = label;
+      const detail = document.createElement('dd');
+      detail.append(measurementValue(value, unit));
+      row.append(term, detail);
+      list.append(row);
+    }
+    section.append(heading, list);
+    return section;
+  }));
 }
 
 const STATUS = {

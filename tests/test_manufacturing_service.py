@@ -46,3 +46,21 @@ def test_failed_geometry_is_not_cached(monkeypatch):
     monkeypatch.setattr(module,'generate',fail)
     with pytest.raises(ValueError):service.result({'value':1})
     assert not service.entries
+
+
+def test_zip_before_preview_keeps_the_validated_joint_manifest(monkeypatch):
+    service,calls=fake_service(monkeypatch)
+    assert service.result({'value':1},'zip')==b'zip'
+    result=service.result({'value':1},'preview')
+    assert result['manifest']['wing_segment_joints']==['verified']
+    assert calls==[('generate',1),('split',None)]
+
+
+def test_simulation_before_printing_defers_split_without_losing_joint_metadata(monkeypatch):
+    service,calls=fake_service(monkeypatch)
+    monkeypatch.setattr(module,'simulation_stl',lambda rings:b'simulation')
+    assert service.result({'value':1},'stl')==b'simulation'
+    assert calls==[('generate',1)]
+    assert service.result({'value':1},'preview')['manifest']['wing_segment_joints']==['verified']
+    assert service.result({'value':1},'zip')==b'zip'
+    assert calls==[('generate',1),('split',None)]

@@ -31,11 +31,13 @@ def test_every_wing_seam_is_fastened_without_blocking_existing_features(coords,p
     assert set(seams.values())=={4}
     actual={p.name:p.assembled for p in printed}
     for joint in joints:
-        plate=actual[joint['bridge']]
+        male=actual[joint['male']];female=actual[joint['female']]
+        assert joint['type']=='internal_tongue'
+        assert joint['tongue_thickness_mm']>=4
+        assert not any('_join_' in name for name in actual)
         assert len(joint['segments'])==2 and len(joint['holes']) in (2,4)
         assert all(name in actual for name in joint['segments'])
-        for name in joint['segments']:
-            assert (actual[name]^plate).volume()<.03
+        assert (male^female).volume()<.03
         # Both fastener holes remain open through the bridge and supporting tile.
         for h in joint['holes']:
             point=np.array(h['point_mm']);axis=np.array(h['axis'])
@@ -45,10 +47,10 @@ def test_every_wing_seam_is_fastened_without_blocking_existing_features(coords,p
             nut=np.array(h['nut_seat_mm'])
             probe=cylinder(joint['nut_flat_mm']*.4,joint['nut_height_mm']-.2,nut-axis*.1,-axis)
             for name in joint['segments']:assert (actual[name]^probe).volume()<.02
-        # The keyed bridge is actually removable from above.
-        up=np.array(joint['holes'][0]['axis'])
-        for distance in (1,5,20):
-            for name in joint['segments']:assert (plate.translate((up*distance).tolist())^actual[name]).volume()<.03
+        # Receiver slides off the integral tongue along the seam normal.
+        direction=np.array(joint['insertion_axis'])
+        for distance in (.5,2,8,joint['tongue_depth_mm']+2):
+            assert (male^female.translate((direction*distance).tolist())).volume()<.05
     for wing in wings:
         pieces=[p for p in printed if p.name.startswith(wing.name)]
         for tool in rings['part_cuts'].get(wing.name,[]):
@@ -57,8 +59,8 @@ def test_every_wing_seam_is_fastened_without_blocking_existing_features(coords,p
         # Probe the usable bore, inset by 0.05 mm from tessellated drill walls.
         mat=wing.frame
         for channel in [c for c in manifest['spar_channels'] if c['part']==wing.name]:
-            origin=mat[:,:3]@np.array([rings['wing_specs'][wing.name]['chord']*1000*channel['chord_position'],channel['center_offset_mm'],-20])+mat[:,3]
-            probe=cylinder(channel['hole_diameter_mm']/2-.05,channel['reach_from_center_mm']+20,origin,mat[:,2])
+            from tests.test_manufacturing import channel_probe
+            probe=channel_probe(channel,-20)
             assert sum((p.assembled^probe).volume() for p in pieces)<.01
         body=next(p.solid for p in parts if p.name=='body')
         assert sum((p.assembled^body).volume() for p in pieces)<.1
@@ -73,6 +75,9 @@ def test_zip_contains_joint_hardware_map_and_closed_meshes(coords):
     archive=zipfile.ZipFile(io.BytesIO(package(parts,m,r)))
     report=json.loads(archive.read('manifest.json'))
     names=set(archive.namelist())
+    assert {'wing_joint_test_male.stl','wing_joint_test_female.stl'}<=names
+    assert not any('_join_' in name for name in names)
+    assert 'bütünleşik dili' in archive.read('MONTAJ.txt').decode()
     for joint in report['wing_segment_joints']:
         for name in [joint['bridge'],*joint['segments']]:assert name+'.stl' in names
         assert joint['bridge'] in archive.read('MONTAJ.txt').decode()
@@ -137,3 +142,30 @@ def test_bolted_tiles_preserve_twin_motor_holes_and_control_motion(coords,tail):
         for angle in [-25,-12.5,0,12.5,25]:
             moving=rotate_about(named[c['part']],np.array(c['hinge_point_mm']),np.array(c['hinge_axis']),angle)
             assert sum((solid^moving).volume() for solid in fixed)<.1
+
+
+def test_internal_joints_preserve_saved_dimensions_and_hardware_settings(coords):
+    from copy import deepcopy
+    from backend.wing_segments import segmented_wing
+    data=request_data(coords,wing_shape='rectangular')
+    data['options'].update(wingJoinMode='bolted',clearance=.4,wingPin=3.2,
+                          sparMain=6.4,sparRear=4.4)
+    original=deepcopy(data)
+    parts,m,r=generate(data)
+    wing=next(p for p in parts if p.name=='wing_right')
+    segmented_wing(wing,r['wing_specs'][wing.name],m,parts,r['part_cuts'][wing.name])
+    assert data==original
+    assert m['clearance_mm']==.4 and m['screw_mm']==3
+    assert all(j['clearance_mm']==.4 for j in m['wing_segment_joints'])
+
+
+def test_penta_vtail_exports_integral_joints_without_horizontal_tail(coords):
+    from tests.test_cambered_root_socket import data
+    request=data('vtol5','tapered')
+    parts,m,r=generate(request)
+    archive=zipfile.ZipFile(io.BytesIO(package(parts,m,r)))
+    report=json.loads(archive.read('manifest.json'))
+    assert report['wing_segment_joints']
+    assert all(j['type']=='internal_tongue' for j in report['wing_segment_joints'])
+    assert len(report['wing_root_braces'])==2
+    for entry in report['parts']:assert_stl(archive.read(entry['file']))

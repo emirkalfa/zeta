@@ -12,7 +12,9 @@ def root_braces(parts, manifest, specs, body_rings, cutters):
     body_envelope=mesh_solid(body_rings,body_rings[0][:,[1,2]])
     gap=manifest['clearance_mm']; screw=manifest['screw_mm']
     flat=manifest['nut_flat_mm']; nh=manifest['nut_height_mm']
-    boss_r=max(5,flat/math.sqrt(3)+gap+1.5)
+    boss_r=max(7.,flat/math.sqrt(3)+gap+2.5)
+    strap_thickness=max(5.,screw*1.6)
+    strap_radius=max(8.,boss_r+1.)
     def fitted(name,solid,family):
         solid=printable_precision(solid,name);check(solid,name)
         printed,t=orthogonal_print(solid,manifest['bed_mm'],True)
@@ -46,8 +48,8 @@ def root_braces(parts, manifest, specs, body_rings, cutters):
                 shell_floor.append(floor)
             if len(anchors)!=2:continue
             for rise in [5,7,9,11]:
-                bottom=max(shell_floor)+rise; top=bottom+3.5
-                caps=[cylinder(6,3.5,[pt[0],bottom,pt[2]],[0,1,0]) for pt in anchors]
+                bottom=max(shell_floor)+rise; top=bottom+strap_thickness
+                caps=[cylinder(strap_radius,strap_thickness,[pt[0],bottom,pt[2]],[0,1,0]) for pt in anchors]
                 strap=md.Manifold.batch_hull(caps)
                 if (strap-envelope).volume()>.1:continue
                 recess=strap
@@ -93,5 +95,6 @@ def root_braces(parts, manifest, specs, body_rings, cutters):
         result.append(strap)
         manifest['wing_root_braces'].append(dict(bridge=bridge,parent=name,
             segments=[result[i].name for i,_ in proposals],holes=holes,support_bounds_world_mm=bounds,
-            screw_diameter_mm=screw,nut_flat_mm=flat,nut_height_mm=nh))
+            screw_diameter_mm=screw,nut_flat_mm=flat,nut_height_mm=nh,
+            thickness_mm=strap_thickness,width_mm=2*strap_radius,boss_diameter_mm=2*boss_r))
     return result

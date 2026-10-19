@@ -41,8 +41,8 @@ def test_all_mounts_follow_actual_wing_height(coords,preset,position,layout):
         spec=next(p for p in expected['panels'] if p['name']==channel['part'])
         mat,length=panel_frame(spec)
         reach=channel['reach_from_center_mm'];trim=reach-channel['wing_insertion_length_mm']
-        x=spec['chord']*1000*channel['chord_position']
-        probe=local_transform(cylinder(channel['hole_diameter_mm']*.4,reach-trim-2,[x,channel['center_offset_mm'],trim+1],[0,0,1]),mat)
+        from tests.test_manufacturing import channel_probe
+        probe=channel_probe(channel,trim+1,reach-1,inset=channel['hole_diameter_mm']*.1)
         assert (named[channel['part']]^probe).volume()<.01, channel['part']+' tube blocked'
     if layout=='twin':
         for motor in report['motors']:

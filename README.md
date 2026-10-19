@@ -3,7 +3,7 @@
 </p>
 <h1 align="center">ZETA</h1>
 <p align="center"><strong>Uçağını tasarla. Montajını incele. Baskı parçalarını hazırla.</strong></p>
-<p align="center">Parametrik uçak ve VTOL tasarım stüdyosu · Güncel sürüm: <strong>3.5.29</strong></p>
+<p align="center">Parametrik uçak ve VTOL tasarım stüdyosu · Güncel sürüm: <strong>3.5.37</strong></p>
 <p align="center">
   <a href="https://github.com/emirkalfa/zeta/releases/latest">Uygulamayı indir</a> ·
   <a href="CHANGELOG.md">Sürüm notları</a> ·
@@ -60,16 +60,18 @@ Flap, aileron, elevator, rudder ve V-kuyruk kumanda yüzeyleri ayrı STL parçal
 
 Normal gövdelerde bir ön ve iki ana teker bağlantı yuvası bulunur. VTOL gövdelerinde iki ön ve bir arka merkez bağlantı yuvası vardır. M3 vida delikleri ve içeriden erişilen somun cepleri gövdeye dahildir. Tekerler, ayaklar ve harici taşıyıcılar basılı modelin parçası değildir.
 
+Simülasyon için **Tek STL (mm)** seçeneği, montaj konumlarını koruyan birleşik dış yüzeyi tek dosyada verir. Yazıcıya göre bölünmüş parçalar ve montaj donanımı için ZIP seçeneğini kullanın.
+
 ## STL paketinde neler var?
 
 - Yazıcı hacmine göre bölünmüş gövde, kanat ve kuyruk parçaları.
 - İki servis kapağı ve tasarımın gerektirdiği motor/servo taşıyıcıları.
 - Ayrı kumanda yüzeyleri, menteşe geometrileri ve kontrol kolları.
-- Vidalı kanat dilim modunda geçmeli montaj köprüleri.
+- Vidalı kanat dilim modunda bütünleşik iç dil ve yuvalar; ayrı köprü gerektirmeyen vida kilitleri.
 - Geçme ve menteşe deneme parçaları.
 - Parça bilgileri için `manifest.json`, montaj sırası için `MONTAJ.txt`.
 
-Geometri veya montaj boşluğu uygun değilse uygulama ilgili parçayı ve değiştirilecek ayarı açıklar. Yazıcı hacmini gerçek ölçülerinden büyük girerek kontrolü atlamayın. Kanat dilimleri seçilen montaj yöntemine göre vidalı köprülerle veya yapıştırılarak birleştirilir; diğer dilimlerin yöntemi montaj dosyasında belirtilir.
+Geometri veya montaj boşluğu uygun değilse uygulama ilgili parçayı ve değiştirilecek ayarı açıklar. Yazıcı hacmini gerçek ölçülerinden büyük girerek kontrolü atlamayın. Kanat dilimleri seçilen montaj yöntemine göre vidalı iç geçmelerle veya yapıştırılarak birleştirilir; diğer dilimlerin yöntemi montaj dosyasında belirtilir.
 
 Motor, pervane, servo, metal pim, vida, somun, karbon boru ve iniş takımı donanımı ayrıca temin edilir.
 

@@ -1,11 +1,14 @@
 /* Explain failed exports without bypassing the production checks. */
 function manufacturingAdvice(message) {
   const rules=[
-    [/kanat dilim bağlantısı/i,'Kanat dilimlerinin vidalı köprüleri için yeterli engelsiz alan bulunamadı.',[
+    [/karbon boru.*kök pimi|karbon boru.*çok yakın/i,'Karbon boru hattı kök kilit pimine veya diğer boruya fazla yakın.',[
+      ['sparMainPosition','Ana boru konumunu değiştir. Kanal ile kök pimi birbirini kesmemeli.'],
+      ['sparRearPosition','Arka boru konumunu değiştir. Gerçek boru çaplarıyla yeterli et kalınlığı bırak.']]],
+    [/kanat dilim bağlantısı/i,'Kanat dilimlerinin vidalı iç geçmeleri için yeterli engelsiz alan bulunamadı.',[
       ['airfoil','Daha kalın bir kanat profili seç veya kanat veterini artır. İnce kenara vida eklenmez.'],
       ['mountScrew','Vida çapını ve somun ölçülerini gerçek donanımınla karşılaştır. Uygun daha küçük bağlantı donanımı seçebilirsin.'],
       ['printBedX','Yazıcının gerçek baskı hacmini kontrol et; doğru olmayan büyük ölçü girme. Üretim önizlemesini tekrar çalıştır.'],
-      ['wingJoinMode','Vidalı birleşimden vazgeçeceksen Yapıştırmalı (önceki yöntem) seçeneğiyle eski parçalama yöntemini kullanabilirsin. Bu modda dilim vidaları ve köprüleri oluşmaz.']]],
+      ['wingJoinMode','Vidalı birleşimden vazgeçeceksen Yapıştırmalı (önceki yöntem) seçeneğiyle eski parçalama yöntemini kullanabilirsin. Bu modda dilim vidaları ve iç geçmeleri oluşmaz.']]],
     [/yazıcı|bölme sınırı|bed[XYZ]/i,'Parça, yazıcının kullanılabilir baskı alanına sığmıyor.',[
       ['printBedX','Yazıcının gerçek kullanılabilir X, Y ve Z ölçülerini kontrol et. Sadece hatayı kaldırmak için daha büyük değer yazma.'],
       ['wingspan','Ölçüler doğruysa kanat açıklığını/model boyutunu azaltıp Hesapla’ya bas. Otomatik bölme bundan sonra yeniden denenir.']]],
