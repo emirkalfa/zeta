@@ -3,7 +3,7 @@
 </p>
 <h1 align="center">ZETA</h1>
 <p align="center"><strong>Uçağını tasarla. Montajını incele. Baskı parçalarını hazırla.</strong></p>
-<p align="center">Parametrik uçak ve VTOL tasarım stüdyosu · Güncel sürüm: <strong>3.5.37</strong></p>
+<p align="center">Parametrik uçak ve VTOL tasarım stüdyosu · Güncel sürüm: <strong>3.5.38</strong></p>
 <p align="center">
   <a href="https://github.com/emirkalfa/zeta/releases/latest">Uygulamayı indir</a> ·
   <a href="CHANGELOG.md">Sürüm notları</a> ·

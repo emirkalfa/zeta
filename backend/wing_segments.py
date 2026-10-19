@@ -19,6 +19,15 @@ def segmented_wing(part,spec,manifest,all_parts,cutters):
         plans += [(phase,0.,0) for phase in [-.08,.08,-.14,.14]]
         plans += [(phase,shift,extra) for phase,shift,extra in [(-.08,-20,1),(-.14,20,1),(0,-25,1),(0,25,1)]]
         plans += [(phase,shift,extra) for phase,shift,extra in [(-.20,0,1),(.20,0,1),(-.25,-35,1),(-.25,35,1),(-.32,0,1),(-.32,-35,2),(-.32,35,2)]]
+    mirror=part.name.replace('_left','_right')
+    previous=next((p for p in manifest.get('automatic_split_adjustments',[])
+                   if part.name!=mirror and p['part']==mirror),None)
+    if previous:
+        preferred=(previous['chord_shift_fraction'],previous['span_shift_mm'],previous['extra_span_tiles'])
+        if preferred in plans:plans.remove(preferred)
+        # Reuse only the search order, never the geometry: the opposite wing
+        # still passes every bore, control, fastener, connectivity and bed check.
+        plans.insert(0,preferred)
     last=None;precision_retry_added=False
     for plan_index,(phase,shift,extra) in enumerate(plans):
         trial={**manifest,'wing_segment_joints':list(manifest.get('wing_segment_joints',[])),
@@ -72,6 +81,20 @@ def _segmented_wing_plan(part, spec, manifest, all_parts, cutters):
         raise error('somun ağız ölçüsü vida deliğinin çevresinde yeterli yatak bırakmıyor')
 
     # Plan all tiles first: no late anonymous split may destroy a joint.
+    def clear_of_spars(value,z0,z1):
+        for channel in manifest.get('spar_channels',[]):
+            if channel['part']!=part.name:continue
+            reach=channel.get('reach_from_center_mm',span)
+            if z0>reach:continue
+            # Use the physical taper-following bore throughout this row;
+            # a root-only chord fraction is wrong at an outboard seam.
+            direction=channel.get('local_direction',[0,0,1])
+            start=chord*channel['chord_position']
+            values=[start+direction[0]*z for z in (z0,min(z1,reach))]
+            reserve=channel['hole_diameter_mm']/2+max(20.,2*flat+8)+max(2.,wall)+1
+            if min(values)-reserve<=value<=max(values)+reserve:return False
+        return True
+
     phase,span_shift,extra=manifest.get('_wing_plan',(0.,0.,0))
     adaptive_penta=manifest.get('design_mode','auto')=='auto' and any(m.get('name','').startswith('vtol5_') for m in manifest.get('motors',[]))
     nx=1;nz=max(1,math.ceil((bounds[5]-bounds[2])/min(max(bed)-max(48.,4*flat+20),180)))+extra
@@ -85,9 +108,7 @@ def _segmented_wing_plan(part, spec, manifest, all_parts, cutters):
             nominal=xs[i];reach=min(30,(bounds[3]-bounds[0])/nx*.2)
             options=sorted(np.linspace(nominal-reach,nominal+reach,61),key=lambda v:abs(v-nominal))
             for value in options:
-                if all(abs(value-chord*c['chord_position']) >
-                       c['hole_diameter_mm']/2+max(20.,2*flat+8)+max(2.,wall)+1
-                       for c in manifest.get('spar_channels',[]) if c['part']==part.name):
+                if clear_of_spars(value,bounds[2],bounds[5]):
                     xs[i]=value;break
         # Hinge knuckles and boom saddles may overhang their attachment. A cut
         # through that overhang creates an orphan even if its shell fits the bed.
@@ -128,7 +149,7 @@ def _segmented_wing_plan(part, spec, manifest, all_parts, cutters):
                     nominal=row_xs[i];reach=min(30,(end-bounds[0])/row_nx*.2)
                     alternatives=sorted(np.linspace(nominal-reach,nominal+reach,61),key=lambda x:abs(x-nominal))
                     for value in alternatives:
-                        if row_xs[i-1]+25<value<row_xs[i+1]-25 and all(abs(value-chord*c['chord_position'])>c['hole_diameter_mm']/2+max(20.,2*flat+8)+max(2.,wall)+1 for c in manifest.get('spar_channels',[]) if c['part']==part.name):
+                        if row_xs[i-1]+25<value<row_xs[i+1]-25 and clear_of_spars(value,zs[iz],zs[iz+1]):
                             row_xs[i]=round(float(value),2);break
             row_xs[-1]=bounds[3]
             for ix in range(row_nx):

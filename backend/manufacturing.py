@@ -264,8 +264,7 @@ def make_fuselage(data, wall, clearance, screw, nutflat, nuth, shared_outer=None
             if abs(clean.volume()-cap.volume())>max(.1,cap.surface_area()*.001):raise
             cap=printable_precision(clean,cap_name)
         lid+=cap
-    if shared_outer is not None:
-        body=printable_precision(body,'body')
+    body=printable_precision(body,'body')
     check(body,'body')
     return body,lid,outer,rings,holes,cutter,inner
 
@@ -737,7 +736,9 @@ def orthogonal_print(solid,bed,with_transform=False):
             return (printed,np.column_stack([rotation,-b[:3]])) if with_transform else printed
         # Broad combat wings can use all three bed dimensions. Evaluate rigid
         # compound rotations on vertices before transforming the actual solid.
-        vertices=np.asarray(solid.to_mesh().vert_properties)[:,:3].astype(float)
+        # Rotated bounds depend only on the convex hull. Keep the complete
+        # production mesh for the final rigid transform, not every trial.
+        vertices=np.asarray(solid.hull().to_mesh().vert_properties)[:,:3].astype(float)
         rotations=[]
         for axis in range(3):
             family=[]
@@ -826,6 +827,9 @@ def printable_parts(parts,manifest,rings):
         local=p.solid
         if p.frame is not None:
             mat=p.frame; inv=np.linalg.inv(mat[:,:3]);local=local.transform(np.column_stack([inv,-inv@mat[:,3]]).tolist())
+        # The source was already simplified once. Use a tighter Boolean
+        # tolerance for partitions without simplifying thin control skins again.
+        if p.frame is not None:local=local.set_tolerance(.001)
         b=local.bounding_box();start=b[p.axis];end=b[p.axis+3]
         count=max(1,math.ceil((end-start)/maxlen));step=(end-start)/count
         for i in range(count):
@@ -856,6 +860,13 @@ def printable_parts(parts,manifest,rings):
                     inside=ring.copy();inside[:,1:]-=direction*(gap/2+2.04)
                     lip_outer.append(outside);lip_inner.append(inside)
                 sleeve=mesh_solid(lip_outer,lip_outer[0][:,[1,2]])-mesh_solid(lip_inner,lip_inner[0][:,[1,2]])
+                # The completed roof/rims can enter the original pod cavity.
+                # Fit the spigot to the actual receiving shell, as for booms,
+                # rather than assuming the original cavity is still empty.
+                following=local^box([hi,-10000,-10000],[hi+6.5,10000,10000])
+                sleeve=sleeve-following
+                for shift in ([0,gap/2,0],[0,-gap/2,0],[0,0,gap/2],[0,0,-gap/2]):
+                    sleeve=sleeve-following.translate(shift)
                 # Saddles and internal brackets occupy some of the original cavity.
                 # Reserve their real material in the receiving slice as well.
                 for obstacle in obstacles:
@@ -880,7 +891,8 @@ def printable_parts(parts,manifest,rings):
                 piece=piece+collar+lip
                 for tool in part_cuts.get(p.name,[]):piece=piece-tool
             name=p.name if count==1 else f'{p.name}_{i+1:02d}of{count:02d}'
-            piece=piece.as_original().set_tolerance(.02).simplify(.02)
+            if p.frame is None:
+                piece=piece.as_original().set_tolerance(.02).simplify(.02)
             piece=printable_precision(piece,name)
             check(piece,name,connected=False)
             # Panel frames include sweep/dihedral shear. Restore the physical
@@ -957,7 +969,7 @@ def package(parts,manifest,rings,filter='all',printed=None):
                 label='wing_joint_test_'+role
                 coupon=printable_precision(named[integral[role]].assembled^region,label)
                 check(coupon,label)
-                z.writestr(label+'.stl',binary_stl(orthogonal_print(coupon,manifest['bed_mm'])))
+                z.writestr(label+'.stl',binary_stl(printable_precision(orthogonal_print(coupon,manifest['bed_mm']),label)))
         if manifest['controls']:
             pin=manifest['controls'][0]['pin_diameter_mm'];radius=max(3,pin/2+gap/2+1.2)
             center_z=radius+3;fixed=box([0,0,0],[24,4,3]);moving=md.Manifold()

@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.5.38] - 2026-10-19
+- Ölçü kartlarındaki sayı ve birim gösterimi düz metne çevrildi; mobil görünüm ve ondalık hassasiyetleri düzenlendi.
+- Gövde dilim geçmeleri gerçek kapak yuvasına göre boşaltılır; komşu gövde dilimleri arasındaki çakışma giderildi.
+- Kanat dilim kesimleri, konik kanattaki karbon kanallarının gerçek güzergâhını dikkate alır. Karşı kanatta başarılı bölme planı öncelikle denenir; bağlantı kontrolleri korunur.
+- İnce kumanda yüzeylerinin dilimlenmesinde tekrarlanan sadeleştirme kaldırıldı; STL hassasiyet denetimi ve kalibrasyon parçalarının dışa aktarımı düzeltildi.
+- Baskı yönü aramasında aynı sınırları veren dışbükey zarf kullanılarak hesap yükü azaltıldı; gerçek parça geometrisi korunur.
+- Önizleme ve ZIP arasında doğrulanmış bağlantı bilgilerinin önbellekte korunması sağlandı.
+
 ## [3.5.37] - 2026-10-19
 - Geometrik ölçü kartlarında sayı ve birimler düz metin olarak oluşturulur; hassasiyetleri tutarlıdır ve dar ekranlarda birlikte kalır. Eksik veya geçersiz sayılar çizgiyle gösterilir.
 - Önizleme, ZIP ve tek STL istekleri arasında geçişte doğrulanmış montaj/dilim bilgilerinin önbellekte kaybolması giderildi.

@@ -1,5 +1,6 @@
 """Manufactured output tests exercise real CSG and serialized binary STL."""
 import io
+import itertools
 import json
 import subprocess
 import zipfile
@@ -76,7 +77,7 @@ def test_tail_assembly_and_package(coords,tail):
             assert (parent^named[joint['part']]).volume()<.1, joint['part']
     archive=zipfile.ZipFile(io.BytesIO(package(parts,manifest,rings)))
     slices=printable_parts([p for p in parts if p.name=='body'],manifest,rings)
-    for a,b in zip(slices,slices[1:]):
+    for a,b in itertools.combinations(slices,2):
         assert (a.assembled ^ b.assembled).volume()<.1, 'body sleeve fits the receiving cavity'
     report=json.loads(archive.read('manifest.json'))
     assert any(p['file'].startswith('hatch') for p in report['parts'])
