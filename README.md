@@ -3,7 +3,7 @@
 </p>
 <h1 align="center">ZETA</h1>
 <p align="center"><strong>Uçağını tasarla. Montajını incele. Baskı parçalarını hazırla.</strong></p>
-<p align="center">Parametrik uçak ve VTOL tasarım stüdyosu · Güncel sürüm: <strong>3.5.38</strong></p>
+<p align="center">Parametrik uçak ve VTOL tasarım stüdyosu · Güncel sürüm: <strong>3.5.41</strong></p>
 <p align="center">
   <a href="https://github.com/emirkalfa/zeta/releases/latest">Uygulamayı indir</a> ·
   <a href="CHANGELOG.md">Sürüm notları</a> ·
@@ -60,7 +60,7 @@ Flap, aileron, elevator, rudder ve V-kuyruk kumanda yüzeyleri ayrı STL parçal
 
 Normal gövdelerde bir ön ve iki ana teker bağlantı yuvası bulunur. VTOL gövdelerinde iki ön ve bir arka merkez bağlantı yuvası vardır. M3 vida delikleri ve içeriden erişilen somun cepleri gövdeye dahildir. Tekerler, ayaklar ve harici taşıyıcılar basılı modelin parçası değildir.
 
-Simülasyon için **Tek STL (mm)** seçeneği, montaj konumlarını koruyan birleşik dış yüzeyi tek dosyada verir. Yazıcıya göre bölünmüş parçalar ve montaj donanımı için ZIP seçeneğini kullanın.
+Simülasyon için **Tek STL** seçeneği, dış yüzeyi motor ve tekerlerle birlikte metre cinsinden verir. Burun +X, yukarı +Y ve teker temas düzlemi Y=0. Yazıcıya göre bölünmüş parçalar ve montaj donanımı için ZIP seçeneğini kullanın.
 
 ## STL paketinde neler var?
 

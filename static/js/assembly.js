@@ -383,8 +383,8 @@ async function runManufacturing(mode='preview',filter='all') {
       manufacturingResult=data;showManufacturingPreview(manufacturingResult);
       previewStatus(`Detaylı model hazır. ${data.parts.length} baskı parçası.`,'ready');
     } else if(mode==='stl') {
-      downloadBlob(data,'zeta_simulasyon_mm.stl');
-      previewStatus('Montajlı model tek STL dosyası olarak indirildi. Birim: mm.','ready');
+      downloadBlob(data,'zeta_simulasyon_m.stl');
+      previewStatus('Montajlı model tek STL dosyası olarak indirildi. Birim metre, burun +X ve yukarı +Y.','ready');
     } else {
       downloadBlob(data,`zeta_${filter}_montajli_stl.zip`);
       previewStatus('STL paketi indirildi. ZIP içinde parçalar ve montaj kılavuzu var.','ready');

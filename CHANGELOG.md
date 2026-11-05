@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+## [3.5.41] - 2026-10-23
+- Simülasyon STL ekseni kullanıcı simülatörüne uygun Y-yukarı olarak düzeltildi. Burun +X, üç tekerin temas düzlemi Y=0 ve birim metre; dönüşüm yansıtma yapmadan uygulanır.
+
+## [3.5.40] - 2026-10-23
+- Simülasyon STL çıktısına tasarımdaki motor gövdeleri, milleri, iki palalı pervaneler ve motor taşıyıcıları eklendi. Üç tekerin ortak Z=0 zemin düzlemi korunur.
+
+## [3.5.39] - 2026-10-23
+- Simülasyon STL’sine aynı zemine basan, nominal ağırlık merkezini çevreleyen üç tekerli sabit iniş takımı eklendi. Teker temas düzlemi Z=0 olarak dışa aktarılır. Pervane tarama hacmi için yerden açıklık ayrılır; baskı parçalarına teker veya ayak eklenmez.
+- Simülasyon STL çıktısı mm/Y-yukarı tasarım eksenlerinden metre, burun +X ve yukarı +Z düzenine dönüştürülür. Baskı dosyalarının mm birimi ve yerleşimi korunur.
+- Dosya adı `zeta_simulasyon_m.stl` olarak değişti; içe aktarma ölçeği ve geometri/fizik ayrımı arayüzde açıklandı. Üç model ailesinde gerçek dış zarf için ölçek, eksen, hacim ve kapalı yüzey testleri eklendi.
+
 ## [3.5.38] - 2026-10-19
 - Ölçü kartlarındaki sayı ve birim gösterimi düz metne çevrildi; mobil görünüm ve ondalık hassasiyetleri düzenlendi.
 - Gövde dilim geçmeleri gerçek kapak yuvasına göre boşaltılır; komşu gövde dilimleri arasındaki çakışma giderildi.

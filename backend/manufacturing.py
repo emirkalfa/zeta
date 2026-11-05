@@ -706,7 +706,7 @@ def generate(data):
             boom['end_x_mm']-x,[x,y,z],[1,0,0]))
     simulation_envelopes.extend([simulation_body,root_outer_union])
     simulation_outer=md.Manifold.batch_boolean(simulation_envelopes,md.OpType.Add)
-    return parts,{'bed_mm':bed,'fixed_vtol_body':g.get('vtol_fixed_body',False),'design_mode':options.get('designMode','auto'),'wing_join_mode':wing_join,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'wing_position_offset_mm':float(g['wing_position_offset'])*1000,'hatch_bolts_mm':hatch_holes,'service_hatches':[{'part':'hatch_front','bolt_points_mm':hatch_holes[:4]},{'part':'hatch_rear','bolt_points_mm':hatch_holes[4:]}],'interfaces':interfaces,'spar_channels':spar_channels,'controls':controls,'wing_root_fairings':root_fairings,'motors':motors,'vtol_joints':vtol_joints,'cameras':cameras,'booms':booms,'carbon_boom':carbon_boom,'hover_balance':hover_report,'landing_mounts':landing_mounts,'notes':notes},{'simulation_outer':simulation_outer,'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'part_cuts':cuts,'obstacles':body_obstacles,'wing_specs':{s['name']:s for s in specs if s['kind']=='wing'},'assembly_parts':parts}
+    return parts,{'bed_mm':bed,'fixed_vtol_body':g.get('vtol_fixed_body',False),'design_mode':options.get('designMode','auto'),'wing_join_mode':wing_join,'wall_mm':wall,'clearance_mm':gap,'mesh_tolerance_mm':.02,'screw_mm':screw,'nut_flat_mm':nf,'nut_height_mm':nh,'wing_position_offset_mm':float(g['wing_position_offset'])*1000,'hatch_bolts_mm':hatch_holes,'service_hatches':[{'part':'hatch_front','bolt_points_mm':hatch_holes[:4]},{'part':'hatch_rear','bolt_points_mm':hatch_holes[4:]}],'interfaces':interfaces,'spar_channels':spar_channels,'controls':controls,'wing_root_fairings':root_fairings,'motors':motors,'vtol_joints':vtol_joints,'cameras':cameras,'booms':booms,'carbon_boom':carbon_boom,'hover_balance':hover_report,'landing_mounts':landing_mounts,'notes':notes},{'simulation_outer':simulation_outer,'simulation_geometry':g,'simulation_motors':motors,'simulation_mounts':motor_service_parts,'outer':rings,'cavity':cavity_rings,'cuts':cuts['body'],'part_cuts':cuts,'obstacles':body_obstacles,'wing_specs':{s['name']:s for s in specs if s['kind']=='wing'},'assembly_parts':parts}
 
 
 def orthogonal_print(solid,bed,with_transform=False):
@@ -1018,8 +1018,44 @@ def assembled_stl(parts):
     return b'ZETA assembled model; units mm'.ljust(80,b'\0')+struct.pack('<I',count)+b''.join(chunk[84:] for chunk in chunks)
 
 
+def simulation_envelope(rings):
+    solid=rings['simulation_outer']
+    if 'simulation_geometry' in rings:
+        from backend.simulation_gear import landing_gear
+        gear,_=landing_gear(solid,rings['outer'],rings['simulation_geometry'],rings['simulation_motors'])
+        solid+=gear
+        from backend.simulation_propulsion import propulsion
+        solid=md.Manifold.batch_boolean([solid,*(p.solid for p in rings.get('simulation_mounts',[])),*propulsion(rings['simulation_motors'])],md.OpType.Add)
+    return solid
+
+
 def simulation_stl(rings):
-    """External envelope only; no manufacturing cavities or internal faces."""
-    solid=rings['simulation_outer'].as_original().set_tolerance(.02).simplify(.02)
+    """External envelope in metres, nose +X, up +Y (right-handed).
+
+    Design coordinates are millimetres with the nose towards -X and +Y up.
+    Apply a proper rotation, not an axis swap/reflection or a print orientation.
+    Keep longitudinal/lateral origins. With wheels, set their contact plane
+    to Y=0 to avoid spawning the landing gear beneath the ground.
+    """
+    solid=simulation_envelope(rings).as_original().set_tolerance(.02).simplify(.02)
+    ground=float(solid.bounding_box()[1]) if 'simulation_geometry' in rings else 0.
+    header=b'ZETA simulation; units m; nose +X; up +Y'
+    header+=b'; wheel ground Y=0' if 'simulation_geometry' in rings else b'; origin unchanged'
+    return simulation_mesh_stl(solid, ground, header)
+
+
+def simulation_mesh_stl(solid, ground, header):
+    solid=solid.transform([[-1,0,0,0],[0,1,0,-ground],[0,0,-1,0]])
     solid=printable_precision(solid,'Simülasyon dış yüzeyi')
-    return binary_stl(solid,connected=False)
+    content=binary_stl(solid,connected=False)
+    # Validate in the native mm precision before converting STL float32 data
+    # to SI units. Normals are dimensionless and must not be scaled.
+    dtype=np.dtype([('normal','<f4',(3,)),('vertices','<f4',(3,3)),('attr','<u2')])
+    triangles=np.frombuffer(content,offset=84,dtype=dtype).copy()
+    triangles['vertices']*=.001
+    tri=triangles['vertices'];vertices=tri.reshape(-1,3)
+    faces=np.arange(len(vertices)).reshape(-1,3)
+    area=np.linalg.norm(np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]),axis=1)
+    if np.any(area==0) or not welded_mesh_closed(vertices,faces):
+        raise ManufacturingError('Simülasyon STL: metre dönüşümünde yüzey hassasiyeti kayboldu.')
+    return header.ljust(80,b'\0')+content[80:84]+triangles.tobytes()
