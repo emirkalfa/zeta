@@ -77,7 +77,7 @@ async function requestManufacturing(mode,filter,stamp,revision=null) {
   const active={key};
   active.promise=(async()=>{
     const res=await fetch(`/api/manufacturing?mode=${mode}&part=${filter}`,{method:'POST',headers:{'Content-Type':'application/json'},body:stamp});
-    const data=(mode==='zip' || mode==='stl') && res.ok?await res.blob():await res.json();
+    const data=['zip','merkusim'].includes(mode) && res.ok?await res.blob():await res.json();
     if(!res.ok)throw new Error(data.error||'Üretim hesabı tamamlanamadı.');
     return data;
   })();
@@ -372,7 +372,7 @@ async function runManufacturing(mode='preview',filter='all') {
   clearTimeout(manufacturingTimer);
   ++manufacturingRevision;
   if(typeof showManufacturingIssue==='function')showManufacturingIssue('');
-  const status=$('manufacturingStatus'), buttons=Array.from(document.querySelectorAll('#manufacturingPreview, #manufacturingDownload, #simulationDownload, .stl-list button'));
+  const buttons=Array.from(document.querySelectorAll('#manufacturingPreview, #manufacturingDownload, #merkusimDownload, .stl-list button'));
   buttons.forEach(b=>b.disabled=true);
   previewStatus('STL hazırlanıyor: parçalar ve bağlantılar kontrol ediliyor.','busy');
   try {
@@ -382,9 +382,9 @@ async function runManufacturing(mode='preview',filter='all') {
     if (mode==='preview') {
       manufacturingResult=data;showManufacturingPreview(manufacturingResult);
       previewStatus(`Detaylı model hazır. ${data.parts.length} baskı parçası.`,'ready');
-    } else if(mode==='stl') {
-      downloadBlob(data,'zeta_simulasyon_m.stl');
-      previewStatus('Montajlı model tek STL dosyası olarak indirildi. Birim metre, burun +X ve yukarı +Y.','ready');
+    } else if(mode==='merkusim') {
+      downloadBlob(data,'zeta_merkusim_mm.stl');
+      previewStatus('Merkusim STL dosyası indirildi. Model türü ve kütle için ZETA proje dosyanı da Merkusim’e yükleyebilirsin.','ready');
     } else {
       downloadBlob(data,`zeta_${filter}_montajli_stl.zip`);
       previewStatus('STL paketi indirildi. ZIP içinde parçalar ve montaj kılavuzu var.','ready');
@@ -405,7 +405,7 @@ function captureManufacturingSettings() {
 }
 function setupManufacturing() {
   $('manufacturingPreview').addEventListener('click',()=>runManufacturing('preview'));
-  $('simulationDownload').addEventListener('click',()=>runManufacturing('stl'));
+  $('merkusimDownload').addEventListener('click',()=>runManufacturing('merkusim'));
   $('manufacturingDownload').addEventListener('click',()=>runManufacturing('zip'));
   let saved=null;try {saved=JSON.parse(store.get('zeta-manufacturing')||'null');} catch(e) { /* damaged local settings */ }
   const ids=MANUFACTURING_FIELDS;

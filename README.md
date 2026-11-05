@@ -60,7 +60,7 @@ Flap, aileron, elevator, rudder ve V-kuyruk kumanda yüzeyleri ayrı STL parçal
 
 Normal gövdelerde bir ön ve iki ana teker bağlantı yuvası bulunur. VTOL gövdelerinde iki ön ve bir arka merkez bağlantı yuvası vardır. M3 vida delikleri ve içeriden erişilen somun cepleri gövdeye dahildir. Tekerler, ayaklar ve harici taşıyıcılar basılı modelin parçası değildir.
 
-Simülasyon için **Tek STL** seçeneği, dış yüzeyi motor ve tekerlerle birlikte metre cinsinden verir. Burun +X, yukarı +Y ve teker temas düzlemi Y=0. Yazıcıya göre bölünmüş parçalar ve montaj donanımı için ZIP seçeneğini kullanın.
+**Simülasyon STL** düğmesi, gövdeyi, kanatları ve kuyruğu Merkusim’in beklediği eksenlerde ve milimetre cinsinden dışa aktarır. STL ile birlikte ZETA proje dosyasını da yükleyerek model ailesini ve kütleyi aktarabilirsiniz. Motor ve iniş takımı Merkusim’de seçilen araç şablonundan gelir.
 
 ## STL paketinde neler var?
 

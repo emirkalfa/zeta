@@ -619,9 +619,9 @@
 <div class="production-status" data-state="idle"><p id="manufacturingStatus" role="status">STL üretimi için önce modeli hesaplayın.</p><div class="production-progress" role="progressbar" aria-label="STL hazırlama durumu" hidden><span></span></div></div>
 <section id="manufacturingIssue" class="manufacturing-issue" role="alert" hidden=""></section>
 </div>
-<h3>Simülasyon için tek STL</h3>
-<p class="hint">Modelin dış geometrisi, motorları ve tekerleri tek STL dosyasına aktarılır. İç boşluklar, vida yuvaları, karbon kanalları, nervürler ve baskı bağlantıları eklenmez. Kanat ve kuyruk yüzeyleri kapalı dış zarf olarak birleştirilir. Birim metre, burun +X ve yukarı +Y. Üç tekerin temas düzlemi Y=0.</p>
-<div class="form-actions"><button class="btn btn-primary" id="simulationDownload">Simülasyon için tek STL indir</button></div>
+<h3>Simülasyon dışa aktarımı</h3>
+<p class="hint">Merkusim için gövde STL’sini indir ve Merkusim’in STL yükleme ekranına bırak. ZETA proje dosyasını da yüklersen Merkusim model türünü ve kütleyi okur. Motor ve iniş takımı Merkusim’in seçili araç şablonundan gelir.</p>
+<div class="form-actions"><button class="btn btn-primary" id="merkusimDownload" type="button">Simülasyon STL</button></div>
 <h3>Parçalı STL indirme</h3>
 <p class="hint">Her ZIP içinde baskı parçaları ayrı STL dosyalarıdır. Parçaların boyutunu yukarıdaki yazıcı ölçüleri belirler; bağlantı yuvaları ve vida delikleri korunur.</p>
 <div class="stl-list">
