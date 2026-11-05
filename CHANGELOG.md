@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Simülasyon ZIP paketi, tekerleri ve pervaneleri ayrı STL dosyaları olarak dışa aktarır. Eklem merkezleri, eksenler, itki yönleri ve Tria motor eğim bağlantıları model.json dosyasına yazılır.
+
 ## [3.5.41] - 2026-10-23
 - Simülasyon STL ekseni kullanıcı simülatörüne uygun Y-yukarı olarak düzeltildi. Burun +X, üç tekerin temas düzlemi Y=0 ve birim metre; dönüşüm yansıtma yapmadan uygulanır.
 

@@ -6,13 +6,14 @@ import json
 from threading import RLock
 from time import monotonic
 from backend.manufacturing import generate, printable_parts, preview, package, simulation_stl
+from backend.simulation_package import simulation_package
 
 class ManufacturingService:
     def __init__(self, limit=2, ttl=1200):
         self.limit=limit;self.ttl=ttl;self.entries=OrderedDict();self.lock=RLock()
 
     def result(self, data, mode='preview', filter='all'):
-        if mode not in ('preview','zip','stl'):
+        if mode not in ('preview','zip','stl','simulation'):
             raise ValueError('Geçersiz dışa aktarma biçimi.')
         key=sha256(json.dumps(data,sort_keys=True,separators=(',',':')).encode()).digest()
         # Single-flight also prevents simultaneous preview/ZIP requests from
@@ -33,15 +34,17 @@ class ManufacturingService:
             if output_key not in entry['outputs']:
                 if mode=='stl':
                     result=simulation_stl(entry['rings'])
+                elif mode=='simulation':
+                    result=simulation_package(entry['rings'], entry['manifest'])
                 else:
                     if entry['printed'] is None:
                         entry['printed']=printable_parts(entry['parts'],entry['manifest'],entry['rings'])
-                manifest=deepcopy(entry['manifest'])
-                if mode=='zip':
-                    result=package(entry['parts'],manifest,entry['rings'],filter,
-                                   printed=entry['printed'])
-                elif mode=='preview':
-                    result=preview(entry['parts'],manifest,entry['rings'],printed=entry['printed'])
+                    manifest=deepcopy(entry['manifest'])
+                    if mode=='zip':
+                        result=package(entry['parts'],manifest,entry['rings'],filter,
+                                       printed=entry['printed'])
+                    else:
+                        result=preview(entry['parts'],manifest,entry['rings'],printed=entry['printed'])
                 # Cache only the common complete ZIP and preview; arbitrary
                 # filter strings must not grow memory without a bound.
                 if output_key[1]=='all':entry['outputs'][output_key]=result
