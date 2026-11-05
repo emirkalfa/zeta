@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Merkusim için gövde STL’si, yükleyicinin beklediği milimetre birimi ve ZETA eksenleriyle dışa aktarılır.
 - Simülasyon ZIP paketi, tekerleri ve pervaneleri ayrı STL dosyaları olarak dışa aktarır. Eklem merkezleri, eksenler, itki yönleri ve Tria motor eğim bağlantıları model.json dosyasına yazılır.
 
 ## [3.5.41] - 2026-10-23

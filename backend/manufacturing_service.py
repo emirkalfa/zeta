@@ -5,7 +5,7 @@ from hashlib import sha256
 import json
 from threading import RLock
 from time import monotonic
-from backend.manufacturing import generate, printable_parts, preview, package, simulation_stl
+from backend.manufacturing import generate, printable_parts, preview, package, simulation_stl, merkusim_stl
 from backend.simulation_package import simulation_package
 
 class ManufacturingService:
@@ -13,7 +13,7 @@ class ManufacturingService:
         self.limit=limit;self.ttl=ttl;self.entries=OrderedDict();self.lock=RLock()
 
     def result(self, data, mode='preview', filter='all'):
-        if mode not in ('preview','zip','stl','simulation'):
+        if mode not in ('preview','zip','stl','simulation','merkusim'):
             raise ValueError('Geçersiz dışa aktarma biçimi.')
         key=sha256(json.dumps(data,sort_keys=True,separators=(',',':')).encode()).digest()
         # Single-flight also prevents simultaneous preview/ZIP requests from
@@ -34,6 +34,8 @@ class ManufacturingService:
             if output_key not in entry['outputs']:
                 if mode=='stl':
                     result=simulation_stl(entry['rings'])
+                elif mode=='merkusim':
+                    result=merkusim_stl(entry['rings'])
                 elif mode=='simulation':
                     result=simulation_package(entry['rings'], entry['manifest'])
                 else:

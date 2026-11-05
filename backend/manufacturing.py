@@ -1044,6 +1044,18 @@ def simulation_stl(rings):
     return simulation_mesh_stl(solid, ground, header)
 
 
+def merkusim_stl(rings):
+    """Airframe only, in the design frame recognized by Merkusim's ZETA importer."""
+    skin = rings['simulation_outer'].as_original().set_tolerance(.02).simplify(.02)
+    skin = printable_precision(skin, 'Merkusim gövdesi')
+    content = binary_stl(skin, connected=False)
+    g = rings['simulation_geometry']
+    wing_ac = g.get('wing_ac_x', g['wing_x_pos'] + .25 * g['mac'])
+    cg_x_mm = (wing_ac - .25 * g['mac'] + g['cg_position']) * 1000
+    header = f'ZETA Merkusim airframe; units mm; nose -X; up +Y; cg_x_mm={cg_x_mm:.6g}'
+    return header.encode('ascii').ljust(80, b'\0') + content[80:]
+
+
 def simulation_mesh_stl(solid, ground, header):
     solid=solid.transform([[-1,0,0,0],[0,1,0,-ground],[0,0,-1,0]])
     solid=printable_precision(solid,'Simülasyon dış yüzeyi')

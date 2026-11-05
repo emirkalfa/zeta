@@ -212,6 +212,9 @@ def api_manufacturing():
         if mode == 'stl':
             content = manufacturing_service.result(data,'stl')
             return Response(content, mimetype='model/stl', headers={'Content-Disposition': 'attachment; filename=zeta_simulasyon_m.stl'})
+        if mode == 'merkusim':
+            content = manufacturing_service.result(data, mode)
+            return Response(content, mimetype='model/stl', headers={'Content-Disposition': 'attachment; filename=zeta_merkusim_mm.stl'})
         if mode == 'simulation':
             content = manufacturing_service.result(data, mode)
             return Response(content, mimetype='application/zip', headers={'Content-Disposition': 'attachment; filename=zeta_simulasyon.zip'})
