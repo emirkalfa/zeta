@@ -3,40 +3,50 @@
 </p>
 <h1 align="center">ZETA</h1>
 <p align="center"><strong>Uçağını tasarla. Montajını incele. Baskı parçalarını hazırla.</strong></p>
-<p align="center">Parametrik uçak ve VTOL tasarım stüdyosu · Güncel sürüm: <strong>3.5.41</strong></p>
+<p align="center">Parametrik uçak ve VTOL tasarım stüdyosu · Kaynak sürümü <strong>3.5.118</strong></p>
 <p align="center">
   <a href="https://github.com/emirkalfa/zeta/releases/latest">Uygulamayı indir</a> ·
   <a href="CHANGELOG.md">Sürüm notları</a> ·
   <a href="static/references.html">Hesap yöntemleri ve kaynaklar</a>
 </p>
 
-![ZETA 3.5.29 içinde Tria VTOL: iki döner ön motor, karbon kuyruk borusu ve sabit dikey arka motor](docs/tria-vtol-3.5.29.png)
+![ZETA 3.5.118 içinde Goliath sabit kanat modeli](docs/images/goliath-3.5.118-airframe.png)
 
 ZETA; kanat açıklığı, toplam ağırlık, profil ve donanım ölçülerinden bir uçak modeli oluşturur. Gövde, kanat, kuyruk ve bağlantı parçalarını birlikte inceleyebilir; tasarımını proje dosyası olarak saklayabilir ve yazıcına göre bölünmüş STL paketini indirebilirsin.
 
-Türkçe arayüz bilgisayarında çalışır. Tasarım sırasında internet bağlantısı gerekmez. Detaylı 3D önizleme, STL üretiminde kullanılan geometriyi gösterir; vida delikleri, yuvalar ve ayrı kumanda yüzeyleri bu modele dahildir.
+Masaüstü uygulaması Türkçe ve İngilizce arayüz ile açık ve koyu tema sunar. Tasarım sırasında internet bağlantısı gerekmez. Detaylı 3D önizleme, STL üretiminde kullanılan geometriyi gösterir; vida delikleri, yuvalar ve ayrı kumanda yüzeyleri bu modele dahildir.
 
 ## Başlamak için
 
 1. [Sürümler sayfasından](https://github.com/emirkalfa/zeta/releases/latest) uygulama paketini indir ve aç. Hazır Windows paketi için Python kurulumu gerekmez.
-2. Kanat açıklığını, pil dahil toplam ağırlığı ve profili gir. Normal gövde, Tria VTOL veya Penta VTOL ailesini seç.
+2. Kanat açıklığını, pil dahil toplam ağırlığı ve profili gir. Sabit kanat, Tria VTOL veya Penta VTOL ailesini seç. Kanat, gövde, motor ve kuyruk ayarları ayrı bölümlerdedir.
 3. **Hesapla** ile ölçüleri oluştur. **3D model** ekranında detaylı üretim önizlemesini, bağlantıları ve hareketli yüzeyleri incele.
 4. Projeni kaydet. **STL indirme** ekranında yazıcı ölçülerini ve geçme boşluğunu girerek montaj paketini oluştur.
-
-![Güncel ZETA parametre ekranı, Tria VTOL ailesi seçili](docs/parameters-3.5.29.png)
 
 ## Model aileleri
 
 | Aile | Modelin yapısı |
 |---|---|
-| **Atlas** | Geniş ekipman hacimli, ölçüleri düzenlenebilen gövde. |
-| **Seyir** | Alternatif gövde kesitleriyle parametrik sabit kanat tasarımı. |
-| **Akın** | Farklı burun ve gövde kesitlerine sahip parametrik tasarım. |
+| **Goliath** | Sökülebilir burun, gövdeyle hizalı kanat kökleri ve isteğe bağlı gimbal bölmesi. |
+| **Caraxes** | İki servis kapaklı parametrik sabit kanat gövdesi. |
+| **Lark** | Arka itici motorlu ve karbon kuyruk borulu sabit kanat gövdesi. |
 | **Savaşan İHA** | Kısa merkez gövde, çift kuyruk bomu ve arka motor yerleşimi. |
 | **Tria VTOL** | İki bağımsız döner ön motor, bir sabit dikey arka motor ve karbon kuyruk borusu. Sabit gövde ailesi ve orta kanat yerleşimi. |
 | **Penta VTOL** | Dört dikey kaldırma motoru, bir arka itici motor ve çift bomlu kuyruk. Gövde ölçüleri kanat ve motor ölçülerine uyarlanır; üst, orta ve alt kanat konumları seçilebilir. |
 
 Dikdörtgen, konik ve düz firar kenarlı kanat seçenekleri bulunur. Kanat kökü, motor bağlantıları ve üretim parçaları seçilen modele göre yeniden oluşturulur. Sabit gövde kısıtları ilgili model ailesinde korunur.
+
+## Goliath gimbal burnu
+
+**Gövde ayarları → Burun kamerası → Kamera yuvası** altında **Gimbal burnu ve VTX kapağı** seçeneğini aç. Burun, Goliath gövdesinin kesitlerinden üretilir ve iki M2 vidayla gövdeye bağlanır.
+
+| Üst kapak ve ızgara | Alt kamera açıklığı |
+| --- | --- |
+| ![Goliath’ın kısa, oval burun ucu ile sökülebilir kapaktaki yedi açık havalandırma yarığı](docs/images/goliath-3.5.118-grille.png) | ![Önde kavisli bir dudakla başlayan ve gövde bağlantısından önce kapanan alt açıklık](docs/images/goliath-3.5.118-opening.png) |
+
+Kamera, alt açıklığın üzerindeki iç montaj plakasına takılır. VTX tepsisi üst kapağın altında yer alır ve kapakla birlikte çıkar. Burun kabuğu, ızgaralı kapak, kamera montaj plakası ve VTX tepsisi ayrı STL parçalarıdır.
+
+![Kablo geçişli gimbal montaj plakası ve bağ yuvalı VTX tepsisi](docs/images/goliath-3.5.118-mounts.png)
 
 ## Tasarımdan montaja
 
@@ -48,9 +58,9 @@ Tria'nın ön motor mekanizmalarında servo bölmesi ve ayrı servis kapağı bu
 
 ### İki ayrı yerden servis yap
 
-Gövdenin üstünde, aralarında sabit köprü bulunan iki bağımsız servis kapağı vardır. Her kapak dört vida ve alt oturma çerçevesiyle kendi açıklığına oturur. **Servis kapakları** bölümünden ön ve arka kapak ayrı gizlenerek iç bölmeler incelenebilir. Kapaklar STL paketinde ayrı parçalar olarak bulunur.
+Gövdenin üstünde, aralarında sabit köprü bulunan iki bağımsız servis kapağı vardır. Kapaklar seçilen montaja göre geçme tırnaklarla ya da vidalarla sabitlenir. **Servis kapakları** bölümünden ön ve arka servis kapakları ile burun kapağı ayrı gizlenerek iç bölmeler incelenebilir. Kapaklar STL paketinde ayrı parçalar olarak bulunur.
 
-![Tria VTOL gövdesinde ön ve arka servis kapakları açık](docs/tria-service-hatches-3.5.29.png)
+![Tria VTOL servis kapağı yerleşimi, ZETA 3.5.29](docs/tria-service-hatches-3.5.29.png)
 
 ### Kumanda yüzeylerini ayrı üret
 
@@ -65,7 +75,8 @@ Normal gövdelerde bir ön ve iki ana teker bağlantı yuvası bulunur. VTOL gö
 ## STL paketinde neler var?
 
 - Yazıcı hacmine göre bölünmüş gövde, kanat ve kuyruk parçaları.
-- İki servis kapağı ve tasarımın gerektirdiği motor/servo taşıyıcıları.
+- İki servis kapağı ve tasarımın gerektirdiği motor ve servo taşıyıcıları.
+- Goliath gimbal seçildiğinde dört ayrı parça olarak burun, ızgaralı kapak, kamera montaj plakası ve VTX tepsisi.
 - Ayrı kumanda yüzeyleri, menteşe geometrileri ve kontrol kolları.
 - Vidalı kanat dilim modunda bütünleşik iç dil ve yuvalar; ayrı köprü gerektirmeyen vida kilitleri.
 - Geçme ve menteşe deneme parçaları.
@@ -91,10 +102,10 @@ Yöntemler: [uygulama kaynakları](static/references.html), [hesap denetimi](doc
 
 | Platform | İndirme |
 |---|---|
-| **Windows 10/11, x64** | [ZETA 3.5.29 uygulaması](https://github.com/emirkalfa/zeta/releases/download/v3.5.29/ZETA-3.5.29-windows-x64.exe) |
+| **Windows 10/11, x64** | [GitHub Releases üzerinden yayınlanmış Windows paketi](https://github.com/emirkalfa/zeta/releases/latest) |
 | **Linux / macOS** | [Sürümler sayfasındaki platform paketleri](https://github.com/emirkalfa/zeta/releases) |
 
-Bu depo gizlidir. Kaynak koda ve indirme dosyalarına erişmek için yetkili GitHub hesabıyla giriş yapılmalıdır. Hazır uygulama yerine GitHub'ın otomatik `Source code` arşivini indirmeyin. Dosyanın bütünlüğünü sürümdeki `SHA256SUMS.txt` ile kontrol edebilirsiniz.
+Bu README kaynak sürümünü açıklar. Hazır Windows paketinin sürümü GitHub Releases sayfasında gösterilir. Bu depo gizlidir. Kaynak koda ve indirme dosyalarına erişmek için yetkili GitHub hesabıyla giriş yapılmalıdır. Hazır uygulama yerine GitHub'ın otomatik `Source code` arşivini indirmeyin. Dosyanın bütünlüğünü sürümdeki `SHA256SUMS.txt` ile kontrol edebilirsiniz.
 
 Windows'ta Chrome veya Edge varsa uygulama ayrı pencerede açılır; diğer durumda varsayılan tarayıcı kullanılır. Masaüstünde yalnız kısayol bulundurabilirsiniz. İmzalanmamış paketler için işletim sistemi uyarı gösterebilir; yalnız güvendiğiniz sürüm dosyasını çalıştırın.
 
@@ -131,5 +142,9 @@ Paketler `dist/release/` klasörüne yazılır. Paketleyici çalıştığı işl
 | Arayüz ve 3D önizleme | `templates/`, `static/` |
 | Masaüstü paketleme | `packaging/` |
 | Doğrulamalar | `tests/` |
+
+## Commit özeti
+
+Bu çalışma GitHub’a **2 commit** ile aktarılmıştır. İlk commit uygulama değişikliklerini, ikinci commit README ve detay görsellerini içerir. Bu güncelleme dahil dalın toplam geçmişi **157 commit** içerir. [Dalın commit geçmişi](https://github.com/emirkalfa/zeta/commits/codex/fuselage-model-library/)
 
 [Sürüm geçmişi](CHANGELOG.md) · [MIT lisansı](LICENSE)
