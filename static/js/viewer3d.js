@@ -3,21 +3,8 @@ let scene, camera, renderer, controls;
 let wingGroup, fuseGroup, tailGroup;
 let autoRotate = false;
 let animFrame;
-let grid;
 const viewTarget = new THREE.Vector3(0.6, 0, 0);
 let viewDist = 4;
-const HOME_VIEW = [0.55, 0.35, 0.75];
-
-function cssColor(name) {
-  return new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue(name).trim());
-}
-
-// Tema renklerinde zemin ızgarası; boyut bilgisi tema değişiminde yeniden kurmak için saklanır
-function makeGrid(size, divisions) {
-  const g = new THREE.GridHelper(size, divisions, cssColor('--border-strong'), cssColor('--border'));
-  g.userData = { size, divisions };
-  return g;
-}
 
 function setCameraDirection(dir) {
   const v = new THREE.Vector3(dir[0], dir[1], dir[2]).normalize().multiplyScalar(viewDist);
@@ -27,14 +14,31 @@ function setCameraDirection(dir) {
 }
 
 function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tailType) {
-  if (viewer) disposeViewer();
+  if(viewer){
+    const direction=camera.position.clone().sub(controls.target).normalize();
+    const zoom=camera.position.distanceTo(controls.target)/Math.max(.001,viewDist);
+    for(const group of [wingGroup,fuseGroup,tailGroup]){scene.remove(group);disposeModel(group);}
+    wingGroup=buildWingGroup(geom,wingCoords);
+    fuseGroup=buildFuselageGroup(geom,geom.fuse_type,wingCoords);
+    tailGroup=buildTailGroup(geom,tailCoords,vtailCoords||tailCoords);
+    scene.add(wingGroup,fuseGroup,tailGroup);
+    const box=new THREE.Box3().setFromObject(wingGroup).expandByObject(fuseGroup).expandByObject(tailGroup);
+    const sphere=box.getBoundingSphere(new THREE.Sphere());
+    viewTarget.copy(sphere.center);
+    viewDist=modelViewDistance(camera,sphere.radius);
+    controls.target.copy(viewTarget);
+    camera.position.copy(viewTarget).addScaledVector(direction,viewDist*zoom);
+    controls.update();
+    requestViewerFrame();
+    return;
+  }
 
   const container = document.getElementById('three-container');
   const w = container.clientWidth || 800;
   const h = container.clientHeight || 500;
 
   scene = new THREE.Scene();
-  scene.background = cssColor('--bg');
+  scene.background = new THREE.Color(MODEL_BACKGROUND);
 
   camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 1000);
 
@@ -48,76 +52,23 @@ function initViewer(geom, wingCoords, tailCoords, vtailCoords, airfoilCode, tail
   controls.dampingFactor = 0.1;
   controls.autoRotate = false;
   controls.autoRotateSpeed = 2.0;
+  controls.addEventListener('change',requestViewerFrame);
 
   wingGroup = buildWingGroup(geom, wingCoords);
   fuseGroup = buildFuselageGroup(geom, geom.fuse_type, wingCoords);
   tailGroup = buildTailGroup(geom, tailCoords, vtailCoords || tailCoords);
   scene.add(wingGroup, fuseGroup, tailGroup);
 
-  // Kamerayı ve ızgarayı modelin gerçek boyutuna göre yerleştir
   const box = new THREE.Box3().setFromObject(wingGroup).union(new THREE.Box3().setFromObject(fuseGroup)).union(new THREE.Box3().setFromObject(tailGroup));
   const sphere = box.getBoundingSphere(new THREE.Sphere());
   viewTarget.copy(sphere.center);
-  // Dar (dikey) ekranlarda yatay görüş açısı belirleyici olur
-  const halfV = THREE.MathUtils.degToRad(camera.fov / 2);
-  const halfH = Math.atan(Math.tan(halfV) * camera.aspect);
-  viewDist = sphere.radius / Math.sin(Math.min(halfV, halfH)) * 0.85;
-  setCameraDirection(HOME_VIEW);
-
-  const cell = sphere.radius > 3 ? 1 : 0.1;
-  const cells = Math.ceil(sphere.radius * 3 / cell / 2) * 2;
-  grid = makeGrid(cells * cell, cells);
-  grid.position.set(Math.round(sphere.center.x / cell) * cell, box.min.y - sphere.radius * 0.05, 0);
-  scene.add(grid);
-
-  // Modelin zemine düşen gölgesi
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(cells * cell, cells * cell),
-    new THREE.ShadowMaterial({ opacity: 0.16 })
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.copy(grid.position);
-  ground.receiveShadow = true;
-  scene.add(ground);
-  addModelLights(scene, sphere.center, sphere.radius, true);
-
-  addAxes(sphere.radius * 0.16);
+  viewDist = modelViewDistance(camera, sphere.radius);
+  setCameraDirection(MODEL_HOME_VIEW);
+  addModelLights(scene, sphere.center, sphere.radius);
 
   window.addEventListener('resize', onResize);
   viewer = { scene, camera, renderer, controls, container };
-  animate();
-}
-
-function addAxes(axLen) {
-  const makeArrow = (dir, clr, label) => {
-    const a = new THREE.ArrowHelper(new THREE.Vector3(dir[0], dir[1], dir[2]).normalize(), new THREE.Vector3(0, 0, 0), axLen, clr, axLen * 0.25, axLen * 0.12);
-    scene.add(a);
-    const s = makeTextSprite(label, clr);
-    s.scale.multiplyScalar(axLen / 0.4);
-    s.position.set(dir[0]*axLen*1.3, dir[1]*axLen*1.3, dir[2]*axLen*1.3);
-    scene.add(s);
-  };
-  makeArrow([1,0,0], 0xd9534f, 'X');
-  makeArrow([0,1,0], 0x3f9d5a, 'Y');
-  makeArrow([0,0,1], 0x3b7dd8, 'Z');
-}
-
-function makeTextSprite(text, color) {
-  const c = document.createElement('canvas');
-  c.width = 32; c.height = 32;
-  const ctx = c.getContext('2d');
-  ctx.font = 'Bold 22px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
-  ctx.fillText(text, 16, 16);
-  const tex = new THREE.CanvasTexture(c);
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-  const sprite = new THREE.Sprite(mat);
-  sprite.scale.set(0.18, 0.18, 1);
-  return sprite;
+  requestViewerFrame();
 }
 
 function rebuildFuselage(geom, wingCoords) {
@@ -127,6 +78,7 @@ function rebuildFuselage(geom, wingCoords) {
   fuseGroup = buildFuselageGroup(geom, geom.fuse_type, wingCoords);
   fuseGroup.visible = visible;
   scene.add(fuseGroup);
+  requestViewerFrame();
 }
 
 function applyWingRootCutout(sections, nCirc, geom, airfoilCoords) {
@@ -212,7 +164,6 @@ function applyWingRootCutout(sections, nCirc, geom, airfoilCoords) {
   }
 }
 
-// Toggle fuselage visibility
 function toggleFuselage() {
   if (typeof manufacturingOverlay !== 'undefined' && manufacturingOverlay) {
     const bodies=manufacturingOverlay.children.filter(m=>/^(body|hatch)(_|$)/.test(m.userData.partName||''));
@@ -226,11 +177,15 @@ function toggleFuselage() {
   document.getElementById('toggleFuse')?.setAttribute('aria-pressed', fuseGroup.visible);
 }
 
-function animate() {
-  animFrame = requestAnimationFrame(animate);
-  if (!viewerPaneVisible('three-container')) return;
-  if (controls) controls.update();
-  if (renderer && scene && camera) renderer.render(scene, camera);
+function requestViewerFrame() {
+  if(animFrame||!renderer||!viewerPaneVisible('three-container'))return;
+  animFrame=requestAnimationFrame(()=>{
+    animFrame=null;
+    if(!renderer||!viewerPaneVisible('three-container'))return;
+    controls.update();
+    renderer.render(scene,camera);
+    if(controls.autoRotate)requestViewerFrame();
+  });
 }
 
 function viewerPaneVisible(id) {
@@ -245,19 +200,20 @@ function onResize() {
   if (!c || !c.clientWidth || !c.clientHeight) return;
   camera.aspect = c.clientWidth / c.clientHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(c.clientWidth, c.clientHeight);
+  if(renderer.domElement.clientWidth!==c.clientWidth || renderer.domElement.clientHeight!==c.clientHeight)renderer.setSize(c.clientWidth,c.clientHeight);
+  requestViewerFrame();
 }
 
 function viewerSetView(axis) {
   if (!viewer) return;
-  // y: tam tepeden bakışta OrbitControls kilitlenmesin diye hafif eğik
-  const dir = { x: [-1, 0, 0], y: [0, 1, 0.001], z: [0, 0, 1] }[axis] || HOME_VIEW;
+  const dir = { x: [-1, 0, 0], y: [0, 1, 0.001], z: [0, 0, 1] }[axis] || MODEL_HOME_VIEW;
   setCameraDirection(dir);
 }
 
 function viewerToggleRotate() {
   if (!viewer) return;
   controls.autoRotate = !controls.autoRotate;
+  requestViewerFrame();
   document.getElementById('viewAutoRotate')?.setAttribute('aria-pressed', controls.autoRotate);
 }
 
@@ -265,7 +221,7 @@ function viewerReset() {
   if (!viewer) return;
   controls.autoRotate = false;
   document.getElementById('viewAutoRotate')?.setAttribute('aria-pressed', 'false');
-  setCameraDirection(HOME_VIEW);
+  setCameraDirection(MODEL_HOME_VIEW);
 }
 
 function offsetSectionInward(sec, wallM, nHalf, nPts, axis) {
@@ -384,21 +340,15 @@ function fitFuseViewerToModel() {
   fuseViewerRenderer.setSize(w, h);
 
   const box = new THREE.Box3().setFromObject(fuseViewerGroup);
-  const size = box.getSize(new THREE.Vector3());
-  const center = box.getCenter(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z) || 1;
-  const dist = maxDim * 1.6;
-
-  fuseViewerCamera.position.set(
-    center.x + dist * 0.5,
-    center.y + dist * 0.25,
-    center.z + dist
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const distance = modelViewDistance(fuseViewerCamera, sphere.radius || .1);
+  fuseViewerCamera.position.copy(sphere.center).addScaledVector(
+    new THREE.Vector3(...MODEL_HOME_VIEW).normalize(), distance
   );
-  fuseViewerControls.target.copy(center);
+  fuseViewerControls.target.copy(sphere.center);
   fuseViewerControls.update();
 }
 
-// ========== SLICED SEGMENT GENERATORS ==========
 
 function makeCapFan(verts, idxs, perimeterStart, nPts, center, outwardDir) {
   const cOff = verts.length / 3;
@@ -466,7 +416,7 @@ function addCylinder(verts, idxs, baseCenter, axis, radius, height, nRadial) {
   verts.push(baseCenter.x, baseCenter.y, baseCenter.z);
   for (let j = 0; j < nRadial; j++) {
     const jn = (j + 1) % nRadial;
-    idxs.push(botOff, start + j, start + jn);  // base: faces outward (away from wing)
+    idxs.push(botOff, start + j, start + jn);
   }
 
   const topC = baseCenter.clone().add(ax.clone().multiplyScalar(height));
@@ -524,7 +474,6 @@ function addDimple(verts, idxs, baseCenter, axis, radius, depth, nRadial) {
   }
 }
 
-// Build a single wing segment as a closed manifold mesh
 function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, wallM, capTip) {
   const halfSpan = geom.wingspan / 2;
   const rootChord = geom.root_chord;
@@ -620,7 +569,6 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
   }
 
   if (wallMeters <= 0) {
-    // Surface-only mode: makeCapFan caps
     const rootSec = secs[0];
     const rootC = new THREE.Vector3(0, 0, 0);
     for (const p of rootSec) rootC.add(p);
@@ -634,7 +582,6 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
     makeCapFan(verts, idxs, nSec * nPts, nPts, tipC, spanDir);
   }
 
-  // Holes on root cap (recess into the segment)
   if (hasHoles) {
     const yPos = yStart;
     const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
@@ -650,7 +597,6 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
     }
   }
 
-  // Pins on tip cap
   if (hasPins) {
     const yPos = yEnd;
     const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
@@ -676,7 +622,6 @@ function buildWingSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, w
   }));
 }
 
-// Build a single horizontal tail segment
 function buildHTailSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, wallM, capTip) {
   const hSpan = geom.htail_span / 2;
   const hChord = geom.htail_chord;
@@ -812,7 +757,6 @@ function buildHTailSegment(geom, coords, yStart, yEnd, sign, hasPins, hasHoles, 
   }));
 }
 
-// Build a single vertical tail segment
 function buildVTailSegment(geom, vCoords, yStart, yEnd, hasPins, hasHoles, wallM, capTip) {
   const vSpan = geom.vtail_span;
   const vChord = geom.vtail_chord;
@@ -946,11 +890,9 @@ function buildVTailSegment(geom, vCoords, yStart, yEnd, hasPins, hasHoles, wallM
   }));
 }
 
-/* ─── Fuse Viewer (Gövde sekmesi için ayrı 3D görüntüleyici) ─── */
 let fuseViewerScene, fuseViewerCamera, fuseViewerRenderer, fuseViewerControls;
-let fuseViewerGroup, fuseViewerRunning = false, fuseViewerAnimFrame;
+let fuseViewerGroup, fuseViewerRunning=false, fuseViewerAnimFrame, fuseViewerDirty=true;
 let fuseViewerWingGrid, fuseViewerTailCoords, fuseViewerVtailCoords, fuseViewerTailType;
-let fuseViewerGridHelper;
 
 function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   const container = document.getElementById('fuse-three-container');
@@ -961,7 +903,7 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   const h = container.clientHeight || 350;
 
   fuseViewerScene = new THREE.Scene();
-  fuseViewerScene.background = cssColor('--bg');
+  fuseViewerScene.background = new THREE.Color(MODEL_BACKGROUND);
 
   fuseViewerCamera = new THREE.PerspectiveCamera(40, w / h, 0.01, 100);
   fuseViewerCamera.position.set(1.5, 0.6, 1.8);
@@ -974,13 +916,11 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   fuseViewerControls = new THREE.OrbitControls(fuseViewerCamera, fuseViewerRenderer.domElement);
   fuseViewerControls.enableDamping = true;
   fuseViewerControls.dampingFactor = 0.1;
+  fuseViewerControls.addEventListener('change',requestFuseFrame);
   fuseViewerControls.target.set(0.6, 0, 0);
   fuseViewerControls.update();
 
-  addModelLights(fuseViewerScene, new THREE.Vector3(0, 0.2, 0), 1, false);
-
-  fuseViewerGridHelper = makeGrid(2, 20);
-  fuseViewerScene.add(fuseViewerGridHelper);
+  addModelLights(fuseViewerScene, new THREE.Vector3(), 1);
 
   fuseViewerGroup = new THREE.Group();
   fuseViewerScene.add(fuseViewerGroup);
@@ -989,11 +929,10 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
   fuseViewerTailCoords = tailCoords || null;
   fuseViewerVtailCoords = vtailCoords || null;
   fuseViewerTailType = tailType || 'conventional';
+  fuseViewerRunning = true;
   buildFuseViewerFuselage(geom, wingCoords);
   fitFuseViewerToModel();
-
-  fuseViewerRunning = true;
-  animateFuseViewer();
+  requestFuseFrame();
 
   function onFuseResize() {
     if (!fuseViewerRunning) return;
@@ -1001,32 +940,34 @@ function initFuseViewer(geom, wingCoords, tailCoords, vtailCoords, tailType) {
     if (!c || !c.clientWidth || !c.clientHeight) return;
     fuseViewerCamera.aspect = c.clientWidth / c.clientHeight;
     fuseViewerCamera.updateProjectionMatrix();
-    fuseViewerRenderer.setSize(c.clientWidth, c.clientHeight);
+    if(fuseViewerRenderer.domElement.clientWidth!==c.clientWidth || fuseViewerRenderer.domElement.clientHeight!==c.clientHeight)fuseViewerRenderer.setSize(c.clientWidth,c.clientHeight);
+    requestFuseFrame();
   }
   window.addEventListener('resize', onFuseResize);
   fuseViewerRenderer._onResize = onFuseResize;
 }
 
-// Gövde sekmesi ana 3D görünüm ve STL ile aynı seçili gövdeyi gösterir.
 function buildFuseViewerFuselage(geom, wingCoords) {
+  fuseViewerDirty=false;
   disposeModel(fuseViewerGroup);
   fuseViewerGroup.clear();
   const showAircraft = document.getElementById('fuseShowAircraft')?.checked;
   const production=typeof manufacturingResult!=='undefined'?manufacturingResult:null;
-  if(production?.parts?.length){
-    for(const part of production.parts){
-      if(!showAircraft&&!/^(body|hatch)(_|$)/.test(part.name))continue;
-      let geometry=new THREE.BufferGeometry();
-      geometry.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices.map(v=>v/1000),3));
-      geometry.setIndex(part.faces);geometry.computeVertexNormals();
-      if(production.manifest.fixed_vtol_body&&(part.name.startsWith('body')||/^wing_(right|left)(?:$|_\d)/.test(part.name)))geometry=creaseShellNormals(geometry);
-      const color=part.name.includes('_join_')?0x9b85c4:part.name.startsWith('hatch')?0x34424d:part.name.startsWith('body')?MODEL_COLORS.fuselage:MODEL_COLORS.airframe;
-      const mesh=new THREE.Mesh(geometry,modelMaterial(color));mesh.material.flatShading=!(part.name.startsWith('body')||/^wing_(right|left)(?:$|_\d)/.test(part.name));mesh.userData.partName=part.name;
+  if(production?.parts?.length&&manufacturingOverlay){
+    for(const original of manufacturingOverlay.children){
+      const name=original.userData.partName;
+      if(!name||(!showAircraft&&!/^(body|hatch)(_|$)/.test(name)))continue;
+      const mesh=new THREE.Mesh(original.geometry.clone(),original.material.clone());
+      mesh.userData.partName=name;
+      mesh.visible=original.visible;
+      mesh.matrixAutoUpdate=original.matrixAutoUpdate;
+      mesh.matrix.copy(original.matrix);
       fuseViewerGroup.add(mesh);
     }
+    if (!production.manifest.nose_module) addManufacturedNoseGrille(fuseViewerGroup, geom.fuselage_length);
     if(showAircraft&&['vtol','vtol5'].includes(geom.fuse_preset))addMotorHardware(fuseViewerGroup,production.manifest.motors||[]);
     if(showAircraft&&production.manifest?.vtol_joints?.length)addVtolServoHardware(fuseViewerGroup,production.manifest.vtol_joints);
-    if(showAircraft&&production.manifest?.carbon_boom)addCarbonBoomHardware(fuseViewerGroup,production.manifest.carbon_boom);
+    if(showAircraft&&production.manifest?.carbon_boom)addCarbonBoomHardware(fuseViewerGroup,production.manifest.carbon_boom,production.manifest.carbon_boom.structural);
   }else{
   fuseViewerGroup.add(buildFuselageGroup(geom, geom.fuse_type, wingCoords));
   if (showAircraft && fuseViewerWingGrid) fuseViewerGroup.add(buildWingGroup(geom, fuseViewerWingGrid));
@@ -1035,30 +976,36 @@ function buildFuseViewerFuselage(geom, wingCoords) {
   }
   }
 
-  // Modeli ızgaranın ortasına, zemine oturacak şekilde yerleştir
+  applyServiceHatchVisibility();
+
   fuseViewerGroup.position.set(0, 0, 0);
   const box = new THREE.Box3().setFromObject(fuseViewerGroup);
   const c = box.getCenter(new THREE.Vector3());
-  fuseViewerGroup.position.set(-c.x, -box.min.y, -c.z);
+  fuseViewerGroup.position.copy(c).negate();
 }
 
 function updateFuseViewer(geom, wingCoords) {
-  if (!fuseViewerRunning || !fuseViewerGroup) return;
-  buildFuseViewerFuselage(geom, wingCoords);
+  fuseViewerDirty=true;
+  if(!fuseViewerRunning||!viewerPaneVisible('fuse-three-container'))return;
+  buildFuseViewerFuselage(geom,wingCoords);
   fitFuseViewerToModel();
   if(typeof applyVtolTilt==='function')applyVtolTilt();
+  requestFuseFrame();
 }
 
-function animateFuseViewer() {
-  if (!fuseViewerRunning) return;
-  fuseViewerAnimFrame = requestAnimationFrame(animateFuseViewer);
-  if (!viewerPaneVisible('fuse-three-container')) return;
-  fuseViewerControls.update();
-  fuseViewerRenderer.render(fuseViewerScene, fuseViewerCamera);
+function requestFuseFrame() {
+  if(fuseViewerAnimFrame||!fuseViewerRenderer||!viewerPaneVisible('fuse-three-container'))return;
+  fuseViewerAnimFrame=requestAnimationFrame(()=>{
+    fuseViewerAnimFrame=null;
+    if(!fuseViewerRenderer||!viewerPaneVisible('fuse-three-container'))return;
+    fuseViewerControls.update();
+    fuseViewerRenderer.render(fuseViewerScene,fuseViewerCamera);
+  });
 }
 
 function disposeFuseViewer() {
   if (fuseViewerAnimFrame) cancelAnimationFrame(fuseViewerAnimFrame);
+  fuseViewerAnimFrame=null;
   if (fuseViewerScene) disposeViewerScene(fuseViewerScene);
   if (fuseViewerRenderer) {
     fuseViewerRenderer.dispose();
@@ -1074,6 +1021,7 @@ function disposeFuseViewer() {
 
 function disposeViewer() {
   if (animFrame) cancelAnimationFrame(animFrame);
+  animFrame=null;
   window.removeEventListener('resize', onResize);
   if (scene) disposeViewerScene(scene);
   if (renderer) {
@@ -1097,22 +1045,4 @@ function disposeViewerScene(root) {
   });
   geometries.forEach(item=>item.dispose());
   materials.forEach(item=>item.dispose());
-}
-
-function updateViewerTheme() {
-  const bg = cssColor('--bg');
-  if (scene) scene.background = bg;
-  if (fuseViewerScene) fuseViewerScene.background = bg;
-
-  const regrid = (parent, old) => {
-    const g = makeGrid(old.userData.size, old.userData.divisions);
-    g.position.copy(old.position);
-    parent.remove(old);
-    old.geometry.dispose();
-    old.material.dispose();
-    parent.add(g);
-    return g;
-  };
-  if (grid && scene) grid = regrid(scene, grid);
-  if (fuseViewerGridHelper && fuseViewerScene) fuseViewerGridHelper = regrid(fuseViewerScene, fuseViewerGridHelper);
 }

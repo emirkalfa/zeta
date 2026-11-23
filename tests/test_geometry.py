@@ -7,7 +7,7 @@ from backend.geometry import (
     calculate_control_surfaces,
     generate_wing_mesh_data,
     generate_conventional_fuselage_mesh_data,
-    generate_tail_mesh_data,
+    generate_tail_mesh_data, tail_planform,
 )
 from backend.airfoil import naca_4_digit_coordinates
 
@@ -234,7 +234,7 @@ class TestConfigPassthrough:
     @pytest.mark.parametrize('airframe',['standard','combat'])
     def test_vtail_meets_both_equivalent_area_targets(self,wing_shape,airframe):
         g=calculate_geometry(1.5,2.5,'2412',tail_type='vtail',wing_shape=wing_shape,airframe=airframe)
-        physical=(g['vtail_chord']+g['vtail_tip_chord'])*g['vtail_span']/2
+        physical=tail_planform(g['vtail_chord'],g['vtail_tip_chord'],g['vtail_span'],True)[0]
         assert physical == pytest.approx(g['vtail_surface_area'],abs=1e-6)
         assert g['htail_effective_area'] == pytest.approx(g['vtail_surface_area']*np.cos(np.radians(35))**2,abs=1e-6)
         assert g['vtail_effective_area'] == pytest.approx(g['vtail_surface_area']*np.sin(np.radians(35))**2,abs=1e-6)
@@ -250,7 +250,7 @@ class TestConfigPassthrough:
         assert g['vtail_span']==.72
         assert g['vtail_chord']==.25
         assert g['vtail_tip_chord']==.13
-        assert g['vtail_surface_area']==pytest.approx(.1368)
+        assert g['vtail_surface_area']==pytest.approx(tail_planform(.25,.13,.72,True)[0],abs=1e-6)
         assert g['vtail_sizing']=='manual'
 
     def test_manual_zero_angles_are_preserved(self):
@@ -324,7 +324,6 @@ class TestCombatAirframe:
         assert cmb["airframe"] == "combat"
         assert cmb["aspect_ratio"] < std["aspect_ratio"]
         assert cmb["fuselage_length"] < std["fuselage_length"]
-        # Kuyruk gövdenin gerisinde, bomlarla taşınır
         assert cmb["tail_x_pos"] > cmb["fuselage_length"]
         assert cmb["control_surfaces"]["aileron"]["area"] > std["control_surfaces"]["aileron"]["area"]
 

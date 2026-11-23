@@ -29,8 +29,6 @@ layouts=json.loads(run.stdout)
 def measures(p):
     a,b=np.asarray(p['root']),np.asarray(p['tip']);cr,ct=p['chord'],p['tipChord']
     eta=np.linspace(0,1,4001);ch=cr+(ct-cr)*eta
-    # Physical thin-surface area is chord times span perpendicular to chord;
-    # streamwise sweep must not be counted as extra span.
     span=math.hypot(b[1]-a[1],b[2]-a[2])
     area=float(np.trapezoid(ch,eta)*span)
     ac=float(np.trapezoid(ch*(a[0]+(b[0]-a[0])*eta+.25*ch),eta)/np.trapezoid(ch,eta))

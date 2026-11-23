@@ -2,11 +2,24 @@
 import math
 import numpy as np
 
-STATIONS=[(0,.035,.05,0),(.06,.58,.62,0),(.18,.94,.95,.04),(.30,1,1,.04),
-          (.43,.9,.85,.02),(.55,.48,.48,0),(.65,.2,.25,0),(.8,.17,.22,0),(1,.13,.18,0)]
+STATIONS=[
+    (0,.045,.065,-.13),(.024,.35,.34,-.12),(.058,.64,.54,-.09),
+    (.105,.82,.72,-.06),(.16,.96,.91,-.025),(.23,1.09,1.07,-.015),
+    (.30,1.13,1.11,-.005),(.37,1.08,1.06,-.01),(.43,.93,.90,-.015),
+    (.49,.70,.69,-.01),(.53,.55,.55,0),(.56,.42,.48,0),
+    (.65,.23,.29,0),(.80,.17,.22,0),(1,.13,.18,0),
+]
 
-PENTA_STATIONS=[(0,.20,.25,0),(.08,.52,.56,.02),(.22,.88,.92,.04),(.38,1,1,.03),
-                (.56,.95,.88,0),(.72,.78,.72,0),(.87,.57,.59,0),(1,.45,.50,0)]
+PENTA_STATIONS=[(0,.18,.22,0),(.08,.64,.63,.015),(.22,.93,.90,.025),(.38,1,1,.03),
+                (.56,.92,.94,.025),(.72,.71,.76,.015),(.87,.50,.57,.005),(1,.36,.46,0)]
+
+
+def tria_dimensions(wingspan):
+    length=round(max(.96,.9+.2*wingspan) if wingspan<=4.2
+                 else 1.74+1.68*(math.sqrt(wingspan/4.2)-1),3)
+    scale=length/1.2
+    return dict(length=length,width=.1921*scale,height=.1221*scale,
+                wing=round(.30*length,3),tail=round(.82*length,3))
 
 
 def canonical_rings(preset='vtol',geometry=None):
@@ -15,9 +28,7 @@ def canonical_rings(preset='vtol',geometry=None):
     keys=np.asarray(PENTA_STATIONS if penta else STATIONS,float);keys[:,0]*=body_length
     keys[:,1]*=width;keys[:,2:]*=height
     if penta:
-        # One monotone roof envelope, rather than compressing a rising cabin
-        # halfway along the hatch (which produced a hump and a dip).
-        keys=np.column_stack([keys,np.asarray([.25,.36,.44,.46,.44,.40,.35,.50])*height/2])
+        keys=np.column_stack([keys,np.asarray([.22,.58,.83,.94,.88,.72,.55,.46])*height/2])
     def interpolate(x,col):
         xs=keys[:,0];ys=keys[:,col];ds=np.diff(ys)/np.diff(xs)
         if x<=xs[0]:return ys[0]
@@ -37,28 +48,72 @@ def canonical_rings(preset='vtol',geometry=None):
         w=interpolate(x,1)/2;h=interpolate(x,2)/2;cy=interpolate(x,3)
         exponent=2+shape*math.sin(math.pi*x/body_length)**2
         s=np.sin(angles);c=np.cos(angles)
-        def smooth(u):
-            u=np.clip(u,0,1);return 6*u**5-15*u**4+10*u**3
-        a,b,cx,d=(.14,.28,.56,.76) if penta else (.12,.28,.43,.60)
-        t=x/body_length;roof=1-(.55 if penta else 0)*smooth((t-a)/(b-a))*(1-smooth((t-cx)/(d-cx)))
-        yy=cy+h*np.sign(s)*np.abs(s)**(2/exponent)
-        if penta:roof=interpolate(x,4)/h
-        yy=np.where(yy>cy,cy+(yy-cy)*roof,yy)
-        rings.append(np.column_stack([np.full(64,x),yy,w*np.sign(c)*np.abs(c)**(2/exponent)]))
+        vertical=np.sign(s)*np.abs(s)**(2/exponent)
+        upper=interpolate(x,4) if penta else h
+        yy=cy+vertical*np.where(vertical>0,upper,h)
+        shoulder=1
+        if not penta:
+            fade=np.clip((.56-x/body_length)/.15,0,1)
+            shoulder=1-.29*fade**2*(3-2*fade)*np.maximum(0,s)**2
+        rings.append(np.column_stack([np.full(64,x),yy,w*shoulder*np.sign(c)*np.abs(c)**(2/exponent)]))
     rings=np.asarray(rings)
     if penta and geometry:
         rings[:,:,0]*=geometry['fuselage_length']
         rings[:,:,1]*=geometry['fuselage_max_height']/.14
         rings[:,:,2]*=geometry['fuselage_max_width']/.18
         diameter=float(geometry.get('penta_motor_diameter',28))
-        # The short pod ends in the true motor's circular mounting face.
         for ring in rings:
             t=ring[0,0]/(1000*geometry['fuselage_length']);u=np.clip((t-.80)/.20,0,1)
             blend=6*u**5-15*u**4+10*u**3
             yz=ring[:,1:];r=np.linalg.norm(yz,axis=1)
             target=yz/np.maximum(r[:,None],1e-12)*diameter/2
             ring[:,1:]=yz*(1-blend)+target*blend
+    if not penta and geometry:
+        rings*=tria_dimensions(float(geometry['wingspan']))['length']/1.2
     return rings
+
+def standard_tria_nose(rings):
+    """Continue the shared Tria shell forward into a new standard nose."""
+    from backend.tria_gimbal import TRIA_GIMBAL_SEAM_FRACTION
+
+    x=rings[:,0,0]
+    seam=x[0]+TRIA_GIMBAL_SEAM_FRACTION*(x[-1]-x[0])
+    joint=int(np.argmin(abs(x-seam)))
+    rim=rings[joint,:,1:]
+    center=(rim.min(axis=0)+rim.max(axis=0))/2
+    slope=(rings[joint+1,:,1:]-rim)/(x[joint+1]-x[joint])
+    first=x[0]+.12*(seam-x[0])
+    length=seam-first
+    u=np.linspace(0,1,48,endpoint=False)**2
+    offsets=rim-center
+    span=.045+.955*np.sqrt(u*(1.55-.55*u))
+    rear_slope=.955*.225*offsets/length
+    points=center+span[:,None,None]*offsets
+    points+=length*(u*u*(u-1))[:,None,None]*(slope-rear_slope)
+    shoulder=1.30*u*(1-u)**3+.70*u*u*(1-u)**2
+    points[:,:,1]+=shoulder[:,None]*offsets[:,1]
+    ahead=x[joint+2]-seam
+    cabin_curve=2*(rings[joint+2,:,1:]-rim-ahead*slope)/ahead**2
+    nose_curve=(-.955*.600625*offsets+4*length*(slope-rear_slope))/length**2
+    nose_curve[:,1]+=1.40*offsets[:,1]/length**2
+    correction=np.clip(cabin_curve-nose_curve,-.02,.02)
+    distance=length*(1-u)
+    fade=np.maximum(0,1-distance/42)**3
+    points+=(distance**2*fade/2)[:,None,None]*correction
+    nose=np.concatenate([np.broadcast_to((first+length*u)[:,None,None],(*points.shape[:2],1)),points],axis=2)
+    result=np.concatenate([nose,rings[joint:]])
+    stations=result[:,0,0]
+    start=seam-.56*length
+    end=seam+.67*length
+    widths=np.max(np.abs(result[:,:,2]),axis=1)
+    ends=np.interp([start,end],stations,widths)
+    linear=ends[0]+(ends[1]-ends[0])*(stations-start)/(end-start)
+    t=np.clip(np.minimum(stations-start,end-stations)/(.12*length),0,1)
+    blend=t*t*(3-2*t)
+    selected=blend>0
+    result[selected,:,2]*=(1+blend[selected]*(linear[selected]/widths[selected]-1))[:,None]
+    return result
+
 
 def normalize(data):
     old=data['geometry'];g=dict(old)
@@ -67,12 +122,16 @@ def normalize(data):
     clearance=(float(o.get('motorLength',30))+float(o.get('propOffset',8))+max(40,.15*float(o.get('propDiameter',152))))/1000
     if penta:
         from backend.penta_layout import penta_layout
-        pod=penta_layout(float(old['wingspan']),float(old['root_chord']),float(o.get('motorDiameter',old.get('penta_motor_diameter',28))),clearance)
+        pod=penta_layout(float(old['wingspan']),float(old['root_chord']),
+                         float(o.get('motorDiameter',old.get('penta_motor_diameter',28))),clearance,
+                         wing_shape=None if old.get('manual_mode') else old.get('wing_shape'))
         wing_x=pod['wing'];tail_x=pod['tail']
-    else:wing_x=.36;tail_x=.984
+    else:
+        pod=tria_dimensions(float(old['wingspan']))
+        wing_x=pod['wing'];tail_x=pod['tail']
     dx=wing_x-float(old['wing_x_pos']);dt=tail_x-float(old['tail_x_pos'])
-    g.update(fuselage_length=pod['length'] if penta else 1.2,fuselage_max_width=pod['width'] if penta else .17,fuselage_max_height=pod['height'] if penta else .11,
-             wing_x_pos=wing_x,tail_x_pos=tail_x,wing_position=old.get('wing_position','mid') if penta else 'mid',fuse_type='conventional',
+    g.update(fuselage_length=pod['length'],fuselage_max_width=pod['width'],fuselage_max_height=pod['height'],
+             wing_x_pos=wing_x,tail_x_pos=tail_x,wing_position='mid',fuse_type='conventional',
              fuse_width_scale=1,fuse_height_scale=1,vtol_fixed_body=True,tail_le_spacing=tail_x-wing_x)
     for key,delta in [('wing_ac_x',dx),('htail_ac_x',dt),('vtail_ac_x',dt)]:
         if key in g:g[key]+=delta
@@ -87,4 +146,10 @@ def normalize(data):
         p={**source,'root':list(source['root']),'tip':list(source['tip'])}
         delta=dx if p['kind']=='wing' else dt
         p['root'][0]+=delta;p['tip'][0]+=delta;panels.append(p)
-    return {**data,'geometry':g,'panels':panels,'fuselage':canonical_rings('vtol5' if penta else 'vtol',g if penta else None).tolist()}
+    rings=canonical_rings('vtol5' if penta else 'vtol',g)
+    if not penta:
+        from backend.tria_gimbal import follow_gimbal_profile
+        rings=follow_gimbal_profile(rings)
+        if o.get('cameraMount')!=3:
+            rings=standard_tria_nose(rings)
+    return {**data,'geometry':g,'panels':panels,'fuselage':rings.tolist()}

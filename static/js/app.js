@@ -1,13 +1,12 @@
-/* ─── Kalıcı ayarlar (localStorage) ─── */
 const store = {
-  cache:{}, pending:{}, active:null, initialized:false,
+  cache:{}, pending:{}, active:null, initialized:false, timer:null,
   async load() {
     try {
       const res=await fetch('/api/settings');
       if(!res.ok)throw new Error('Kayıtlar okunamadı.');
       this.cache=await res.json();
       this.initialized=true;
-      for(const key of ['zeta-project','zeta-manufacturing','zeta-theme']) {
+      for(const key of ['zeta-project','zeta-manufacturing','zeta-theme','zeta-language']) {
         if(this.cache[key]===undefined) {
           const old=this.get(key);
           if(old!==null)this.set(key,old);
@@ -22,12 +21,15 @@ const store = {
     try { return localStorage.getItem(key); } catch (e) { return null; }
   },
   set(key, value) {
+    if(this.cache[key]===value)return;
     this.cache[key]=value;
-    try { localStorage.setItem(key, value); } catch (e) { /* gizli sekme vb. */ }
+    try { localStorage.setItem(key, value); } catch (e) {   }
     this.pending[key]=value;
-    if(this.initialized)this.flush().catch(()=>{});
+    clearTimeout(this.timer);
+    if(this.initialized)this.timer=setTimeout(()=>this.flush().catch(()=>{}),220);
   },
   async flush() {
+    clearTimeout(this.timer);
     if(!this.initialized)throw new Error('Kalıcı kayıt bağlantısı kurulamadı. Sayfayı yenileyin.');
     if(this.active){await this.active;return this.flush();}
     if(!Object.keys(this.pending).length)return;
@@ -49,7 +51,6 @@ const MANUAL_FIELDS = [
   'htail_span', 'htail_root', 'htail_tip', 'htail_sweep',
   'vtail_span', 'vtail_root', 'vtail_tip',
 ];
-// Varsayılan gövde biçimi: uzunluğa ve azami en/boya oranlı altı kesit
 const FUSE_DEFAULT_SHAPE = [
   { t: 0.000, w: 0.143, h: 0.111 },
   { t: 0.125, w: 0.571, h: 0.667 },
@@ -59,11 +60,11 @@ const FUSE_DEFAULT_SHAPE = [
   { t: 1.000, w: 0.057, h: 0.044 },
 ];
 const RESULT_TABS = ['results', 'viewer', 'fuse', 'charts', 'flight', 'mission', 'stl'];
-// Değeri olduğu gibi saklanıp geri yüklenen görev/güç alanları
 const MISSION_FIELDS = ['propEfficiency', 'motorPower', 'batteryWh', 'avionicsPower', 'nLimit', 'targetEndurance', 'targetTurnRate', 'targetStall'];
-// Bataryadan itkiye toplam verim (ESC · motor · pervane) için tipik değer
 const PROP_EFFICIENCY = 0.6;
 let wingPlacementRequest=0;
+let placementTimer, pendingPlacement=false, calculationActive=false;
+let chartsDirty=false, missionChartsDirty=false;
 
 const state = {
   geometry: null,
@@ -74,11 +75,11 @@ const state = {
   airfoilCoords: null,
   tailCoords: null,
   vtailCoords: null,
+  cgFuselagePercent: null,
+  legacyCgPercent: 25,
   airfoilCode: '2412',
   wallThickness: 1.2,
-  // Özgün gövde kesitleri, metre cinsinden (t: burundan uzaklık, w: genişlik, h: yükseklik)
   fuseSections: scaleFuseShape(1.2, 0.14, 0.14),
-  // Kullanıcı kesitlere dokunana kadar her hesaplamada otomatik gövde ölçülerine uydurulur
   fuseSectionsEdited: false,
   fusePreset: 'atlas',
   fuseWidthScale: 1,
@@ -138,7 +139,6 @@ function notify(message) {
   toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
 }
 
-/* ─── Sidebar / Tab System ─── */
 function switchTab(tabId) {
   document.querySelectorAll('.tab-pane').forEach(pane => {
     pane.classList.toggle('active', pane.dataset.tab === tabId);
@@ -148,7 +148,6 @@ function switchTab(tabId) {
     link.classList.toggle('active', active);
     if (active) {
       link.setAttribute('aria-current', 'page');
-      // Scroll only the navigation strip; scrollIntoView can move its ancestors.
       const nav = link.closest('#sidebar-nav');
       if (nav) {
         if (window.innerWidth <= 760) nav.scrollLeft = Math.max(0, link.parentElement.offsetLeft - nav.offsetLeft - 8);
@@ -160,11 +159,19 @@ function switchTab(tabId) {
   const content = $('content');
   if (content) content.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  // Gizliyken 0×0 ölçülen 3D sahneler görünür olunca yeniden boyutlansın
   window.dispatchEvent(new Event('resize'));
-  if (tabId === 'fuse' && typeof fitFuseViewerToModel === 'function') {
-    fitFuseViewerToModel();
+  if((tabId==='viewer'||tabId==='fuse')&&manufacturingResult&&!manufacturingOverlay){
+    showManufacturingPreview(manufacturingResult,false);
   }
+  if(tabId==='fuse'&&state.geometry) {
+    if(!fuseViewerRunning)initFuseViewer(state.geometry,state.airfoilCoords,state.tailCoords,state.vtailCoords,state.geometry.tail_type);
+    else if(fuseViewerDirty)updateFuseViewer(state.geometry,state.airfoilCoords);
+  }
+  if(tabId==='charts'&&chartsDirty&&state.polars){displayCharts(state.polars);chartsDirty=false;}
+  if(tabId==='mission'&&missionChartsDirty&&state.mission){displayMissionCharts(state.mission);missionChartsDirty=false;}
+  if(tabId==='viewer')requestViewerFrame();
+  if(tabId==='fuse')requestFuseFrame();
+
 }
 
 function enableResultTabs() {
@@ -202,7 +209,6 @@ function setupSidebar() {
   document.addEventListener('keydown', event => { if (event.key === 'Escape') hideTooltip(); });
 }
 
-/* ─── Fuselage Helpers ─── */
 function setupFuseLibrary() {
   $('fuse-preset-grid').innerHTML = Object.entries(FUSELAGE_PRESETS).map(([id, p]) =>
     `<button type="button" class="fuse-preset" data-preset="${id}" aria-pressed="false" aria-label="${p.name} gövdesi">
@@ -216,21 +222,29 @@ function setupFuseLibrary() {
     setRadio('fuse_type', 'conventional');
     if (state.geometry) state.geometry.fuse_type = 'conventional';
     if(state.fusePreset==='vtol')setRadio('tail_type','vtail');
-    if(state.fusePreset==='vtol5'){setRadio('tail_type','conventional');$('motorLayout').value='single';}
-    if(['combat','vtol','vtol5'].includes(state.fusePreset) || ['combat','vtol','vtol5'].includes(previous)) {
+    if(state.fusePreset==='vtol5'){setRadio('tail_type','conventional');$('motorLayout').value='rear';}
+    if(state.fusePreset==='akin'){setRadio('tail_type','ttail');setRadio('wing_pos','high');$('motorLayout').value='rear';}
+    if(['combat','vtol','vtol5','akin'].includes(state.fusePreset) || ['combat','vtol','vtol5','akin'].includes(previous)) {
       setRadio('mission_profile',state.fusePreset==='combat'?'competition':'general');
       updateMissionProfile();
       if(state.fusePreset==='combat' && $('motorLayout').value==='none') {
-        $('motorLayout').value='single';$('motorLayout').dispatchEvent(new Event('change'));
+        $('motorLayout').value='rear';$('motorLayout').dispatchEvent(new Event('change'));
       }
-      if(state.geometry) {await calculateAll();switchTab('fuse');return;}
+    }
+    if(state.geometry && previous!==state.fusePreset) {
+      await calculateAll();switchTab('fuse');return;
     }
     updateFuselageViews();
   }));
+  let fuselageEditFrame;
   for (const [id, prop] of [['fuseWidthScale', 'fuseWidthScale'], ['fuseHeightScale', 'fuseHeightScale']]) {
     $(id).addEventListener('input', () => {
       state[prop] = Number($(id).value) / 100;
-      updateFuselageViews();
+      if(fuselageEditFrame)return;
+      fuselageEditFrame=requestAnimationFrame(()=>{
+        fuselageEditFrame=null;
+        updateFuselageViews();
+      });
     });
   }
   $('fuseShowAircraft').addEventListener('change', () => {
@@ -257,6 +271,7 @@ function setupFuseLibrary() {
 }
 
 function syncFuseLibrary() {
+  syncMotorLayoutAvailability();
   if(typeof syncVtolPanel==='function')syncVtolPanel();
   const custom = state.fusePreset === 'custom';
   const preset = FUSELAGE_PRESETS[state.fusePreset];
@@ -272,10 +287,10 @@ function syncFuseLibrary() {
   $('fuseWidthValue').textContent = '%' + Math.round(state.fuseWidthScale * 100);
   $('fuseHeightValue').textContent = '%' + Math.round(state.fuseHeightScale * 100);
   if (state.geometry) {
-    const keys = custom ? state.fuseSections : presetFuseKeys(state.geometry, state.fusePreset);
-    const dims = [['Uzunluk', Math.max(...keys.map(s => s.t)) - Math.min(...keys.map(s => s.t))],
-      ['Azami genişlik', Math.max(...keys.map(s => s.w))], ['Azami yükseklik', Math.max(...keys.map(s => s.h))]];
-    if(state.fusePreset==='vtol')dims[0]=['Sabit ana gövde uzunluğu',.672];
+    const envelope = fuselageEnvelopeDimensions(state.geometry);
+    const dims = [['Uzunluk', envelope.length], ['Azami genişlik', envelope.width],
+      ['Azami yükseklik', envelope.height]];
+    if(state.fusePreset==='vtol')dims[0]=['Ana gövde uzunluğu',.56*state.geometry.fuselage_length];
     $('fuse-dimensions').innerHTML = dims.map(([label, value]) => `<div><dt>${label}</dt><dd>${Math.round(value * 1000)} <span>mm</span></dd></div>`).join('');
   }
 }
@@ -324,7 +339,6 @@ function renderFuseControls() {
   syncFuseControls();
 }
 
-// state.fuseSections → kaydırıcı ve sayı alanları. Kaydırıcı aralığı gövde boyutuna göre ayarlanır.
 function syncFuseControls() {
   const secs = state.fuseSections;
   const range = {
@@ -335,7 +349,6 @@ function syncFuseControls() {
   secs.forEach((sec, i) => {
     for (const { key, prop } of FUSE_PARAMS) {
       const slider = $(`sec_${i}_${key}`);
-      // Sürükleme sırasında aralık değişirse kaydırıcı elin altından kayar
       if (document.activeElement !== slider) slider.max = range[prop];
       slider.value = sec[prop];
       const input = $(`sec_${i}_${key}_inp`);
@@ -363,13 +376,15 @@ function updateFuselageViews() {
   saveProject();
 }
 
-/* ─── Init ─── */
 async function init() {
+  const refreshVisibleScenes=()=>{requestViewerFrame();requestFuseFrame();};
+  for(const event of ['change','input','click','visibilitychange'])document.addEventListener(event,refreshVisibleScenes);
   store.ready=store.load();
   await store.ready;
   setupVtol();
   setupManufacturing();
   setupTheme();
+  setupLanguage();
   setupSidebar();
   renderFuseControls();
   setupFuseLibrary();
@@ -383,6 +398,8 @@ async function init() {
     return;
   }
   restoreProject();
+  state.projectRestored=true;
+  syncMotorLayoutAvailability();
   setupProjects();
   $('saveProjectButton').addEventListener('click',async()=>{
     saveProject();
@@ -400,12 +417,13 @@ async function init() {
   window.addEventListener('pagehide',()=>{
     if(window.projectOpening)return;
     saveProject();
-    if(store.initialized)navigator.sendBeacon('/api/settings',new Blob([JSON.stringify(store.cache)],{type:'application/json'}));
+    if(store.initialized&&Object.keys(store.pending).length){
+      navigator.sendBeacon('/api/settings',new Blob([JSON.stringify(store.pending)],{type:'application/json'}));
+    }
   });
   if(store.initialized && store.get('zeta-project'))store.status('Son tasarım yüklendi. Modeli açmak için Hesapla’ya basın.');
 }
 
-// Masaüstü uygulamasında sunucu, bu sekme açık kaldığı sürece çalışır
 async function setupDesktopPresence() {
   const beat = () => fetch('/api/heartbeat', { method: 'POST' }).then(r => r.json());
   try {
@@ -413,14 +431,14 @@ async function setupDesktopPresence() {
     if (!desktop) return;
     setInterval(() => beat().catch(() => {}), 5000);
     window.addEventListener('pagehide', () => navigator.sendBeacon('/api/closing'));
-  } catch (e) { /* sunucu yanıt vermiyorsa yapılacak bir şey yok */ }
+  } catch (e) {   }
 }
 
 async function loadVersion() {
   try {
     const { version } = await fetchAPI('/api/version');
     $('appVersion').textContent = 'v' + version;
-  } catch (e) { /* sürüm etiketi zorunlu değil */ }
+  } catch (e) {   }
 }
 
 async function loadAirfoils() {
@@ -434,10 +452,33 @@ async function loadAirfoils() {
   }
 }
 
-async function fetchAirfoilCoords(code) {
-  const found = state.airfoils.find(a => a.code === code) || state.airfoils[0];
-  const data = await fetchAPI(`/api/airfoil/${found.id}`);
-  return data.coordinates;
+const airfoilRequests=new Map();
+function fetchAirfoilCoords(code) {
+  const found=state.airfoils.find(a=>a.code===code)||state.airfoils[0];
+  if(!airfoilRequests.has(found.id)){
+    airfoilRequests.set(found.id,fetchAPI(`/api/airfoil/${found.id}`).then(data=>data.coordinates).catch(error=>{
+      airfoilRequests.delete(found.id);
+      throw error;
+    }));
+  }
+  return airfoilRequests.get(found.id);
+}
+
+function setupLanguage() {
+  const toggle = $('languageToggle');
+  const apply = language => {
+    setStudioLanguage(language);
+    toggle.textContent = language === 'en' ? 'TR' : 'EN';
+    toggle.setAttribute('aria-label', language === 'en' ? 'Switch to Turkish' : 'İngilizceye geç');
+    if(state.polars)displayCharts(state.polars);
+    if(state.mission)displayMissionCharts(state.mission);
+  };
+  apply(store.get('zeta-language') === 'en' ? 'en' : 'tr');
+  toggle.addEventListener('click', () => {
+    const language = document.documentElement.lang === 'en' ? 'tr' : 'en';
+    store.set('zeta-language', language);
+    apply(language);
+  });
 }
 
 function setupTheme() {
@@ -455,13 +496,10 @@ function applyTheme() {
   $('darkToggle').querySelector('i').className = dark ? 'ph ph-sun' : 'ph ph-moon';
   $('darkToggle').setAttribute('aria-label', dark ? 'Açık temaya geç' : 'Koyu temaya geç');
   $('darkToggle').title = dark ? 'Açık temaya geç' : 'Koyu temaya geç';
-  if (typeof updateViewerTheme === 'function') updateViewerTheme();
-  // Chart.js renkleri oluşturulurken okuduğu için grafikler yeniden çizilir
   if (state.polars) displayCharts(state.polars);
   if (state.mission) displayMissionCharts(state.mission);
 }
 
-/* ─── Proje kaydı ─── */
 function restoreProject() {
   let data;
   try { data = JSON.parse(store.get('zeta-project')); } catch (e) { return; }
@@ -469,7 +507,7 @@ function restoreProject() {
   if(typeof restoreVtolSettings==='function')restoreVtolSettings(data);
   if($('projectName'))$('projectName').value=data.project_name||'';
   setRadio('mode',data.mode||'auto');
-  $('manual-inputs').hidden=(data.mode||'auto')!=='manual';
+  toggleManualCategories((data.mode||'auto')==='manual');
   for(const id of MANUAL_FIELDS)if(data.manual?.[id]!=null)$('man_'+id).value=data.manual[id];
 
   $('wingspan').value = data.wingspan;
@@ -478,11 +516,16 @@ function restoreProject() {
   if (data.tail_airfoil_code) $('htailAirfoil').value = data.tail_airfoil_code;
   if (data.vtail_airfoil_code) $('vtailAirfoil').value = data.vtail_airfoil_code;
   setRadio('wing_shape', data.wing_shape);
+  $('flightStyle').value = data.flight_style === 'calm' ? 'calm' : 'standard';
+  $('wingControls').value = data.wing_controls === 'single' ? 'single' : 'dual';
+  for(const id of CONTROL_SIZE_FIELDS) $(id).value=data[id]??'';
   setRadio('wing_pos', data.wing_position);
-  setRadio('tail_type', data.tail_type);
+  const legacyAkin = data.fuse_preset==='akin' && data.larkLayoutVersion!==2;
+  setRadio('tail_type', legacyAkin ? 'ttail' : data.tail_type);
   setRadio('fuse_type', data.fuse_type);
   if (data.reynolds) $('reynolds').value = data.reynolds;
-  if (data.cg_percent) { $('cgSlider').value = data.cg_percent; updateCGDisplay(); }
+  state.legacyCgPercent = Number.isFinite(data.cg_percent) ? data.cg_percent : 25;
+  state.cgFuselagePercent = Number.isFinite(data.cg_fuselage_percent) ? data.cg_fuselage_percent : null;
   if (data.max_alpha) $('maxAlpha').value = data.max_alpha;
   setRadio('mission_profile', data.mission_profile);
   for (const id of MISSION_FIELDS) {
@@ -508,6 +551,7 @@ function saveProject() {
   store.set('zeta-project', JSON.stringify({
     vtol:typeof vtolSettings==='function'?vtolSettings():undefined,
     vtolLayoutVersion:3,
+    larkLayoutVersion:state.fusePreset==='akin' ? 2 : undefined,
     project_name:$('projectName')?.value||'',
     mode:radioValue('mode','auto'),
     manual:Object.fromEntries(MANUAL_FIELDS.map(id=>[id,$('man_'+id).value])),
@@ -517,6 +561,8 @@ function saveProject() {
     tail_airfoil_code: $('htailAirfoil').value,
     vtail_airfoil_code: $('vtailAirfoil').value,
     wing_shape: radioValue('wing_shape', 'tapered'),
+    ...controlSizeSettings(),
+    wing_controls: $('wingControls').value, flight_style: $('flightStyle').value,
     wing_position: radioValue('wing_pos', 'mid'),
     tail_type: radioValue('tail_type', 'conventional'),
     fuse_type: radioValue('fuse_type', 'conventional'),
@@ -526,15 +572,33 @@ function saveProject() {
     fuse_section_exponent: state.fuseSectionExponent,
     fuse_sections_m: state.fuseSectionsEdited ? state.fuseSections : undefined,
     reynolds: parseInt($('reynolds').value) || 200000,
-    cg_percent: parseInt($('cgSlider').value) || 25,
+    cg_percent: state.legacyCgPercent,
+    cg_fuselage_percent: state.cgFuselagePercent,
     max_alpha: parseInt($('maxAlpha').value) || 20,
     mission_profile: radioValue('mission_profile', 'general'),
     mission: Object.fromEntries(MISSION_FIELDS.map(id => [id, $(id).value])),
   }));
 }
 
+function updateManualTailFields() {
+  const tail = radioValue('tail_type', 'conventional');
+  const linked = tail === 'conventional';
+  for (const id of ['man_htail_sweep','man_vtail_root','man_vtail_tip']) {
+    const input = $(id);
+    input.disabled = linked || (id === 'man_htail_sweep' && tail === 'ttail');
+    input.closest('.field').hidden = input.disabled;
+  }
+  $('manualTailHint').hidden = !linked;
+  for(const group of document.querySelectorAll('[data-tail-control]')) {
+    group.hidden=(group.dataset.tailControl==='ruddervator')!==(tail==='vtail');
+    for(const input of group.querySelectorAll('input'))input.disabled=group.hidden;
+  }
+}
+
 function updateMissionProfile() {
+  updateManualTailFields();
   if(radioValue('mission_profile','general')==='general' && state.fusePreset==='combat')state.fusePreset='atlas';
+  syncMotorLayoutAvailability();
   const combat=radioValue('mission_profile','general')==='competition';
   $('competition-inputs').hidden = !combat;
   const labels=combat?{conventional:'H kuyruk (ikiz fin)',ttail:'Π kuyruk (üst köprü)',vtail:'Ters V kuyruk'}:TAIL_TYPE_LABELS;
@@ -542,43 +606,106 @@ function updateMissionProfile() {
   $('tailLayoutHint').textContent=combat?'Çift bomlu modelde H, üst köprülü Π ve ters V yerleşimleri kullanılır. Π ve ters V ortasında ayrı vidalı bağlantı vardır.':'Klasik gövdede konvansiyonel, T ve V kuyruk yerleşimleri kullanılır.';
 }
 
-// Tipik bir yarışma İHA'sı için başlangıç değerleri (6S 10 Ah ≈ 222 Wh)
 function loadCompetitionPreset() {
   const values = { wingspan: 2.0, weight: 5.0, motorPower: 1200, batteryWh: 222, avionicsPower: 30, nLimit: 4 };
   for (const [id, value] of Object.entries(values)) $(id).value = value;
 }
 
-function updateCGDisplay() {
-  $('cgValue').textContent = $('cgSlider').value;
+function drawCGLayout(geom, wingX, cgX) {
+  const length = geom.fuselage_length;
+  const x = value => 20 + 278 * value / length;
+  const root = x(wingX);
+  const rootEnd = x(wingX + geom.root_chord);
+  const sweep = geom.straight_te ? geom.root_chord - geom.tip_chord
+    : geom.wingspan / 2 * Math.tan(geom.sweep_angle * Math.PI / 180);
+  const tip = x(wingX + sweep);
+  const tipEnd = x(wingX + sweep + geom.tip_chord);
+  $('cgWingPlan').setAttribute('d', `M${root} 48 L${tip} 9 L${tipEnd} 9 L${rootEnd} 48 L${tipEnd} 87 L${tip} 87 Z`);
+  $('cgPoint').setAttribute('cx', x(cgX));
+}
+
+function previewCGTarget() {
+  const geom = state.geometry;
+  const [fore, aft] = geom.cg_placement.limits;
+  const progress = (state.cgFuselagePercent - fore.cg_percent) / (aft.cg_percent - fore.cg_percent);
+  const t = Math.max(0, Math.min(1, progress));
+  const cg = (fore.cg_percent + t * (aft.cg_percent - fore.cg_percent)) * geom.fuselage_length / 100;
+  drawCGLayout(geom, fore.wing_x + t * (aft.wing_x - fore.wing_x), cg);
+  $('cgValue').textContent = `Hedef: burundan ${Math.round(cg * 1000)} mm`;
+}
+
+function updateCGDisplay(geom, requested) {
+  const balance = geom.cg_placement;
+  if (!balance) return;
+  const length = geom.fuselage_length;
+  drawCGLayout(geom, geom.wing_x_pos, balance.cg_x);
+  const slider = $('cgSlider');
+  slider.disabled = !balance.available;
+  if (requested === state.cgFuselagePercent) slider.value = 100 * balance.cg_x / length;
+  $('cgValue').textContent = `Burundan ${Math.round(1000 * balance.cg_x)} mm`;
+  document.querySelectorAll('[data-cg-option]').forEach(button => {
+    const option = balance.options[Number(button.dataset.cgOption)];
+    button.disabled = !option;
+    if (option) {
+      button.setAttribute('aria-pressed', String(Math.abs(option.wing_x - geom.wing_x_pos) < .001 &&
+                                                  state.cgFuselagePercent !== null));
+      button.title = `CG burundan ${Math.round(option.cg_percent * length * 10)} mm`;
+    }
+  });
+  $('cgPlacementStatus').textContent = balance.available
+    ? `Statik marj %${balance.static_margin.toFixed(1)} MAC · Mevcut kanat için hedef CG burundan ${Math.round(1000 * balance.recommendation_x)} mm.${balance.limited ? ' Kanat bağlantı aralığına ulaşıldı.' : ''}`
+    : 'Bu gövdede boyuna kanat konumu sabit. Şema hesaplanan CG konumunu gösterir.';
+}
+
+function toggleManualCategories(enabled) {
+  document.querySelectorAll('[data-manual-category]').forEach(section => { section.hidden = !enabled; });
+}
+
+const CONTROL_SIZE_FIELDS = ['flap','elevator','rudder','ruddervator']
+  .flatMap(surface=>['start','length','width'].map(dimension=>`${surface}_${dimension}_percent`));
+
+function controlSizeSettings(activeOnly=false) {
+  return Object.fromEntries(CONTROL_SIZE_FIELDS.filter(id=>!activeOnly||!$(id).disabled)
+    .map(id=>[id,$(id).value==='' ? null : $(id).valueAsNumber]));
 }
 
 function setupEventListeners() {
   $('paramForm').addEventListener('submit', (e) => { e.preventDefault(); calculateAll(); });
-  const recalculatePlacement=()=>{
-    if(!state.geometry)return;
-    const request=++wingPlacementRequest;
-    const previous=document.querySelector('.tab-pane.active')?.dataset.tab||'input';
-    const recalculate=async()=>{
-      if(request!==wingPlacementRequest)return;
-      if($('calculateBtn').disabled){setTimeout(recalculate,250);return;}
-      await calculateAll();if(request===wingPlacementRequest)switchTab(previous);
-    };
-    recalculate();
-  };
-  document.querySelectorAll('input[name="wing_pos"]').forEach(input=>input.addEventListener('change',recalculatePlacement));
-  for(const id of ['wingspan','weight','targetStall','motorDiameter','motorLength','propDiameter','propOffset',...MANUAL_FIELDS.filter(f=>['root_chord','tip_chord','sweep','dihedral'].includes(f)).map(f=>'man_'+f)]){
+  const geometryFields=['wingspan','weight','targetStall','airfoil','htailAirfoil','vtailAirfoil','reynolds',
+    'motorLayout','flightStyle','wingControls','triaTailVh','triaTailVv',...MANUAL_FIELDS.map(id=>'man_'+id)];
+  for(const id of geometryFields)$(id)?.addEventListener('change',recalculatePlacement);
+  document.querySelectorAll('input[name="wing_pos"],input[name="wing_shape"],input[name="tail_type"],input[name="mode"]')
+    .forEach(input=>input.addEventListener('change',recalculatePlacement));
+  for(const id of ['motorDiameter','motorLength','propDiameter','propOffset']){
     $(id)?.addEventListener('change',()=>{if(state.fusePreset==='vtol5')recalculatePlacement();});
   }
-  document.querySelectorAll('input[name="wing_shape"]').forEach(input=>input.addEventListener('change',()=>{if(state.fusePreset==='vtol5')recalculatePlacement();}));
-  $('cgSlider').addEventListener('input', updateCGDisplay);
+  let cgTimer;
+  for(const id of CONTROL_SIZE_FIELDS) $(id).addEventListener('change', recalculatePlacement);
+  $('cgSlider').addEventListener('input', event => {
+    if (!state.geometry?.cg_placement?.available) return;
+    state.cgFuselagePercent = Number(event.target.value);
+    previewCGTarget();
+    clearTimeout(cgTimer);
+    cgTimer = setTimeout(recalculatePlacement, 180);
+  });
+  document.querySelectorAll('[data-cg-option]').forEach(button => button.addEventListener('click', () => {
+    const option = state.geometry?.cg_placement?.options[Number(button.dataset.cgOption)];
+    if (!option) return;
+    clearTimeout(cgTimer);
+    state.cgFuselagePercent = option.cg_percent;
+    previewCGTarget();
+    recalculatePlacement();
+  }));
   document.querySelectorAll('input[name="mode"]').forEach(input => {
     input.addEventListener('change', () => {
-      $('manual-inputs').hidden = radioValue('mode') !== 'manual';
+      toggleManualCategories(radioValue('mode') === 'manual');
     });
   });
 
+  document.querySelectorAll('input[name="tail_type"]').forEach(input => input.addEventListener('change', updateManualTailFields));
+  updateManualTailFields();
   document.querySelectorAll('input[name="mission_profile"]').forEach(input => {
-    input.addEventListener('change', updateMissionProfile);
+    input.addEventListener('change',()=>{updateMissionProfile();recalculatePlacement();});
   });
   $('loadCompetitionPreset').addEventListener('click', loadCompetitionPreset);
 
@@ -598,21 +725,36 @@ function setupEventListeners() {
 
 }
 
-async function calculateAll() {
-  if (typeof invalidateManufacturingPreview === 'function') invalidateManufacturingPreview();
-  clearTimeout(manufacturingTimer);++manufacturingRevision;
+function recalculatePlacement() {
+  if(!state.geometry&&!calculationActive)return;
+  ++wingPlacementRequest;
+  invalidateManufacturingPreview(false);
+  pendingPlacement=true;
+  clearTimeout(placementTimer);
+  placementTimer=setTimeout(()=>{
+    if(pendingPlacement&&!calculationActive)calculateAll(true);
+  },180);
+}
+
+async function calculateAll(keepTab=false) {
+  if(calculationActive){recalculatePlacement();return;}
+  clearTimeout(placementTimer);
+  pendingPlacement=false;
+  const revision=++wingPlacementRequest;
+  invalidateManufacturingPreview(false);
   const btn = $('calculateBtn');
   showFormError('');
 
   if ($('paramForm').checkValidity && !$('paramForm').checkValidity()) {
     const invalid=$('paramForm').querySelector(':invalid');
     invalid?.closest('details')?.setAttribute('open','');
-    $('paramForm').reportValidity();return;
+    $('paramForm').reportValidity();previewStatus('Ölçüleri kontrol edin.','idle');return;
   }
   const wingspan = parseFloat($('wingspan').value);
   const weight = parseFloat($('weight').value);
   if (!(wingspan > 0) || !(weight > 0)) {
     showFormError('Kanat açıklığı ve ağırlık sıfırdan büyük olmalı.');
+    previewStatus('Ölçüleri kontrol edin.','idle');
     return;
   }
 
@@ -628,59 +770,69 @@ async function calculateAll() {
   const battery_wh = parseFloat($('batteryWh').value);
   if (!(motor_power > 0) || !(battery_wh > 0)) {
     showFormError('Motor gücü ve batarya enerjisi sıfırdan büyük olmalı.');
+    previewStatus('Motor ve batarya ayarlarını kontrol edin.','idle');
     return;
   }
   const competition = !['vtol','vtol5'].includes(state.fusePreset) && (radioValue('mission_profile', 'general') === 'competition' || state.fusePreset==='combat');
   if(competition && fuse_type!=='manual')state.fusePreset='combat';
 
   const body = {
-    wingspan, weight, airfoil_code, tail_type, fuse_type, manual_mode,
+    wingspan, weight, airfoil_code, tail_airfoil_code: tail_type === 'vtail' ? vtail_airfoil : htail_airfoil, tail_type, fuse_type, manual_mode,
     target_stall_speed: Number($('targetStall').value), reynolds_number,
+    ...controlSizeSettings(true),
     wing_shape: radioValue('wing_shape', 'tapered'),
+    wing_controls: $('wingControls').value, flight_style: $('flightStyle').value,
     wing_position: radioValue('wing_pos', 'mid'),
-    cg_percent: parseInt($('cgSlider').value) || 25,
-    // Yarışma profili ayrı bir gövde yerleşimi kullanır (çift bom, itici pervane)
+    rear_pusher: $('motorLayout').value === 'rear',
+    lark_layout: state.fusePreset==='akin',
+    fuse_preset: state.fusePreset,
+    cg_percent: state.legacyCgPercent,
+    cg_fuselage_percent: state.cgFuselagePercent,
     airframe: state.fusePreset==='vtol'?'vtol_fixed':state.fusePreset==='vtol5'?'vtol5_fixed':competition ? 'combat' : 'standard',
   };
   if(state.fusePreset==='vtol5'){body.penta_pusher_clearance=(Number($('motorLength').value)+Number($('propOffset').value)+Math.max(40,.15*Number($('propDiameter').value)))/1000;body.penta_motor_diameter=Number($('motorDiameter').value);}
   if(state.fusePreset==='vtol'){body.tria_tail_vh=Number($('triaTailVh').value);body.tria_tail_vv=Number($('triaTailVv').value);}
   if (manual_mode) {
     for (const f of MANUAL_FIELDS) {
-      const manualValue = parseFloat($('man_' + f).value);
+      const input = $('man_' + f);
+      const manualValue = input.disabled ? NaN : parseFloat(input.value);
       body['man_' + f] = Number.isFinite(manualValue) ? manualValue : undefined;
     }
   }
 
+  calculationActive=true;
   setBusy(btn, true);
   try {
-    state.airfoilCode = airfoil_code;
-    state.wallThickness = parseFloat($('wallThickness').value) || 0;
-    [state.airfoilCoords, state.tailCoords, state.vtailCoords] = await Promise.all(
-      [airfoil_code, htail_airfoil, vtail_airfoil].map(fetchAirfoilCoords)
-    );
-
-    state.geometry = await fetchAPI('/api/calculate', body);
-    [state.polars, state.stability, state.mission] = await Promise.all([
+    const [[wingCoords,tailCoords,vtailCoords],geometry] = await Promise.all([
+      Promise.all([airfoil_code,htail_airfoil,vtail_airfoil].map(fetchAirfoilCoords)),
+      fetchAPI('/api/calculate',body),
+    ]);
+    if(revision!==wingPlacementRequest)return;
+    const [polars,stability,mission] = await Promise.all([
       fetchAPI('/api/analyze', {
-        geometry: state.geometry, airfoil_code, reynolds_number,
+        geometry, airfoil_code, reynolds_number,
         max_alpha: parseInt($('maxAlpha').value) || 20,
       }),
       fetchAPI('/api/stability', {
-        geometry: state.geometry, airfoil_code, tail_airfoil_code: htail_airfoil, reynolds_number,
+        geometry, airfoil_code, tail_airfoil_code: body.tail_airfoil_code, reynolds_number,
         motor_power, prop_efficiency,
       }),
       fetchAPI('/api/mission', {
-        geometry: state.geometry, airfoil_code, reynolds_number,
+        geometry, airfoil_code, reynolds_number,
         motor_power, battery_wh, prop_efficiency,
         avionics_power: parseFloat($('avionicsPower').value) || 0,
         n_limit: parseFloat($('nLimit').value) || 4,
         targets: competition ? {
           endurance_min: parseFloat($('targetEndurance').value) || undefined,
           turn_rate_deg: parseFloat($('targetTurnRate').value) || undefined,
-          stall_speed: parseFloat($('targetStall').value) || undefined,
+          stall_speed: geometry.wing_sizing.target_stall_speed,
         } : undefined,
       }),
     ]);
+
+    if(revision!==wingPlacementRequest)return;
+    Object.assign(state,{geometry,airfoilCode:airfoil_code,airfoilCoords:wingCoords,tailCoords,vtailCoords,
+      polars,stability,mission,wallThickness:parseFloat($('wallThickness').value)||0});
 
     if (!state.fuseSectionsEdited) {
       const g = state.geometry;
@@ -698,41 +850,47 @@ async function calculateAll() {
     syncFuseLibrary();
     state.geometry.motor_mount=motorMountSettings();
     if(state.fusePreset==='vtol'){state.geometry.motor_mount={motorLayout:'none'};state.geometry.vtol=vtolSettings();}
-    if(state.fusePreset==='vtol5'){state.geometry.motor_mount.motorLayout='single';state.geometry.vtol=vtolSettings();}
+    if(state.fusePreset==='vtol5'){state.geometry.motor_mount.motorLayout='rear';state.geometry.vtol=vtolSettings();}
     syncWingPlacement(state.geometry,buildFuselageSections(state.geometry,fuse_type,state.airfoilCoords).sections);
     saveProject();
 
+    updateCGDisplay(state.geometry, body.cg_fuselage_percent);
     displayResults(state.geometry);
     displayFlightTest(state.stability);
     displayMission(state.mission);
     enableResultTabs();
 
-    // 3D sahneler boyutlarını kapsayıcıdan aldığı için sekme görünürken kurulur
-    switchTab('viewer');
-    initViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, airfoil_code, tail_type);
-
-    // Gövde sekmesi her zaman kesit (K1–K6) önizlemesini gösterir
-    switchTab('fuse');
-    initFuseViewer(state.geometry, state.airfoilCoords, state.tailCoords, state.vtailCoords, tail_type);
-
-    switchTab('charts');
-    displayCharts(state.polars);
-    switchTab('mission');
-    displayMissionCharts(state.mission);
-
-    switchTab('results');
-    scheduleManufacturingPreview();
+    initViewer(state.geometry,state.airfoilCoords,state.tailCoords,state.vtailCoords,airfoil_code,tail_type);
+    if(fuseViewerRunning){
+      fuseViewerWingGrid=state.airfoilCoords;
+      fuseViewerTailCoords=state.tailCoords;
+      fuseViewerVtailCoords=state.vtailCoords;
+      fuseViewerTailType=tail_type;
+      updateFuseViewer(state.geometry,state.airfoilCoords);
+    }
+    chartsDirty=missionChartsDirty=true;
+    const activeTab=document.querySelector('.tab-pane.active')?.dataset.tab;
+    if(!keepTab&&activeTab==='input')switchTab('results');
+    else if(activeTab==='charts'||activeTab==='mission')switchTab(activeTab);
+    scheduleManufacturingPreview(true);
   } catch (err) {
-    showFormError('Hesaplama sırasında bir hata oluştu: ' + err.message);
+    if(revision===wingPlacementRequest){
+      showFormError('Hesaplama sırasında bir hata oluştu: '+err.message);
+      previewStatus(err.message,'error');
+    }
   } finally {
-    setBusy(btn, false);
+    calculationActive=false;
+    setBusy(btn,false);
+    if(pendingPlacement){
+      clearTimeout(placementTimer);
+      placementTimer=setTimeout(()=>calculateAll(true),0);
+    }
   }
 }
 
 const WING_POSITION_LABELS = { low: 'Alçak', mid: 'Orta', high: 'Yüksek' };
 const TAIL_TYPE_LABELS = { conventional: 'Konvansiyonel', ttail: 'T-tail', vtail: 'V-tail' };
 
-// Keep measurement text separate from markup, including copied values.
 function measurementValue(value, unit = '', decimals = null) {
   const result = document.createElement('span');
   result.className = 'measurement-value num';
@@ -750,20 +908,19 @@ function measurementValue(value, unit = '', decimals = null) {
   return result;
 }
 
-function displayResults(geom) {
-  const manualFuse = geom.fuse_type === 'manual' && geom.fuse_sections;
-  const fuse = manualFuse ? {
-    length: Math.max(...geom.fuse_sections.map(s => s.t)) - Math.min(...geom.fuse_sections.map(s => s.t)),
-    width: Math.max(...geom.fuse_sections.map(s => s.w)),
-    height: Math.max(...geom.fuse_sections.map(s => s.h)),
-  } : {
-    length: geom.fuselage_length,
-    width: Math.max(...presetFuseKeys(geom, geom.fuse_preset).map(s => s.w)),
-    height: Math.max(...presetFuseKeys(geom, geom.fuse_preset).map(s => s.h)),
-  };
+function fuselageEnvelopeDimensions(geom) {
+  const {sections,totalLen} = buildFuselageSections(geom,geom.fuse_type,state.airfoilCoords);
+  const sectionSize = axis => Math.max(0,...sections.map(ring => {
+    const values=ring.map(point=>point[axis]);
+    return Math.max(...values)-Math.min(...values);
+  }));
+  return {length:totalLen||0,width:sectionSize('z'),height:sectionSize('y')};
+}
 
+function displayResults(geom) {
+  const fuse = fuselageEnvelopeDimensions(geom);
   const summary = [
-    ['Kanat alanı', geom.wing_area, 'm²', 4],
+    ['Brüt referans kanat alanı', geom.wing_area, 'm²', 4],
     ['Açıklık oranı', geom.aspect_ratio, '', 3],
     ['MAC', geom.mac, 'm', 3],
     ['Kanat yüklemesi', geom.weight / geom.wing_area, 'kg/m²', 2],
@@ -772,6 +929,11 @@ function displayResults(geom) {
   const groups = [
     ['Kanat', [
       ['Açıklık', geom.wingspan, 'm'],
+      ...(geom.wing_sizing?.flight_style === 'calm' ? [
+        ['Hedef stall hızı', geom.wing_sizing.target_stall_speed, 'm/s'],
+        ['Hedef için kanat alanı', geom.wing_sizing.required_area, 'm²'],
+        ['Mevcut alan için AR 8 açıklığı', geom.wing_sizing.glide_span_m, 'm'],
+      ] : []),
       ['Kök veter', geom.root_chord, 'm'],
       ['Uç veter', geom.tip_chord, 'm'],
       ['Daralma oranı', geom.taper_ratio, ''],
@@ -790,7 +952,7 @@ function displayResults(geom) {
       ['X pozisyonu', geom.tail_x_pos, 'm'],
       ['Kuyruk tipi', (geom.tail_booms?{conventional:'H kuyruk (ikiz fin)',ttail:'Π kuyruk (üst köprü)',vtail:'Ters V kuyruk'}:TAIL_TYPE_LABELS)[geom.tail_type] || 'Konvansiyonel', ''],
     ]],
-    [manualFuse ? 'Gövde (özgün) ve denge' : 'Gövde ve denge', [
+    [geom.fuse_type === 'manual' ? 'Gövde (özgün) ve denge' : 'Gövde ve denge', [
       ['Gövde uzunluğu', Number(fuse.length.toFixed(3)), 'm'],
       ['Gövde genişliği', Number(fuse.width.toFixed(3)), 'm'],
       ['Gövde yüksekliği', Number(fuse.height.toFixed(3)), 'm'],
@@ -831,12 +993,15 @@ function displayResults(geom) {
 
   const cs = geom.control_surfaces;
   if (cs) {
-    groups.push(['Kontrol yüzeyi alanları', [
-      ['Aileron', cs.aileron.area, 'm²'],
-      ['Flap', cs.flap.area, 'm²'],
+    const areaRow=(label,area)=>[label,Number.isFinite(area) ? Math.round(area*10000) : null,'cm²'];
+    groups.push(['Hareketli yüzey hedef alanları', [
+      ...(cs.flaperon ? [areaRow('Flaperon, iki kanat toplamı',cs.flaperon.area),
+        ...(cs.flaperon.target_area == null ? [] : [areaRow('Flaperon alan hedefi',cs.flaperon.target_area)])]
+        : [areaRow('Aileron, iki kanat toplamı',cs.aileron.area),areaRow('Flap, iki kanat toplamı',cs.flap.area)]),
       ...(geom.tail_type === 'vtail'
-        ? [['Ruddervator (iki yüzey toplam)',cs.ruddervator?.area ?? geom.vtail_surface_area*.3,'m²']]
-        : [['Elevator',cs.elevator.area,'m²'],['Rudder',cs.rudder.area,'m²']]),
+        ? [areaRow('Ruddervator (iki yüzey toplam)',cs.ruddervator?.area ?? geom.vtail_surface_area*.3)]
+        : [areaRow('İrtifa dümeni',cs.elevator.area),
+           areaRow(geom.tail_booms && geom.tail_type==='conventional' ? 'Yön dümeni, tek dikey fin' : 'Yön dümeni',cs.rudder.area)]),
     ]]);
   }
 
@@ -878,7 +1043,6 @@ const STATUS = {
   warn: { label: 'Sınırda', icon: 'ph-warning' },
   fail: { label: 'Yetersiz', icon: 'ph-x-circle' },
 };
-// Sınırlar backend/stability.py ile aynı olmalı
 const FLIGHT_CHECKS = {
   stall_speed: { label: 'Stall hızı', unit: 'm/s', limit: '15 m/s üzeri dikkat' },
   climb_rate: { label: 'Tırmanma oranı', unit: 'm/s', limit: '> 0 m/s' },
@@ -999,6 +1163,7 @@ function displayMission(m) {
   $('mission-details').innerHTML = [
     ['Stall hızı', m.stall_speed, 'm/s'],
     ['Seyir hızı', m.cruise_speed, 'm/s'],
+    ['Tahmini süzülme oranı', m.glide_ratio_estimate, ':1'],
     ['Seyirde çekilen güç', m.cruise_power, 'W'],
     ['Menzil (seyirde)', m.range_km, 'km'],
     ['Azami tırmanma', m.climb_rate, 'm/s'],

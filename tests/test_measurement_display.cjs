@@ -9,8 +9,8 @@ class Node {
 }
 function context(){
   const nodes={};const document={getElementById(id){return nodes[id]??=new Node('div');},createElement(tag){return new Node(tag);},createTextNode(text){return new Node('#text',text);}};
-  const c=vm.createContext({document,window:{addEventListener(){}}});
-  for(const file of ['fuselage.js','app.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../static/js/'+file),'utf8'),c);
+  const c=vm.createContext({THREE:require('../static/vendor/three.min.js'),document,window:{addEventListener(){}}});
+  for(const file of ['fuselage.js','stlexport.js','app.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../static/js/'+file),'utf8'),c);
   c.geom={wing_area:.3225,aspect_ratio:6.977,mac:.215,weight:4,fuselage_length:1.2,fuse_type:'manual',fuse_sections:[{t:0,w:.1,h:.1},{t:1.2,w:.15,h:.15}]};
   return {c,nodes};
 }

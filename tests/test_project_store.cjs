@@ -3,7 +3,7 @@ const fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../static/js/app.js'),'utf8');
 test('disk settings work when browser storage is unavailable; failed saves retry latest value',async()=>{
   const status={textContent:''},writes=[];let fail=false;
-  const c=vm.createContext({window:{addEventListener(){}},document:{documentElement:{dataset:{}},getElementById:()=>status},
+  const c=vm.createContext({setTimeout,clearTimeout,window:{addEventListener(){}},document:{documentElement:{dataset:{}},getElementById:()=>status},
     localStorage:{getItem(){throw Error('blocked');},setItem(){throw Error('blocked');}},
     fetch:async(url,opts)=>{if(!opts)return {ok:true,json:async()=>({'zeta-project':'saved'})};writes.push(JSON.parse(opts.body));return {ok:!fail};}});
   vm.runInContext(source,c);await vm.runInContext('store.load()',c);

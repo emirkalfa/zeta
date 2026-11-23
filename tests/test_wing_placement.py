@@ -22,8 +22,6 @@ def test_all_mounts_follow_actual_wing_height(coords,preset,position,layout):
     assert report['wing_position_offset_mm']==pytest.approx(expected['geometry']['wing_position_offset']*1000)
     for joint in report['interfaces']:
         assert (named[joint['part']]^named[joint['parent']]).volume()<.1,joint['part']
-    # The fixed fairing completes the curved-body/flat-root crescent. A small
-    # manufacturing seam remains, but there is no missing chordwise root strip.
     import manifold3d as md
     for fairing in report['wing_root_fairings']:
         spec=next(p for p in expected['panels'] if p['name']==fairing['part'])
@@ -36,7 +34,6 @@ def test_all_mounts_follow_actual_wing_height(coords,preset,position,layout):
             y=(np.interp(fraction,*upper.T)+np.interp(fraction,*lower.T))*chord/2
             probe=local_transform(md.Manifold.cube([.3]*3,center=True).translate([fraction*chord,y,z]),mat)
             assert (named['body']^probe).volume()>.025, fairing['part']+' root fairing gap'
-    # Verify the actual void, not only a channel label in the manifest.
     for channel in report['spar_channels']:
         spec=next(p for p in expected['panels'] if p['name']==channel['part'])
         mat,length=panel_frame(spec)

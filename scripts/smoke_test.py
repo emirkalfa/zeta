@@ -20,7 +20,6 @@ PORT = 5791
 BASE = f"http://127.0.0.1:{PORT}"
 ROOT = Path(__file__).resolve().parent.parent
 
-# Windows konsolu Türkçe karakterleri kodlayamayınca print çökmesin
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         _stream.reconfigure(errors="replace")
@@ -42,7 +41,6 @@ def main():
     cmd += ["--no-browser", "--desktop", "--port", str(PORT)]
 
     env = dict(os.environ, ZETA_DATA_DIR=tempfile.mkdtemp(prefix="zeta-smoke-"))
-    # CI'da FUSE olmayabilir; AppImage kendini açarak çalışsın
     env.setdefault("APPIMAGE_EXTRACT_AND_RUN", "1")
     proc = subprocess.Popen(cmd, env=env)
     try:
@@ -86,8 +84,6 @@ def main():
         mission = json.loads(request("/api/mission", {"geometry": geom, "motor_power": 1200, "battery_wh": 222})[1])
         assert mission["can_fly"]
 
-        # Optional production request captured by check_studio_ui.py verifies
-        # the real manufacturing extension and DLLs inside the frozen package.
         if len(sys.argv) > 2:
             import io, zipfile
             payload=json.loads(Path(sys.argv[2]).read_text(encoding='utf-8'))
@@ -139,7 +135,6 @@ def main():
                 assert len(content)==84+count*50
             print(f"Paketlenmiş üretim motoru: {len(report['parts'])} baskı parçası doğrulandı.",flush=True)
 
-        # Masaüstü modu: sayfa kapandı bildirimi gelince süreç kendini sonlandırmalı
         assert json.loads(request("/api/heartbeat", {})[1])["desktop"] is True
         request("/api/closing", {})
         proc.wait(timeout=30)

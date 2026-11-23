@@ -6,7 +6,7 @@ const path = require('node:path');
 const root = path.join(__dirname,'..');
 const THREE = require(path.join(root,'static/vendor/three.min.js'));
 const ctx = vm.createContext({THREE,window:{addEventListener(){}}});
-for (const f of ['assembly.js','aircraftmodel.js']) vm.runInContext(fs.readFileSync(path.join(root,'static/js',f),'utf8'),ctx);
+for (const f of ['fuselage.js','assembly.js','aircraftmodel.js']) vm.runInContext(fs.readFileSync(path.join(root,'static/js',f),'utf8'),ctx);
 const run = code => vm.runInContext(code,ctx);
 const upper = Array.from({length:77},(_,i)=>{
   const x=(1-Math.cos(Math.PI*i/76))/2;
@@ -43,14 +43,19 @@ for (const tail of ['conventional','ttail','vtail']) test(`${tail}: finite symme
   }
 });
 
-test('T stabilizer quarter-chord sits over the fin tip and mount follows it',()=>{
+test('T stabilizer passes through the lower fin with aft clearance',()=>{
   ctx.g={...base,tail_type:'ttail'};
   const panels=run('aircraftPanelSpecs(g,coords,coords,coords)');
   const fin=panels.find(p=>p.name==='tail_vertical');
   const h=panels.find(p=>p.name==='tail_horizontal_right');
-  assert(Math.abs(h.root[0]+h.chord*.25-fin.tip[0]-fin.tipChord*.25)<1e-10);
-  assert.equal(h.root[1],fin.tip[1]);
+  const finQuarter = end => fin[end][0]+.25*(end==='tip'?fin.tipChord:fin.chord);
+  assert(Math.abs(h.root[0]-Math.max(.73*finQuarter('root')+.27*finQuarter('tip')-.25*h.chord,fin.root[0]+fin.chord-.65*h.chord))<1e-10);
+  assert(Math.abs(h.root[1]-(.73*fin.root[1]+.27*fin.tip[1]))<1e-10);
   assert.equal(h.mountChordFraction,.25);
+  for (const panel of [fin,h]) {
+    assert(panel.tip[0]>panel.root[0]);
+    assert(Math.abs(panel.tip[0]+panel.tipChord-panel.root[0]-panel.chord)<1e-12);
+  }
 });
 
 for(const shape of ['rectangular','tapered','ste_tapered']) test(`${shape}: wing tip follows the requested planform`,()=>{
@@ -77,14 +82,16 @@ test('motor references follow span changes but retain physical motor dimensions'
   }
 });
 
-test('combat T-tail roots mount on each actual fin quarter chord',()=>{
+test('combat T-tail roots mount on each actual fin lower fin',()=>{
   ctx.g={...base,tail_type:'ttail',tail_booms:{y:.27}};
   const panels=run('aircraftPanelSpecs(g,coords,coords,coords)');
   for(const side of ['right','left']) {
     const fin=panels.find(p=>p.name==='tail_vertical_'+side),h=panels.find(p=>p.name==='tail_horizontal_'+side);
     assert.equal(h.parent,fin.name);
-    assert.ok(Math.abs(h.root[0]+.25*h.chord-fin.tip[0]-.25*fin.tipChord)<1e-12);
-    assert.equal(h.root[1],fin.tip[1]);assert.equal(h.root[2],fin.tip[2]);
+    const x=Math.max(.73*(fin.root[0]+.25*fin.chord)+.27*(fin.tip[0]+.25*fin.tipChord)-.25*h.chord,fin.root[0]+fin.chord-.65*h.chord);
+    assert.ok(Math.abs(h.root[0]-x)<1e-12);
+    assert(Math.abs(h.root[1]-(.73*fin.root[1]+.27*fin.tip[1]))<1e-12);
+    assert.equal(h.root[2],fin.tip[2]);
     assert.equal(h.tip[2],0);
   }
 });
@@ -93,8 +100,8 @@ test('combat V-tail retains requested physical surface span',()=>{
   const panels=run('aircraftPanelSpecs(g,coords,coords,coords)').filter(p=>p.kind==='tail');
   for(const p of panels)assert.ok(Math.abs(Math.hypot(p.tip[1]-p.root[1],p.tip[2]-p.root[2])-base.vtail_span/2)<1e-12);
 });
-test('combat single motor preview sits behind the rear firewall',()=>{
-  ctx.g={...base,tail_booms:{y:.27}};ctx.settings={motorLayout:'single',motorDiameter:28,motorLength:30,motorPattern:'cross',motorSpacingY:16,motorSpacingZ:19,motorScrew:3,motorPlate:5,propDiameter:152,propOffset:8};
+test('combat rear motor preview sits behind the rear firewall',()=>{
+  ctx.g={...base,tail_booms:{y:.27}};ctx.settings={motorLayout:'rear',motorDiameter:28,motorLength:30,motorPattern:'cross',motorSpacingY:16,motorSpacingZ:19,motorScrew:3,motorPlate:5,propDiameter:152,propOffset:8};
   const m=run('motorPreviewSpecs(g,settings,[[new THREE.Vector3(0,0,0)],[new THREE.Vector3(.75,0,0)]])[0]');
   assert.equal(m.axis[0],-1);assert.equal(m.face_mm[0],750);assert.equal(m.prop_plane_x_mm,788);
 });

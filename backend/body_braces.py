@@ -15,7 +15,6 @@ def neck_braces(parts,manifest):
     tube_region=box([tube['start_mm'][0]+1,-10000,-radius-6],[tube['body_end_mm']-1,10000,radius+6])
     aft=[(i,p) for i,p in bodies if not (p.assembled^tube_region).is_empty()]
     if not aft:return result
-    # The aft slice's incoming plane, not the left/right split, is the joint.
     seam=max(float(p.assembled.bounding_box()[0]) for _,p in aft)
     x_front=seam-18;x_aft=seam+18
     for side,zz in [('left',-spacing),('right',spacing)]:
@@ -35,9 +34,7 @@ def neck_braces(parts,manifest):
         combined=result[indices[0]].assembled+result[indices[1]].assembled
         outline=md.CrossSection.square([48,8],center=True).offset(3,circular_segments=24)
         plate=None
-        # Recess the strap inside the lower equipment cavity. Leave its
-        # outside skin smooth apart from the accessible captive-nut openings.
-        for rise in [10,12,14,16]:
+        for rise in range(10,27,2):
             bottom=max(contacts)+rise;top=bottom+4
             candidate=outline.extrude(4).rotate([-90,0,0]).translate([seam,bottom,zz])
             if (candidate^combined).volume()<.01:plate=candidate;break

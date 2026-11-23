@@ -3,21 +3,11 @@ from backend.mission import mission_performance, PARASITE_CD0
 
 _GRADE_ICONS = {'pass': "✅", 'warn': "⚠️", 'fail': "❌"}
 
-def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available=None):
-    if tail_props is None:
-        tail_props = airfoil_props
-    W = geom['weight'] * 9.81
-    S = geom['wing_area']
+def tail_stability_terms(geom, airfoil_props, tail_props):
+    """Tail contribution to neutral-point position per metre of tail arm."""
     AR = geom['aspect_ratio']
-    mac = geom['mac']
-    htail_area = geom.get('htail_effective_area',geom['htail_area'])
-    htail_arm = geom.get('effective_tail_arm',geom['htail_arm'])
-    cg = geom['cg_position']
-
-    # Cl_max
-    cl_max = airfoil_props['cl_max']
+    htail_area = geom.get('htail_effective_area', geom['htail_area'])
     cl_alpha_2d = airfoil_props['cl_alpha']
-    # Sweep correction (simple sweep theory)
     sweep_deg = geom.get('sweep_angle', 0.0)
     cl_alpha = cl_alpha_2d * np.cos(np.radians(sweep_deg))
     if cl_alpha < 0.01:
@@ -25,23 +15,96 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
 
     cl_alpha_3d = cl_alpha / (1 + cl_alpha / (np.pi * AR))
 
-    # Stall speed
+    d_epsilon_d_alpha = 2.0 * cl_alpha_3d / (np.pi * AR)
+    tail_area=geom.get('vtail_surface_area',htail_area)
+    tail_span=geom['vtail_span'] if geom.get('tail_type')=='vtail' else geom['htail_span']
+    tail_ar=tail_span**2/max(tail_area,.000001)
+    a_t_2d=tail_props['cl_alpha']
+    a_t=a_t_2d/(1+a_t_2d/(np.pi*max(tail_ar,.01)))
+    factor = htail_area / geom['wing_area'] * (a_t / cl_alpha_3d) * (1 - d_epsilon_d_alpha)
+    return factor, tail_ar, a_t
+
+
+def apply_cg_wing_placement(geom, airfoil_props, tail_props, target_percent=None):
+    """Place the wing for a stick-fixed preliminary static margin of 10% MAC."""
+    length = geom['fuselage_length']
+    mac = geom['mac']
+    wing = geom['wing_x_pos']
+    wing_ac = geom['wing_ac_x']
+    tail_ac = geom['htail_ac_x']
+    effect, _, _ = tail_stability_terms(geom, airfoil_props, tail_props)
+    target_margin = .10
+    cg = wing_ac - .25 * mac + geom['cg_position']
+
+    fore = max(0., wing - .12 * length)
+    aft = min(wing + .12 * length, geom['tail_x_pos'] - .75 * geom['root_chord'],
+              wing + tail_ac - wing_ac - .10 * mac)
+    if geom.get('tail_booms'):
+        aft = min(aft, wing + geom['tail_booms']['length'] - .08)
+    available = not geom.get('vtol_fixed_body') and aft > fore and 0 <= effect < 1
+    placements = []
+    limited = False
+    limits = []
+    if available:
+        def placement(root):
+            center = wing_ac + root - wing
+            target = center + effect * (tail_ac - center) - target_margin * mac
+            return {'wing_x': root, 'cg_percent': target * 100 / length}
+
+        limits = [placement(fore), placement(aft)]
+        placements = [placement(fore + fraction * (aft - fore)) for fraction in (.15, .50, .85)]
+        if target_percent is not None:
+            requested = target_percent * length / 100
+            goal_ac = (requested + target_margin * mac - effect * tail_ac) / (1 - effect)
+            goal = wing + goal_ac - wing_ac
+            actual = min(aft, max(fore, goal))
+            limited = abs(goal - actual) > .0005
+            shift = actual - wing
+            wing_ac += shift
+            cg = wing_ac + effect * (tail_ac - wing_ac) - target_margin * mac
+            geom.update(wing_x_pos=actual, wing_ac_x=wing_ac,
+                        cg_position=cg - (wing_ac - .25 * mac),
+                        htail_arm=tail_ac-wing_ac, effective_tail_arm=tail_ac-wing_ac,
+                        effective_vertical_tail_arm=geom['vtail_ac_x']-wing_ac,
+                        tail_le_spacing=geom['tail_x_pos']-actual)
+            if geom.get('tail_booms'):
+                boom = geom['tail_booms']
+                geom['tail_booms'] = {**boom, 'x_start': boom['x_start']+shift,
+                                     'length': boom['length']-shift}
+
+    neutral = wing_ac + effect * (tail_ac - wing_ac)
+    geom['cg_placement'] = {
+        'available': bool(available), 'limited': bool(limited),
+        'cg_x': cg, 'neutral_x': neutral, 'target_margin': 100 * target_margin,
+        'static_margin': 100 * (neutral - cg) / mac,
+        'recommendation_x': neutral - target_margin * mac,
+        'options': placements, 'limits': limits,
+    }
+
+
+def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available=None):
+    if tail_props is None:
+        tail_props = airfoil_props
+    W = geom['weight'] * 9.81
+    S = geom['wing_area']
+    AR = geom['aspect_ratio']
+    mac = geom['mac']
+    htail_arm = geom.get('effective_tail_arm',geom['htail_arm'])
+    cg = geom['cg_position']
+
+    cl_max = airfoil_props['cl_max']
     V_stall = np.sqrt(2 * W / (rho * S * cl_max))
 
-    # Optimum Cl for max range (Cl_opt = sqrt(CD_0 * pi * AR * e))
     cd_0 = airfoil_props['cd_0'] + PARASITE_CD0
     e = 0.85
     cl_opt = np.sqrt(cd_0 * np.pi * AR * e)
 
-    # Cruise speed at optimum Cl
     V_cruise = np.sqrt(2 * W / (rho * S * cl_opt))
 
-    # Cruise drag
     cd_i_opt = cl_opt**2 / (np.pi * AR * e)
     cd_cruise = cd_0 + cd_i_opt
     D_cruise = 0.5 * rho * V_cruise**2 * S * cd_cruise
 
-    # Mevcut güç: güç sistemi verilmişse ondan, yoksa 150 W/kg varsayımından
     power_avail = power_available if power_available is not None else geom['weight'] * 150
     power_req = D_cruise * V_cruise
     performance=mission_performance(geom,airfoil_props,power_avail,0,prop_efficiency=1,rho=rho)
@@ -52,24 +115,12 @@ def flight_test(geom, airfoil_props, tail_props=None, rho=1.225, power_available
     power_req=D_cruise*V_cruise
     climb_rate=performance['climb_rate']
 
-    # Static stability
-    # Downwash gradient from lifting-line theory (Anderson Eq. 6.27):
-    #   d_eps/d_alpha = 2 * a_w_3d / (pi * AR)
-    # For typical AR=5-10, this gives 0.40-0.50, not 0.5 flat.
-    v_h = (htail_area * htail_arm) / (S * mac)
-    d_epsilon_d_alpha = 2.0 * cl_alpha_3d / (np.pi * AR)
-    tail_area=geom.get('vtail_surface_area',htail_area)
-    tail_span=geom['vtail_span'] if geom.get('tail_type')=='vtail' else geom['htail_span']
-    tail_ar=tail_span**2/max(tail_area,.000001)
-    a_t_2d=tail_props['cl_alpha']
-    a_t=a_t_2d/(1+a_t_2d/(np.pi*max(tail_ar,.01)))
-    np_position = 0.25 + v_h * (a_t / cl_alpha_3d) * (1 - d_epsilon_d_alpha)
+    effectiveness, tail_ar, a_t = tail_stability_terms(geom, airfoil_props, tail_props)
+    np_position = .25 + effectiveness * htail_arm / mac
 
-    # CG at 25% MAC
     cg_percent = cg / mac
     static_margin = np_position - cg_percent
 
-    # Her kriter: (durum, mesaj). Durum 'fail' ise uçak uçamaz sayılır.
     if 0.05 <= static_margin <= 0.20:
         stability_status = "Stabil"
         stability_level = 'pass'

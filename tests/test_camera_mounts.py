@@ -15,6 +15,12 @@ def test_camera_fits_and_screw_holes_are_open(coords,preset):
     c=report['cameras'][0]
     b=c['envelope_mm']
     assert (body ^ box(b[:3],b[3:])).volume()<.02
+    lens = c['lens']
+    x, y, z = lens['point_mm']
+    assert z == 0
+    optical_path = cylinder(lens['diameter_mm'] / 2 - .1,
+                            lens['bore_end_x_mm'] - x + 1, [x - 1, y, z], [1, 0, 0], 48)
+    assert (body ^ optical_path).volume() < .001
     for h in c['holes']:
         x,y,z=h['point_mm']
         probe=cylinder(.8,8,[x,y,z-4],[0,0,1])

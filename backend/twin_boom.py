@@ -1,7 +1,7 @@
 """Printable twin boom tubes, pinned wing sockets and removable tail bridge."""
 import math
 import numpy as np
-from backend.manufacturing import box,cylinder,mesh_solid,ManufacturingError
+from backend.manufacturing import box,cylinder,mesh_solid,ManufacturingError,rounded_hatch_prism
 
 def vtail_end_fairing(g,x,y,z,radius,wall):
     """Tangent round-to-taper transition, with a closed printable aft end."""
@@ -35,30 +35,66 @@ def prepare_booms(g,assemblies,frames,cuts,wall,gap,screw,nf,nh,tail_floor_mm=No
         if g['tail_type']=='vtail':
             transition,fairing=vtail_end_fairing(g,x1,y,z,r,wall)
             tube=tube+transition
-        assemblies[name]=tube
-        frames[name]=(identity,0,'tail');cuts[name]=[]
+        purchased = g.get('fuse_preset') == 'vtol5'
+        if purchased:
+            start = min(x1-26, g['tail_x_pos']*1000-4)
+            outside = cylinder(r+3,x1-start,[start,y,z],[1,0,0])
+            socket = cylinder(r+gap/2,x1-start+1,[start-.5,y,z],[1,0,0])
+            tube = outside-socket
+            if fairing:
+                tube += transition
+        if not purchased or g['tail_type']!='conventional':
+            assemblies[name]=tube
+            frames[name]=(identity,0,'tail')
+        cuts[name]=[]
         report.append({'part':name,'parent':'wing_'+side,'center_mm':[x0,y,z],'end_x_mm':x1,
                        'outer_diameter_mm':2*r,'wall_mm':wall,'socket_length_mm':25,
                        'bolt_point_mm':[x0+12,y,z],'bolt_axis':[0,1,0],
-                       'screw_diameter_mm':screw,'nut_flat_mm':nf,'segment_spigot_mm':12,'tail_fairing':fairing})
+                       'screw_diameter_mm':screw,'nut_flat_mm':nf,'segment_spigot_mm':12,'tail_fairing':fairing,'purchased':purchased,
+                       'length_mm':x1-x0})
     if g['tail_type']=='conventional':
         x=(float(g['tail_x_pos'])+float(g['htail_chord'])*.4)*1000
         top=min(y-r-1,tail_floor_mm-wall-gap if tail_floor_mm is not None else y-r-1)
         bottom=top-max(4,2*wall)
-        # Keep a continuous spine below the real stabilizer envelope, including
-        # large chords. Root-seat cuts must not sever the boom-to-boom beam.
-        bridge=box([x-5,bottom,-by],[x+5,top,by])
-        bridge=bridge+box([x-22,bottom if tail_floor_mm is not None else y-r-4,-22],[x+22,y+6,22])
+        if tail_floor_mm is not None:
+            bridge=rounded_hatch_prism(x-5,x+5,by,2.2,bottom,top)
+            spine=rounded_hatch_prism(x-22,x+22,22,8,bottom,y+6)
+            bridge+=spine
+        else:
+            bridge=box([x-5,bottom,-by],[x+5,top,by])
+            bridge+=box([x-22,y-r-4,-22],[x+22,y+6,22])
         for sign in [1,-1]:
             z=sign*by
+            if tail_floor_mm is not None:
+                engagement = max(34., 2.2*r)
+                start = x1-engagement
+                end = x1+max(3.5,wall)
+                skin = max(4.,wall+1)
+                angles = np.arange(64)*2*math.pi/64
+                positions = np.linspace(start,end,41)
+                rings = []
+                for xx in positions:
+                    lead = np.clip((xx-start)/9,0,1)
+                    lead = lead*lead*(3-2*lead)
+                    radius = r+gap/2+skin-1.1*(1-lead)
+                    rings.append(np.column_stack([np.full(64,xx),y+radius*np.sin(angles),z+radius*np.cos(angles)]))
+                collar = mesh_solid(np.asarray(rings),rings[0][:,[1,2]])
+                web = rounded_hatch_prism(start+4,end-1,r*.80,4,bottom,y-r+1).translate([0,0,z])
+                bore = cylinder(r+gap/2,engagement+1.3,[start-1,y,z],[1,0,0])
+                entry = cylinder(r+gap/2+.7,1.8,[start-.5,y,z],[1,0,0])
+                bridge=(bridge+collar+web)-bore-entry
+                socket_report=report[0 if sign>0 else 1]
+                socket_report['tail_socket']={
+                    'part':'tail_bridge','engagement_mm':engagement,'start_x_mm':start,
+                    'socket_diameter_mm':2*r+gap,'nominal_wall_mm':skin,'closed_end':True,
+                    'retention':'bonded_full_circumference',
+                }
+                continue
             collar=cylinder(r+3,16,[x-8,y,z],[1,0,0])-cylinder(r+gap/2,18,[x-9,y,z],[1,0,0])
             drill=cylinder((screw+gap)/2,2*r+12,[x,y-r-6,z],[0,1,0])
             nut=cylinder((nf+gap)/math.sqrt(3),nh+gap,[x,y-r-3-.01,z],[0,1,0],sides=6)
-            if tail_floor_mm is not None:
-                web=box([x-5,bottom,z-8],[x+5,y-r+2,z+8])
-                web-=cylinder(r+gap/2,18,[x-9,y,z],[1,0,0])
-                bridge=bridge+web
-            bridge=(bridge+collar)-drill-nut
+            bridge=bridge+collar
+            bridge=bridge-drill-nut
             name='boom_'+('right' if sign>0 else 'left')
             cuts[name].append(drill)
         assemblies['tail_bridge']=bridge;frames['tail_bridge']=(identity,0,'tail')
@@ -72,6 +108,11 @@ def install_boom_sockets(assemblies,cuts,report,gap,screw,nf,nh):
         drill=cylinder((screw+gap)/2,2*r+14,[x+12,y-r-7,z],[0,1,0])
         nut=cylinder((nf+gap)/math.sqrt(3),nh+gap,[x+12,y-r-3-.01,z],[0,1,0],sides=6)
         if (sleeve^assemblies[parent]).volume()<1:raise ManufacturingError('Bom bağlantısı kanada ulaşmıyor; kanat/bom ölçülerini kontrol edin.')
-        assemblies[parent]=(assemblies[parent]+sleeve)-hole-drill-nut
-        cuts.setdefault(parent,[]).extend([hole,drill,nut])
-        cuts[name].append(drill)
+        if b.get('purchased'):
+            assemblies[parent]=(assemblies[parent]+sleeve)-hole
+            cuts.setdefault(parent,[]).append(hole)
+            b['bolt_point_mm']=None
+        else:
+            assemblies[parent]=(assemblies[parent]+sleeve)-hole-drill-nut
+            cuts.setdefault(parent,[]).extend([hole,drill,nut])
+            cuts[name].append(drill)

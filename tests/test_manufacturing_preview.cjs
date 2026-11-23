@@ -2,6 +2,15 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../static/js/assembly.js'),'utf8');
+test('only the control and its printed fragments rotate, never its servo cover',()=>{
+  const ctx=vm.createContext({window:{addEventListener(){}}});vm.runInContext(source,ctx);
+  const controls=vm.runInContext(`[
+    'wing_right_flaperon','wing_right_flaperon_01of02',
+    'wing_right_flaperon_01of02_split02of03','wing_right_flaperon_control_servo_cover',
+    'wing_right_aileron'
+  ].map(name=>isPrintedControl(name,{part:'wing_right_flaperon'}))`,ctx);
+  assert.deepEqual(Array.from(controls),[true,true,true,false,false]);
+});
 test('wing splice screws are included in the real-hole close-up list',()=>{
   const ctx=vm.createContext({window:{addEventListener(){}}});vm.runInContext(source,ctx);
   const result=vm.runInContext(`makeMountingDetails({wing_segment_joints:[{
@@ -14,7 +23,7 @@ test('wing splice screws are included in the real-hole close-up list',()=>{
 function setup() {
   const status={textContent:''},rendered=[];let callback;
   const ctx=vm.createContext({window:{addEventListener(){}},state:{geometry:{},version:1},scene:{},
-    $:()=>status,setTimeout:f=>{callback=f;return 1;},clearTimeout(){},
+    $:id=>id==='printed-control-areas'?null:status,setTimeout:f=>{callback=f;return 1;},clearTimeout(){},
     fetch:async()=>({ok:true,json:async()=>({parts:[],manifest:{}})}),rendered});
   vm.runInContext(source,ctx);
   vm.runInContext('manufacturingPayload=()=>({version:state.version});showManufacturingPreview=(data,focus)=>rendered.push({data,focus});',ctx);
@@ -78,7 +87,7 @@ test('3D meshes use server STL vertices and split cover visibility',()=>{
   const THREE=require('../static/vendor/three.min.js');
   const ctx=vm.createContext({THREE,window:{addEventListener(){}},scene:new THREE.Scene(),
     wingGroup:new THREE.Group(),tailGroup:new THREE.Group(),fuseGroup:new THREE.Group(),
-    $:id=>id==='serviceHatchPanel'?{}:id==='motorCoverView'?{checked:false}:null,MODEL_COLORS:{fuselage:0xaaaaaa,airframe:0xbbbbbb},
+    $:id=>['serviceHatchPanel','controlServoStatus'].includes(id)?{}:id==='motorCoverView'?{checked:false}:id.startsWith('show')?{closest:()=>({})}:null,MODEL_COLORS:{fuselage:0xaaaaaa,airframe:0xbbbbbb,control:0x325b73},
     modelMaterial:color=>new THREE.MeshBasicMaterial({color}),addMotorHardware(){}});
   vm.runInContext(source,ctx);
   ctx.data={parts:[{name:'motor_wing_right_service_cover_01of02',vertices:[0,0,0,100,0,0,0,100,0],faces:[0,1,2]}],manifest:{motors:[]}};
@@ -90,28 +99,31 @@ test('3D meshes use server STL vertices and split cover visibility',()=>{
   assert.ok(Math.abs(mesh.geometry.attributes.position.array[3]-.1)<1e-7);
   assert.equal(ctx.wingGroup.visible,false);
 });
-test('typing motor diameter updates geometry and the secondary viewer immediately',()=>{
+test('typing motor diameter updates geometry and the secondary viewer after editing pauses',()=>{
+  let diameterUpdate;
   const nodes={};const c=vm.createContext({window:{addEventListener(){}},Event:class{constructor(type){this.type=type;}},
     scene:null,wingGroup:null,tailGroup:null,fuseGroup:null,state:{geometry:{}},buildFuselageSections(){return {sections:[]};},
-    store:{get(){return null;},set(){}},clearTimeout(){},updates:0,
+    store:{get(){return null;},set(){}},setTimeout(fn){diameterUpdate=fn;return 1;},clearTimeout(){},updates:0,
     $(id){return nodes[id]??={value:id==='motorLayout'?'single':id==='motorPattern'?'cross':'28',checked:true,handlers:{},
       addEventListener(type,fn){this.handlers[type]=fn;},dispatchEvent(event){this.handlers[event.type]?.();}};}});
   vm.runInContext(source,c);vm.runInContext('updateFuseViewer=()=>updates++;setupManufacturing();',c);
-  nodes.motorDiameter.value='48';nodes.motorDiameter.handlers.input();
+  nodes.motorDiameter.value='48';nodes.motorDiameter.handlers.input();diameterUpdate();
   assert.equal(c.state.geometry.motor_mount.motorDiameter,48);
   assert.equal(c.updates,1);
 });
 
 test('control preview rotates exported pieces around the physical pin and resets the previous selection',()=>{
   const THREE=require('../static/vendor/three.min.js');
-  const nodes={serviceHatchPanel:{},controlPreviewPanel:{},controlPreviewAngle:{value:'0'},controlPreviewValue:{},
+  const nodes={serviceHatchPanel:{},controlServoStatus:{},motorCoverView:{checked:true},controlPreviewPanel:{},controlPreviewAngle:{value:'0'},controlPreviewValue:{},
+    showFrontHatch:{closest:()=>({})},showRearHatch:{closest:()=>({})},showNoseVentCover:{closest:()=>({})},
     controlPreviewSelect:{value:'',replaceChildren(){this.value='';},append(o){if(!this.value)this.value=o.value;}}};
   const ctx=vm.createContext({THREE,window:{addEventListener(){}},document:{createElement:()=>({})},
     scene:new THREE.Scene(),wingGroup:new THREE.Group(),tailGroup:new THREE.Group(),fuseGroup:new THREE.Group(),
-    $:id=>nodes[id]||null,MODEL_COLORS:{fuselage:0xaaaaaa,airframe:0xbbbbbb},
+    $:id=>nodes[id]||null,MODEL_COLORS:{fuselage:0xaaaaaa,airframe:0xbbbbbb,control:0x325b73},
     modelMaterial:color=>new THREE.MeshBasicMaterial({color}),addMotorHardware(){}});
   vm.runInContext(source,ctx);
   ctx.data={parts:[{name:'wing_right_flap',vertices:[100,0,0,100,10,0,110,0,0],faces:[0,1,2]},
+    {name:'wing_right_flap_control_servo_cover',vertices:[100,0,0,100,10,0,110,0,0],faces:[0,1,2]},
     {name:'tail_horizontal_right_elevator',vertices:[100,0,0,100,10,0,110,0,0],faces:[0,1,2]}],
     manifest:{motors:[],controls:[{part:'wing_right_flap',parent:'wing_right',kind:'flap',hinge_point_mm:[50,0,0],hinge_axis:[0,0,1],travel_deg:[-25,25]},
       {part:'tail_horizontal_right_elevator',parent:'tail_horizontal_right',kind:'elevator',hinge_point_mm:[50,0,0],hinge_axis:[0,0,1],travel_deg:[-25,25]}]}};
@@ -119,6 +131,7 @@ test('control preview rotates exported pieces around the physical pin and resets
   nodes.controlPreviewAngle.value='25';vm.runInContext('applyControlPreviewAngle()',ctx);
   const mesh=vm.runInContext('manufacturingOverlay.children[0]',ctx);
   const p=new THREE.Vector3(.1,0,0).applyMatrix4(mesh.matrix);
+  assert.ok(vm.runInContext('manufacturingOverlay.children[1].matrix.equals(new THREE.Matrix4())',ctx));
   assert.ok(Math.abs(p.x-(.05+.05*Math.cos(25*Math.PI/180)))<1e-8);
   assert.ok(Math.abs(p.y-.05*Math.sin(25*Math.PI/180))<1e-8);
   assert.equal(nodes.controlPreviewValue.textContent,'25°');
@@ -150,9 +163,10 @@ test('detail focus isolates the physical mating parts and restore returns origin
   const body=add('body_01of02'),wing=add('wing_right'),tail=add('tail_horizontal_right');scene.add(overlay);
   const camera=new THREE.PerspectiveCamera(40,1,.01,100),controls={target:new THREE.Vector3(),autoRotate:false,update(){}};
   const ctx=vm.createContext({THREE,window:{addEventListener(){}},document:{createElement:()=>({})},scene,camera,controls,manufacturingResult:{},
-    viewTarget:new THREE.Vector3(),viewDist:4,HOME_VIEW:[1,1,1],setCameraDirection(dir){camera.position.copy(ctx.viewTarget).add(new THREE.Vector3(...dir).normalize().multiplyScalar(ctx.viewDist));controls.target.copy(ctx.viewTarget);controls.update();},
+    viewTarget:new THREE.Vector3(),viewDist:4,setCameraDirection(dir){camera.position.copy(ctx.viewTarget).add(new THREE.Vector3(...dir).normalize().multiplyScalar(ctx.viewDist));controls.target.copy(ctx.viewTarget);controls.update();},
     $:id=>nodes[id]||null});
   vm.runInContext(source,ctx);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../static/js/aircraftmodel.js'),'utf8'),ctx);
   vm.runInContext('setupMountingDetails({interfaces:[{part:"wing_right",parent:"body",bolt_point_mm:[20,0,10],bolt_axis:[0,1,0]}]})',ctx);
   vm.runInContext('manufacturingOverlay=window._overlay;camera=window._camera;controls=window._controls',Object.assign(ctx,{window:Object.assign(ctx.window,{_overlay:overlay,_camera:camera,_controls:controls})}));
   vm.runInContext('focusMountingDetail()',ctx);

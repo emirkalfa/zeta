@@ -41,14 +41,12 @@ def install_vtol(body, assemblies, data, outer, gap, cuts):
     half=r+3;wall=5;journal=pin/2+5
     pieces=[];motors=[];joints=[];obstacles=[]
     holes=[[-spacing_x/2,0],[spacing_x/2,0],[0,-spacing_z/2],[0,spacing_z/2]]
-    moving_template=cylinder(r,10,[0,5,0],[0,1,0])
+    face_offset = max(15, 45-length)
+    moving_template=cylinder(r,face_offset-5,[0,5,0],[0,1,0])
     for xx,zz in holes:
-        moving_template-=cylinder((screw+gap)/2,11,[xx,5,zz],[0,1,0])
-    moving_template-=cylinder((bore+gap)/2,11,[0,5,0],[0,1,0])
-    # A supported pivot sleeve transmits load; a metal servo horn drives its hub.
+        moving_template-=cylinder((screw+gap)/2,face_offset-4,[xx,5,zz],[0,1,0])
+    moving_template-=cylinder((bore+gap)/2,face_offset-4,[0,5,0],[0,1,0])
     moving_template+=cylinder(journal,2*half+wall+gap+7,[0,0,-half],[0,0,1])
-    # Rounded, wider webs join the bearing sleeve to the motor plate.
-    # They stay within the original Z envelope and keep the metal pin bore.
     web=md.CrossSection.square([18,14],center=True).offset(2,circular_segments=24).extrude(6).translate([0,6,0])
     for z in [-half,half-6]:
         moving_template+=web.translate([0,0,z])
@@ -73,9 +71,6 @@ def install_vtol(body, assemblies, data, outer, gap, cuts):
             raise ManufacturingError('VTOL: ön pervaneler birbirine çok yakın. Motorları kanatta dışarı taşıyın veya pervane çapını azaltın.')
         transform=np.column_stack([np.diag([1,1,side]),pivot])
         world=lambda solid:solid.transform(transform.tolist())
-        # Beam is integral to the wing. A separate fork bolts to its front pad.
-        # Flat screw landing retained; a C2 tapered, rounded load path
-        # widens into the wing instead of ending in a rectangular cantilever.
         end_x=forward+chord*.32
         landing=md.CrossSection.square([16,30],center=True).offset(3,circular_segments=24)
         beam=landing.extrude(14).rotate([-90,0,0]).translate([20,-height-9,0])
@@ -83,7 +78,6 @@ def install_vtol(body, assemblies, data, outer, gap, cuts):
         for xx in np.linspace(26,end_x,25):
             u=(xx-26)/(end_x-26);blend=6*u**5-15*u**4+10*u**3
             hz=18+27*blend;hy=7
-            # Match the pad height at the nose; deepen toward the wing skin.
             cy=-height-2
             vy=np.sign(np.sin(angles))*np.abs(np.sin(angles))**.5
             vz=np.sign(np.cos(angles))*np.abs(np.cos(angles))**.5
@@ -102,17 +96,14 @@ def install_vtol(body, assemblies, data, outer, gap, cuts):
             for zz in [-9,9]:
                 cutter=cylinder((3+gap)/2,24,[xx,foot_y-15,zz],[0,1,0])
                 fork-=cutter;beam-=cutter
-                # underside-accessible M3 nut pockets, intersect the through bores
                 beam-=cylinder((5.5+gap)/math.sqrt(3),2.7,[xx,foot_y-14,zz],[0,1,0],sides=6)
                 fixed_holes.append((pivot+np.array([xx,foot_y,side*zz])).tolist())
-        # Side-mounted servo chamber aligned with the pivot, plus a removable lid.
         sx=servo_x/2-servo_offset;sz=lever_z+4+gap+4
         chamber_min=min(foot_y-4,-servo_y/2-4)
         tray=box([sx-servo_holes/2-5,chamber_min,sz],[sx+servo_holes/2+5,servo_y/2+4,sz+servo_z+6])
         cavity=box([-servo_offset-gap/2,-servo_y/2-gap/2,sz+3],[servo_x-servo_offset+gap/2,servo_y/2+gap/2,sz+servo_z+7])
         tray-=cavity
         tray-=cylinder(journal+1,5,[0,0,sz-1],[0,0,1])
-        # Cable outlet opens into the service chamber and under the module.
         tray-=box([sx-3,chamber_min-1,sz+4],[sx+3,-servo_y/2+1,sz+10])
         cover_z=sz+servo_z+6+gap
         cover=box([sx-servo_holes/2-5,chamber_min,cover_z],[sx+servo_holes/2+5,servo_y/2+4,cover_z+3])
@@ -131,7 +122,6 @@ def install_vtol(body, assemblies, data, outer, gap, cuts):
             tray-=cylinder(1.2,5,[xx,0,sz-1],[0,0,1])
             servo_mount_holes.append((pivot+[xx,0,side*sz]).tolist())
         fork+=tray+box([-9,foot_y-4,half+gap],[sx+servo_holes/2+5,foot_y+.5,sz+4])
-        # Hollow fairing integrates the servo bank into the wing projection.
         shroud_rings=[];inner_rings=[]
         angles=np.linspace(0,2*math.pi,64,endpoint=False)
         start_x=sx-servo_holes/2-7;end_x=forward+chord*.32
@@ -160,13 +150,9 @@ def install_vtol(body, assemblies, data, outer, gap, cuts):
             beam_seat+=beam.translate(shift)
         fixed=world(fork)-wing_envelope-world(beam_seat)
         assemblies[spec['name']]+=world(beam)
-        # Keep prior spar channels open after the beam union.
         for cutter in cuts.get(spec['name'],[]):assemblies[spec['name']]-=cutter
         pieces.extend([Part(name+'_fork',fixed,family='wing'),Part(name+'_cradle',moving,family='wing'),Part(name+'_servo_cover',world(cover),family='wing')])
-        # Every checked moving mesh is contained in this conservative cube.
-        # Clip the stationary airframe once instead of intersecting both
-        # complete hollow wings at each of the 23 tilt positions.
-        reach=prop/2+length+max(r,lever_z+4)+40
+        reach=prop/2+length+face_offset+max(r,lever_z+4)+25
         vicinity=box(pivot-reach,pivot+reach)
         collision_airframe=(all_airframe+world(beam))^vicinity
         collision_prop=(collision_airframe+fixed)^vicinity
@@ -175,32 +161,31 @@ def install_vtol(body, assemblies, data, outer, gap, cuts):
             if (rotated^fork).volume()>.1:
                 raise ManufacturingError('VTOL: döner taşıyıcı sabit çatala çarpıyor; pivot/servo ölçülerini kontrol edin.')
             theta=math.radians(angle);axis=np.array([-math.sin(theta),math.cos(theta),0])
-            motor_envelope=cylinder(diameter/2,length,pivot+axis*15,axis)
+            motor_envelope=cylinder(diameter/2,length,pivot+axis*face_offset,axis)
             if (motor_envelope^fixed).volume()>.1:
                 raise ManufacturingError('VTOL: motor kasası sabit taşıyıcıya çarpıyor. Motor çapını ve taşıyıcı ölçülerini kontrol edin.')
             if ((world(rotated)+motor_envelope)^collision_airframe).volume()>.1:
                 raise ManufacturingError('VTOL: motor veya döner taşıyıcı kanada çarpıyor. Kanat önünden uzaklığı veya ön taşıyıcı yüksekliğini artırın.')
-            center=pivot+axis*(15+length+8)
+            center=pivot+axis*(face_offset+length+8)
             disk=cylinder(prop/2,2,center-axis,axis)
             if (disk^collision_prop).volume()>.1:
-                raise ManufacturingError('VTOL: pervane hareketi uçakla çakışıyor. Ön uzaklık, yükseklik veya motor konumunu artırın.')
-        face=(pivot+[0,15,0]).tolist()
+                obstacle = 'sabit çatal' if (disk^fixed).volume()>.1 else 'kanat veya gövde'
+                side_label = 'sağ' if side>0 else 'sol'
+                hint = 'Pervane çapını veya motor ölçülerini değiştirin.' if obstacle=='sabit çatal' else 'Ön uzaklığı, yüksekliği veya motor konumunu artırın.'
+                raise ManufacturingError(f'Tria: {side_label} ön pervane {angle}° konumunda {obstacle} ile çakışıyor. {hint}')
+        face=(pivot+[0,face_offset,0]).tolist()
         motors.append(dict(name=name,parent=name+'_cradle',face_mm=face,out_axis=[0,1,0],motor_diameter_mm=diameter,motor_length_mm=length,prop_diameter_mm=prop,
-            prop_center_mm=(pivot+[0,15+length+8,0]).tolist(),hole_points_mm=[(pivot+[xx,15,side*zz]).tolist() for xx,zz in holes],hole_diameter_mm=screw+gap,center_bore_mm=bore+gap))
+            prop_center_mm=(pivot+[0,face_offset+length+8,0]).tolist(),motor_face_offset_mm=face_offset,hole_points_mm=[(pivot+[xx,face_offset,side*zz]).tolist() for xx,zz in holes],hole_diameter_mm=screw+gap,center_bore_mm=bore+gap))
         joints.append(dict(part=name+'_cradle',parent=name+'_fork',wing=spec['name'],pivot_mm=pivot.tolist(),axis=[0,0,1],range_deg=[-20,90],pin_diameter_mm=pin,hole_diameter_mm=pin+gap,
-            mechanism='compact_direct_servo',wing_support='rounded_tapered',wing_support_width_mm={'landing':36,'root':90},motor_plate_thickness_mm=10,wing_pad_thickness_mm=14,journal_diameter_mm=journal*2,bolt_points_mm=fixed_holes,
+            mechanism='compact_direct_servo',wing_support='rounded_tapered',wing_support_width_mm={'landing':36,'root':90},motor_plate_thickness_mm=face_offset-5,wing_pad_thickness_mm=14,journal_diameter_mm=journal*2,bolt_points_mm=fixed_holes,
             horn_holes_mm=[(pivot+[xx,yy,side*(lever_z+4)]).tolist() for xx,yy in horn_holes],horn_screw_mm=horn_screw,
             servo_mount_holes_mm=servo_mount_holes,cover_holes_mm=service_holes,cover_part=name+'_servo_cover',
             servo_center_mm=(pivot+[sx,0,side*(sz+3+servo_z/2)]).tolist(),servo_output_axis=[0,0,-side],servo_mm=[servo_x,servo_y,servo_z]))
 
-    # Rear motor clamps directly around the purchased carbon tube.
     tube=data['carbon_boom']
     tube_r=tube['outer_diameter_mm']/2;roof=tube_r
     ry=roof+rear_height
     span=r+12
-    # Position inside the genuinely exposed tube bay, with space for the
-    # clamp AND the propeller. A percent of the virtual fuselage length
-    # could put the rear motor inside the enlarged center-wing fairing.
     aft=float(body.bounding_box()[3])
     tail_front=min(float(p['root'][0])*1000 for p in data['panels'] if p['kind']=='tail')
     minimum=max(aft+span+15,aft+prop/2+15)
@@ -222,7 +207,6 @@ def install_vtol(body, assemblies, data, outer, gap, cuts):
         zz=side*flange_z
         top+=box([rx-span,split+gap/2,zz-10],[rx+span,split+7,zz+10])
         lower+=box([rx-span,split-7,zz-10],[rx+span,split-gap/2,zz+10])
-        # Two tenons locate the saddle independently of bolt clearance.
         key=box([rx-4,split-3,zz-3],[rx+4,split+2,zz+3])
         slot=box([rx-4-gap/2,split-3-gap/2,zz-3-gap/2],[rx+4+gap/2,split+1,zz+3+gap/2])
         top+=key;lower-=slot
@@ -232,11 +216,7 @@ def install_vtol(body, assemblies, data, outer, gap, cuts):
             lower-=cylinder((5.5+gap)/math.sqrt(3),2.7,[xx,split-7,zz],[0,1,0],sides=6)
             clamp_bolts.append([xx,split+7,zz])
     top-=clearance;lower-=clearance
-    # Broad dorsal saddle and two full-width walls form an open service portal.
-    # The saddle follows the actual body skin; the central bay remains accessible
-    # from either side for a screwdriver and the motor wiring.
     saddle=top+box([rx-r-8,roof-5,-14],[rx+r+8,roof+4,14])
-    # Flared and rounded webs spread plate loads into the wide tube saddle.
     stem=md.Manifold()
     for side in [-1,1]:
         polygon=[[rx+side*(r+4),roof-5],[rx+side*(r-12),roof-5],

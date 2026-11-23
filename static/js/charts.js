@@ -1,6 +1,5 @@
 const charts = {};
 
-// Her grafik: kapsayıcı id'si, eksenler ve polars verisinden nokta + özet üreten fonksiyon
 const CHART_DEFS = [
   {
     id: 'ClAlpha', title: 'Kaldırma eğrisi', x: 'α (°)', y: 'CL',
@@ -12,7 +11,6 @@ const CHART_DEFS = [
   {
     id: 'CdCl', title: 'Sürükleme poları', x: 'CD', y: 'CL',
     build(p) {
-      // Stall sonrası sürükleme artışı ekseni ezdiği için yalnızca stall öncesi noktalar çizilir
       const points = p.cd_vs_cl.filter(d => !d.stalled);
       return { points, note: `CD min ${fmt(Math.min(...points.map(d => d.x)))} · stall öncesi` };
     },
@@ -43,7 +41,6 @@ function maxBy(arr, fn) {
   return arr.reduce((best, d) => (fn(d) > fn(best) ? d : best), arr[0]);
 }
 
-// Anlamlı basamak sayısını koruyan kısa sayı biçimi (0.0123 → "0.0123", 12.07 → "12.07")
 function fmt(v) {
   if (v === 0) return '0';
   const abs = Math.abs(v);
@@ -72,7 +69,6 @@ function displayCharts(polars) {
   }
 }
 
-// Görev sayfası: dönüş hızı ve güç eğrileri
 function displayMissionCharts(mission) {
   const theme = chartTheme();
   document.getElementById('noteTurn').textContent =
@@ -90,12 +86,11 @@ function displayMissionCharts(mission) {
   ], theme);
 }
 
-// series: [{ points, label?, secondary? }]: ikincil seriler nötr renkte ve kesikli çizilir
 function createLineChart(canvasId, def, series, theme) {
   if (charts[canvasId]) charts[canvasId].destroy();
 
   const axis = (label) => ({
-    title: { display: true, text: label, color: theme.text },
+    title: { display: true, text: studioLabel(label), color: theme.text },
     grid: { color: theme.grid },
     border: { color: theme.grid },
     ticks: { color: theme.text, font: { family: theme.font, size: 11 } },
@@ -105,7 +100,7 @@ function createLineChart(canvasId, def, series, theme) {
     type: 'scatter',
     data: {
       datasets: series.map(({ points, label, secondary }) => ({
-        label,
+        label:studioLabel(label),
         data: points,
         showLine: true,
         borderColor: secondary ? theme.text : theme.line,

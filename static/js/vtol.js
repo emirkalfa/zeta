@@ -17,7 +17,6 @@ function vtolSettings(){return Object.fromEntries(Object.keys(VTOL_FIELDS).map(i
 function restoreVtolSettings(project){
   for(const [id,def] of Object.entries(VTOL_FIELDS)){
     let value=project.vtol?.[id]??def[1];
-    // Migrate only the former default; keep explicitly saved newer/custom values.
     if(id==='vtolForward'&&!project.vtolLayoutVersion&&Number(value)===150)value=75;
     if(id==='vtolHeight'&&(project.vtolLayoutVersion??0)<2&&Number(value)===60)value=25;
     if(id==='vtolRearStation'&&(project.vtolLayoutVersion??0)<3)value=50;
@@ -43,7 +42,6 @@ function setupVtol(){
     fieldHost.append(card);
   }
   const form=$('paramForm'),actions=form.querySelector('.form-actions');
-  const configuration=$('lblTailType').closest('.form-section');configuration.classList.add('configuration-card');configuration.after($('vtolSettingsPanel'));
   const notice=document.createElement('details');notice.className='settings-card analysis-scope';
   notice.innerHTML='<summary>Analiz kapsamı</summary>';notice.append($('vtolAnalysisNotice'));$('vtolSettingsPanel').append(notice);
   const save=$('saveProjectButton').closest('.form-section');
@@ -54,7 +52,7 @@ function setupVtol(){
     state.fusePreset=['vtol','vtol5'].includes($('aircraftFamily').value)?$('aircraftFamily').value:'atlas';
     setRadio('fuse_type','conventional');setRadio('mission_profile','general');
     if(state.fusePreset==='vtol')setRadio('tail_type','vtail');
-    if(state.fusePreset==='vtol5'){setRadio('tail_type','conventional');$('motorLayout').value='single';}
+    if(state.fusePreset==='vtol5'){setRadio('tail_type','conventional');$('motorLayout').value='rear';}
     syncFuseLibrary();saveProject();
     if(state.geometry)await calculateAll();
   });
@@ -69,9 +67,10 @@ function syncVtolPanel(){
   if(!$('aircraftFamily'))return;
   const quad=state.fusePreset==='vtol5',active=quad||state.fusePreset==='vtol';$('aircraftFamily').value=active?state.fusePreset:'standard';
   const fixed=active;
-  for(const input of document.querySelectorAll('input[name="wing_pos"]'))input.disabled=state.fusePreset==='vtol';
+  for(const input of document.querySelectorAll('input[name="wing_pos"]'))input.disabled=fixed||state.fusePreset==='akin';
   for(const input of document.querySelectorAll('input[name="fuse_type"]'))input.disabled=fixed;
-  if(state.fusePreset==='vtol')setRadio('wing_pos','mid');
+  if(fixed)setRadio('wing_pos','mid');
+  else if(state.fusePreset==='akin')setRadio('wing_pos','high');
   if(fixed){setRadio('fuse_type','conventional');state.fuseWidthScale=1;state.fuseHeightScale=1;}
   $('fuseCustomBtn').hidden=fixed;
   $('vtolSettingsPanel').hidden=!active;$('vtolAnalysisNotice').hidden=!active;
@@ -85,10 +84,13 @@ function syncVtolPanel(){
   }
   $('motorLayout').closest('.field').hidden=quad;
   $('motorStation').closest('.field').hidden=quad;
-  if(quad)$('motorLayout').value='single';
+  if(quad)$('motorLayout').value='rear';
   $('vtolSettingsTitle').textContent=quad?'Penta VTOL kaldırma motorları':'Tria VTOL özel ayarları';
-  $('vtolSettingsDescription').textContent=quad?'Kanat açıklığı, veter ve motor ölçüsüne otomatik uyarlanan kısa gövde. Üst, orta ve alt kanat konumu seçilebilir; dört kaldırma motorunun bağlantıları kanadı takip eder. Bu ölçüler dört kaldırma motoruna uygulanır; arkadaki beşinci itici motorun ölçülerini BLDC bölümünden gir. Çift bom ve ikiz finli yatay kuyruk otomatik oluşturulur.':'Sabit gövde ve orta kanat yuvası. Gövde oranları ve kanat yüksekliği değiştirilemez. İki bağımsız döner ön motor, bir sabit dikey arka motor; donanım ölçüleri ayarlanabilir.';
+  $('vtolSettingsDescription').textContent=quad?'Kanat açıklığı, veter ve motor ölçüsüne otomatik uyarlanan kısa gövde. Kanat gövde orta hattında sabittir. Ön motorlar kısa taşıyıcılara, arka motorlar karbon boru kelepçelerine oturur. Bu ölçüler dört kaldırma motoruna uygulanır; arkadaki beşinci itici motorun ölçülerini BLDC bölümünden gir. Çift bom ve ikiz finli yatay kuyruk otomatik oluşturulur.':'Tria gövdesi kanat açıklığına göre boyutlanır. Kanat yuvası gövde orta hattındadır. İki bağımsız döner ön motor ve bir sabit dikey arka motor bulunur.';
   $('vtolMechanismInfo').hidden=quad;
+  document.querySelector('label[for="motorPower"]').textContent = quad
+    ? 'Arka itici motorun elektrik gücü'
+    : active ? 'İki ön motorun toplam ileri uçuş gücü' : 'Motorların toplam elektrik gücü';
   $('vtolAnalysisNotice').textContent=(quad?'Penta':'Tria')+' VTOL mekanik prototipi. Grafikler sabit kanat ön hesabıdır; dikey kalkış ve geçiş uçuşu doğrulanmış değildir.';
   const common=['vtolMotorDiameter','vtolMotorLength','vtolPropDiameter','vtolHoleX','vtolHoleZ','vtolScrew','vtolBore'];
   for(const id of Object.keys(VTOL_FIELDS))$(id).closest('.field').hidden=quad?!common.includes(id)&&!id.startsWith('quad'):id.startsWith('quad');

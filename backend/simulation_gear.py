@@ -32,7 +32,6 @@ def landing_gear_components(airframe, rings, geometry, motors):
     track=max(span*.22, float(np.ptp(rings[:,:,2]))*1.5)
     clearance=max(15.,span*.015)
     floor=float(airframe.bounding_box()[1])
-    # Reserve the swept propeller disk, including front-facing propellers.
     for motor in motors:
         axis=np.asarray(motor.get('out_axis',motor.get('axis',[1,0,0])),dtype=float)
         axis/=np.linalg.norm(axis)
@@ -46,8 +45,6 @@ def landing_gear_components(airframe, rings, geometry, motors):
         j=max(1,min(len(rings)-1,int(np.searchsorted(rings[:,0,0],x))))
         a,b=rings[j-1],rings[j]
         ring=a+(b-a)*((x-a[0,0])/(b[0,0]-a[0,0]))
-        # Mount inside the lower fuselage at its centreline so the strut and
-        # airframe overlap rather than touching along a zero-width edge.
         mount=np.array([x,float(ring[:,1].min())+8.,0.])
         axle=np.array([x,center_y,z])
         strut_radius=max(4.,radius*.2)

@@ -51,7 +51,6 @@ def test_vtol_parts_pivots_and_holes(vtol_model):
     for point in rear['clamp_bolt_points_mm']:
         probe=cylinder(1.4,18,np.array(point)-[0,16,0],[0,1,0])
         assert ((body+lower)^probe).volume()<.1
-    # Both broad walls connect across the support height; the central bay is open.
     for dx in [-18,18]:
         probe=box([x+dx-1,y-25,-8],[x+dx+1,y-8,8])
         assert (body^probe).volume()==pytest.approx(probe.volume(),abs=.1)
@@ -270,7 +269,6 @@ def test_reinforced_motor_and_root_supports_all_wing_shapes(coords,shape):
             bore=cylinder(1.4,h['grip_mm']+2,np.asarray(h['point_mm'])-axis,axis)
             assert (strap^bore).volume()<.01
             assert sum((named[n].assembled^bore).volume() for n in j['segments'])<.01
-    # Reinforcement must not refill purchased spar tubes or the single root pin.
     for c in manifest['spar_channels']:
         spec=next(p for p in data['panels'] if p['name']==c['part'])
         mat,_=panel_frame(spec)

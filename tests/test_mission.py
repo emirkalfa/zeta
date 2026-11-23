@@ -57,7 +57,6 @@ def test_underpowered_aircraft_cannot_fly(default_geom, airfoil_props_2412):
 def test_sustained_turn_respects_structural_limit(default_geom, airfoil_props_2412):
     perf = mission_performance(default_geom, airfoil_props_2412, 5000, 100, n_limit=3.0)
     assert perf['turn_load_factor'] <= 3.0 + 1e-6
-    # Sürekli dönüş, köşe hızındaki anlık dönüşten hızlı olamaz
     assert perf['turn_rate_deg'] <= perf['corner_turn_rate_deg'] + 0.5
 
 
@@ -67,7 +66,7 @@ def test_turn_radius_consistent_with_rate(perf):
 
 
 def test_corner_speed_formula(perf):
-    assert perf['corner_speed'] == pytest.approx(perf['stall_speed'] * 2.0, abs=0.02)  # sqrt(4 g)
+    assert perf['corner_speed'] == pytest.approx(perf['stall_speed'] * 2.0, abs=0.02)
 
 
 def test_heavier_aircraft_turns_worse(airfoil_props_2412):

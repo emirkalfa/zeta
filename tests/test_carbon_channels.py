@@ -25,8 +25,6 @@ def test_straight_tubes_follow_taper_and_never_enter_moving_surfaces(coords,pres
  assert len(m['spar_channels'])==4
  for c in m['spar_channels']:
   spec=r['wing_specs'][c['part']];mat,length=panel_frame(spec)
-  # Independent geometry check: one straight tube maintains its selected
-  # chord fraction along a linearly tapered wing, including sweep/dihedral.
   for z in (0,length*.4,c['reach_from_center_mm']):
    world=np.asarray(c['start_mm'])+np.asarray(c['axis'])*c['path_scale']*z
    local=np.linalg.solve(mat[:,:3],world-mat[:,3])

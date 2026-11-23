@@ -1,20 +1,11 @@
-/* İçi boş, rib'li ve spar delikli kanat STL geometrisi.
- *
- * Kanat yarısı (ya da bir dilimi) şu parçalardan oluşan tek bir kapalı katıdır:
- *   - dış kabuk (duvar kalınlığı kadar et),
- *   - açıklık boyunca aralıklı rib'ler (iç boşluğu bölmelere ayırır),
- *   - rib'lerden geçen dairesel spar delikleri (karbon boru / çubuk iskelet için).
- * Kanat doğrusal daraldığı için istasyonlar arası yüzeyler düz çizgilerle birleştirilir.
- */
 
-const SPAR_MAIN_POS = 0.28;   // veter oranı: profilin en kalın bölgesi
+const SPAR_MAIN_POS = 0.28;
 const SPAR_REAR_POS = 0.62;
-const SPAR_CLEARANCE = 0.0006; // delik ile iç kabuk arasında bırakılan en az et (m)
+const SPAR_CLEARANCE = 0.0006;
 const PROFILE_POINTS = 40;
 const HOLE_SEGMENTS = 24;
 
 function airfoilProfile(coords) {
-  // Koordinat satırları: ilk yarı üst yüzey (x 0→1), ikinci yarı alt yüzey (x 1→0)
   const nHalf = Math.floor(coords.length / 2);
   const upper = coords.slice(0, nHalf).map(c => [c.x, c.y_upper]).sort((a, b) => a[0] - b[0]);
   const lower = coords.slice(nHalf).map(c => [c.x, c.y_lower]).sort((a, b) => a[0] - b[0]);
@@ -59,11 +50,6 @@ function pointInLoop(pt, loop) {
   return inside;
 }
 
-/**
- * opts (hepsi metre): wall, ribSpacing, ribThickness, spars: [{ pos, dia }], capTip
- * Dönüş: { mesh, ribCount, sparReach: [spar başına deliğin ulaştığı açıklık konumu] }
- * Kanat, istenen duvar kalınlığıyla içi boşaltılamayacak kadar inceyse null döner.
- */
 function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
   const halfSpan = geom.wingspan / 2;
   const rootChord = geom.root_chord;
@@ -75,7 +61,6 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
   const prof = airfoilProfile(coords);
   const N = PROFILE_POINTS;
 
-  // Açıklık konumundaki kesitin yerleşimi (buildWingSegment ile aynı)
   const frame = (yPos) => {
     const chord = rootChord * (1 - (yPos / halfSpan) * (1 - taper));
     return {
@@ -95,7 +80,6 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
     return pts;
   };
 
-  // Yüzey noktalarını içe doğru normal boyunca duvar kalınlığı kadar öteler
   const offsetPoints = (f) => {
     const up = [];
     const lo = [];
@@ -106,7 +90,6 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
         const tx = (prof.xs[b] - prof.xs[a]) * f.chord;
         const ty = (ys[b] - ys[a]) * f.chord;
         const len = Math.hypot(tx, ty) || 1;
-        // Teğete dik iki yönden profilin içine bakanı: üstte aşağı, altta yukarı
         let nx = -ty / len;
         let ny = tx / len;
         if (ny * dir < 0) { nx = -nx; ny = -ny; }
@@ -116,8 +99,6 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
     return { up, lo };
   };
 
-  // Boşluğun veter boyunca kapladığı indeks aralığı en dar kesite (uç tarafı) göre seçilir;
-  // böylece tüm istasyonlarda nokta sayısı aynı kalır ve halkalar birbirine bağlanabilir.
   const minGap = Math.max(0.0004, opts.wall * 0.5);
   const tipOffsets = offsetPoints(frame(yEnd));
   const cavityIdx = [];
@@ -143,7 +124,6 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
     return pts;
   };
 
-  // Spar ekseni düz bir çizgidir; eğik eksenin z-düzlemindeki kesiti elips olur
   const sparCenter = (spar, f) => V2(spar.pos * f.chord + f.x0, prof.camberAt(spar.pos) * f.chord + f.y0);
   const sparAxis = (spar) => {
     const a = sparCenter(spar, frame(0));
@@ -167,7 +147,6 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
     return pts;
   };
 
-  // Rib'ler: dilimin iki ucunda birer tane, arada eşit aralıklı
   const tr = Math.min(opts.ribThickness, (yEnd - yStart) / 3);
   const usable = yEnd - yStart - tr;
   const between = Math.max(0, Math.ceil(usable / opts.ribSpacing) - 1);
@@ -177,7 +156,6 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
     ribs.push({ a, b: a + tr, fa: frame(a), fb: frame(a + tr), spars: [] });
   }
 
-  // Bir spar, deliği iç boşluğa sığdığı son rib'e kadar uzanır
   const sparReach = opts.spars.map(() => yStart);
   const blocked = opts.spars.map(() => false);
   ribs.forEach((rib, ri) => {
@@ -192,12 +170,10 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
     });
   });
 
-  // ─── Üçgen üretimi ───
   const pos = [];
   const tri = (a, b, c) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
   const at = (p, z) => new THREE.Vector3(p.x, p.y, z);
 
-  // Düzlemsel yüz: dış halka eksi delikler. normalZ yüzün baktığı ±z yönü.
   const face = (contour, holes, z, normalZ) => {
     const all = contour.concat(...holes);
     const tris = THREE.ShapeUtils.triangulateShape(contour.slice(), holes.map(h => h.slice()));
@@ -209,7 +185,6 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
     }
   };
 
-  // İki halka arasındaki yan yüzey. outward: normal halkanın dışına mı bakacak.
   const loft = (loopA, zA, loopB, zB, outward) => {
     const natural = signedArea(loopA) * (zB - zA) > 0;
     const n = loopA.length;
@@ -222,27 +197,23 @@ function buildRibbedWingSegment(geom, coords, yStart, yEnd, sign, opts) {
     }
   };
 
-  const outward = sign;  // +açıklık yönünün z işareti
+  const outward = sign;
   const first = ribs[0];
   const last = ribs[ribs.length - 1];
 
-  // Dış kabuk
   const stations = [];
   for (const rib of ribs) stations.push(rib.fa, rib.fb);
   for (let i = 0; i < stations.length - 1; i++) {
     loft(outerLoop(stations[i]), stations[i].z, outerLoop(stations[i + 1]), stations[i + 1].z, true);
   }
 
-  // Kök ve uç yüzleri
   face(outerLoop(first.fa), first.spars.map(s => holeLoop(s, first.fa)), first.fa.z, -outward);
   face(outerLoop(last.fb), last.spars.map(s => holeLoop(s, last.fb)), last.fb.z, outward);
 
   ribs.forEach((rib, ri) => {
-    // Rib içinden geçen spar delikleri
     for (const spar of rib.spars) {
       loft(holeLoop(spar, rib.fa), rib.fa.z, holeLoop(spar, rib.fb), rib.fb.z, false);
     }
-    // Bu rib ile sonraki arasındaki boşluk
     const next = ribs[ri + 1];
     if (!next) return;
     loft(innerLoop(rib.fb), rib.fb.z, innerLoop(next.fa), next.fa.z, false);

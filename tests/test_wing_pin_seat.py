@@ -29,12 +29,10 @@ def test_profile_seat_single_pin_and_removal(coords,preset,shape,position):
         assert (body ^ probe).volume()<.01
         spec=next(p for p in specs if p['name']==j['part'])
         mat,length=panel_frame(spec)
-        # The seated root withdraws along its span without jamming in a tapered socket.
         for distance in (2,6,10,20):
             assert (owner.translate((mat[:,2]*distance).tolist()) ^ body).volume()<.1
         root=j['root_trim_mm'];scale=1+(spec['tipChord']/spec['chord']-1)*root/length
         section=profile(spec['coords'],spec['chord']*1000).scale([scale,scale])
-        # A thin profile ring must remain at the outer end of the new seat.
         ring=(section.offset(.8)-section.offset(.4)).extrude(.4).translate([0,0,root+9])
         ring=local_transform(ring,mat)
         assert (body ^ ring).volume() > ring.volume()*.95

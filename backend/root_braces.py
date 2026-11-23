@@ -32,8 +32,6 @@ def root_braces(parts, manifest, specs, body_rings, cutters):
         if not all(candidates):continue
         bridge='wing_root_brace_'+name
         solution=None;last_error='uygun yer bulunamadı'
-        # Search the actual hollow shell, keeping clear of the main spar,
-        # rear spar and the existing root pin. No change to their bores.
         for fraction,inset_span in product([.63,.65,.28,.32],[18,10,6]):
             anchors=[]; owners=[]; contacts=[]; shell_floor=[]
             for span,group in zip([trim-inset_span,trim+depth+18],candidates):
@@ -66,7 +64,6 @@ def root_braces(parts, manifest, specs, body_rings, cutters):
                     access=cylinder(access_r,10000,[pt[0],top+gap/2,pt[2]],[0,1,0])
                     for tool in cutters.get('body' if i==owners[0] else name,[]):boss-=tool
                     solid=(result[i].assembled+boss)-recess-bore-pocket-access
-                    # The opposite shell cannot be bridged by a fixed boss.
                     other=owners[1] if i==owners[0] else owners[0]
                     if (solid^result[other].assembled).volume()>.1:break
                     proposals.append((i,solid));strap-=bore
@@ -82,8 +79,6 @@ def root_braces(parts, manifest, specs, body_rings, cutters):
                     fitted_strap=fitted(bridge,strap,'wing')
                 except ManufacturingError as error:
                     last_error=str(error)
-                    # Retry a different cavity height/location; every returned
-                    # candidate still passes the identical STL and bed checks.
                     continue
                 footprint=md.Manifold.batch_boolean(removals+[strap],md.OpType.Add)
                 solution=(fitted_strap,fitted_parts,holes,list(footprint.bounding_box()));break

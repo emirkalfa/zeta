@@ -20,7 +20,6 @@ def test_every_wing_seam_is_fastened_without_blocking_existing_features(coords,p
     data=request_data(coords,preset=preset,geometry=g)
     parts,manifest,rings=generate(data)
     wings=[p for p in parts if p.name in rings['wing_specs']]
-    # Include every original part in obstacle checking, but export only wings.
     from backend.wing_segments import segmented_wing
     printed=[]
     for wing in wings:
@@ -38,7 +37,6 @@ def test_every_wing_seam_is_fastened_without_blocking_existing_features(coords,p
         assert len(joint['segments'])==2 and len(joint['holes']) in (2,4)
         assert all(name in actual for name in joint['segments'])
         assert (male^female).volume()<.03
-        # Both fastener holes remain open through the bridge and supporting tile.
         for h in joint['holes']:
             point=np.array(h['point_mm']);axis=np.array(h['axis'])
             probe=cylinder(joint['screw_diameter_mm']/2-.05,200,point+axis*20,-axis)
@@ -47,16 +45,13 @@ def test_every_wing_seam_is_fastened_without_blocking_existing_features(coords,p
             nut=np.array(h['nut_seat_mm'])
             probe=cylinder(joint['nut_flat_mm']*.4,joint['nut_height_mm']-.2,nut-axis*.1,-axis)
             for name in joint['segments']:assert (actual[name]^probe).volume()<.02
-        # Receiver slides off the integral tongue along the seam normal.
         direction=np.array(joint['insertion_axis'])
         for distance in (.5,2,8,joint['tongue_depth_mm']+2):
             assert (male^female.translate((direction*distance).tolist())).volume()<.05
     for wing in wings:
         pieces=[p for p in printed if p.name.startswith(wing.name)]
         for tool in rings['part_cuts'].get(wing.name,[]):
-            # Serialization rounds to 0.02 mm; compare against original bore residual.
             assert sum((p.assembled^tool).volume() for p in pieces)<(wing.solid^tool).volume()+.1
-        # Probe the usable bore, inset by 0.05 mm from tessellated drill walls.
         mat=wing.frame
         for channel in [c for c in manifest['spar_channels'] if c['part']==wing.name]:
             from tests.test_manufacturing import channel_probe

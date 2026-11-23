@@ -17,8 +17,6 @@ def test_fixed_root_stays_on_real_wing_planform(coords,taper,roof_blend):
     root=blended_root(section,inset,chord,taper,length,end,wall,.3,
                       body_profile=canonical_rings(),frame=frame,roof_blend=roof_blend,seat_end=end+8)
     assert root.status().name=='NoError'
-    # This catches the old 50 mm lip at the inboard leading edge, which
-    # outboard-only flush-cuff tests could not see.
     assert (root ^ box([-100,-1000,-1],[-.025,1000,end+9])).volume()<.001
     envelope=section.offset(.025).extrude(length,scale_top=[taper]*2)
     tip=root ^ box([-1000,-1000,end+7.95],[1000,1000,end+8.01])

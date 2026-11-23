@@ -1,5 +1,4 @@
 @echo off
-rem ZETA'yi tek komutla baslatir: sanal ortami kurar, bagimliliklari yukler, tarayiciyi acar.
 setlocal
 cd /d "%~dp0"
 

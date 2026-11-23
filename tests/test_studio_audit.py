@@ -88,5 +88,4 @@ def test_naca_shape_against_published_uiuc_coordinates(code):
     for point in ref:
         u=np.clip(np.sum((point-a)*edge,axis=1)/np.maximum(length,1e-20),0,1)
         dist.append(float(np.linalg.norm(a+u[:,None]*edge-point,axis=1).min()))
-    # Known 4415 coordinate convention differs by up to 0.18% of chord.
     assert max(dist)<(.002 if code=='4415' else .0003)

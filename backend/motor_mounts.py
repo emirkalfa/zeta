@@ -5,15 +5,30 @@ from backend.manufacturing import number,box,cylinder,ManufacturingError,Part
 
 def motor_sized_fuselage(data):
     if data['geometry'].get('fuse_preset') in ('vtol','vtol5'):return data
-    if not data['geometry'].get('tail_booms') or data.get('options',{}).get('motorLayout')!='single':return data
+    layout = data.get('options', {}).get('motorLayout')
+    if layout != 'rear' and not (layout == 'single' and data['geometry'].get('tail_booms')):
+        return data
     radius=number(data['options'],'motorDiameter',28,10,100)/2
+    if not data['geometry'].get('tail_booms'):
+        options = data['options']
+        gap = number(options, 'clearance', .3, .1, .8)
+        set_y = number(options, 'motorSpacingY', 16, 4, 100) / 2
+        set_z = number(options, 'motorSpacingZ', 19, 4, 100) / 2
+        bolt_center = math.hypot(set_y, set_z) if options.get('motorPattern') == 'rectangle' else max(set_y, set_z)
+        screw = number(options, 'motorScrew', 3, 2, 6)
+        bore = number(options, 'motorBore', 8, 3, 50)
+        wire = number(options, 'motorWire', 6, 3, 15)
+        radius = max(radius + 3, bolt_center + (screw + gap) / 2 + 3,
+                     (bore + gap) / 2 + wire + 4)
     rings=np.asarray(data['fuselage'],dtype=float).copy()
     if rings.ndim!=3 or rings.shape[0]<3 or rings.shape[1]<16 or rings.shape[2]!=3 or not np.isfinite(rings).all():return data
     if rings[-1,0,0]<=rings[0,0,0]:return data
     cy,cz=rings[-1,:,1:].mean(axis=0)
     distances=np.linalg.norm(rings[-1,:,1:]-[cy,cz],axis=1)
     if np.all(abs(distances-radius)<.01):return data
-    first,last=rings[0,0,0],rings[-1,0,0];start=first+.8*(last-first)
+    first,last=rings[0,0,0],rings[-1,0,0]
+    factor=.976 if data['geometry'].get('fuse_preset')=='akin' else .8 if data['geometry'].get('tail_booms') else .92
+    start=first+factor*(last-first)
     u=np.clip((rings[:,:,0]-start)/(last-start),0,1);blend=u*u*(3-2*u)
     delta=rings[:,:,1:]-[cy,cz];length=np.linalg.norm(delta,axis=2)
     target=np.array([cy,cz])+radius*delta/np.maximum(length[:,:,None],1e-12)
@@ -22,8 +37,9 @@ def motor_sized_fuselage(data):
 
 def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=None):
     options=data.get('options',{});layout=options.get('motorLayout','none')
-    if layout not in ['none','single','twin']:raise ManufacturingError('Motor yerleşimi geçersiz.')
-    if layout=='none':return body,[],[],[]
+    if layout not in ('none','single','rear','twin'):raise ManufacturingError('Motor yerleşimi geçersiz.')
+    if layout == 'none' or (layout == 'single' and not data['geometry'].get('tail_booms')):
+        return body, [], [], []
     diameter=number(options,'motorDiameter',28,10,100)
     length=number(options,'motorLength',30,8,150)
     spacing_y=number(options,'motorSpacingY',16,4,100)
@@ -42,7 +58,8 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
     else:raise ManufacturingError('Motor vida düzeni geçersiz.')
     if min(math.hypot(y,z) for y,z in holes)-(bore+screw+gap)/2<2:
         raise ManufacturingError('Motor orta deliği vida deliklerine çok yakın. Delik/aralık ölçülerini kontrol edin.')
-    exact_face=layout=='single' and bool(data['geometry'].get('tail_booms'))
+    rear = layout in ('single', 'rear')
+    exact_face = rear and bool(data['geometry'].get('tail_booms'))
     radius=diameter/2 if exact_face else max(diameter/2+3,max(math.hypot(y,z) for y,z in holes)+(screw+gap)/2+3,(bore+gap)/2+wire+4)
     if exact_face and max(math.hypot(y,z) for y,z in holes)+(screw+gap)/2+max(2,wall)>radius:
         raise ManufacturingError('Motor çapı bu vida aralıkları için küçük. Motorun gerçek çapını ve vida ölçülerini kontrol edin.')
@@ -53,11 +70,10 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
             wire_center=candidate.tolist();break
     if wire_center is None:raise ManufacturingError('Kablo deliği ile motor vidaları için yeterli alan yok. Motor/plaka ve delik ölçülerini kontrol edin.')
     rings=np.asarray(data['fuselage']);poses=[];obstacles=[];body_cuts=[]
-    pusher=bool(data['geometry'].get('tail_booms'))
-    if layout=='single':
-        ring=rings[-1] if pusher else rings[0]
+    if rear:
+        ring=rings[-1]
         x=float(ring[:,0].mean());y=float(ring[:,1].mean())
-        poses.append(('motor_rear' if pusher else 'motor_nose','body',[x,y,0],x-thickness if pusher else x+thickness))
+        poses.append(('motor_rear','body',[x,y,0],x-thickness))
     else:
         for panel in data['panels']:
             if panel['kind']!='wing':continue
@@ -70,14 +86,12 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
     report=[];prop_disks=[];motor_envelopes=[]
     for name,parent,face,back in poses:
         x,y,z=face
-        direction=-1 if parent=='body' and pusher else 1
+        direction=-1 if parent=='body' else 1
         axis=[direction,0,0]
         drills=[cylinder((screw+gap)/2,thickness+2,[x-direction,y+hy,z+hz],axis) for hy,hz in holes]
         center=cylinder((bore+gap)/2,thickness+2,[x-direction,y,z],axis)
         front_wire=cylinder(wire/2,thickness+2,[x-direction,y+wire_center[0],z+wire_center[1]],axis)
         if parent=='body':
-            # Fill the true nose cross-section so a small motor plate cannot float
-            # inside a wider hollow fuselage.
             firewall=(outer^box([min(x-direction,back),-10000,-10000],[max(x-direction,back),10000,10000]))+cylinder(radius,thickness,face,axis)
             obstacles.append(firewall);body=body+firewall
             for cut in drills+[center,front_wire]:body=body-cut;body_cuts.append(cut)
@@ -94,7 +108,6 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
             for cut in drills+[center,front_wire,cable]:pod=pod-cut
             if (pod^assemblies[parent]).volume()<1:
                 raise ManufacturingError(f'{name}: motor taşıyıcısı kanada bağlanamıyor. Motor konumunu veya ölçüsünü değiştirin.')
-            # Lower half-shell provides hand/tool access behind all four bolts.
             start=x+thickness+2;end=back-4;seam=y-2
             if end-start<18:raise ManufacturingError('Motor taşıyıcısı servis kapağı için çok kısa.')
             opening=box([start,y-radius-5,z-radius-5],[end,seam,z+radius+5])
@@ -105,7 +118,6 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
                 bx=(start+end)/2;bz=z+side*(radius-3)
                 boss=box([bx-5,seam,bz-4],[bx+5,y+3,bz+4])
                 tab=box([bx-5,seam-9,bz-4],[bx+5,seam-gap,bz+4])
-                # Limit tabs to the nacelle outline; retain the curved outer shell.
                 tab=tab^cylinder(radius,10,[bx-5,y,z],[1,0,0])
                 drill=cylinder((3+gap)/2,20,[bx,seam-12,bz],[0,1,0])
                 nut=cylinder((5.5+gap)/math.sqrt(3),2.6,[bx,seam-.01,bz],[0,1,0],sides=6)
@@ -133,7 +145,7 @@ def install_motor_mounts(body,lid,assemblies,data,outer,wall,gap,service_parts=N
     fixed_parts=[body,lid,*assemblies.values()]
     for i,disk in enumerate(prop_disks):
         if any((disk^part).volume()>.1 for part in fixed_parts):
-            raise ManufacturingError('Pervane gövdeye veya kanada çakışıyor. Pervane çapını azaltın veya kanattaki motor konumunu dışarı alın.')
+            raise ManufacturingError('Pervane gövde, kanat veya kuyrukla çakışıyor. Pervane çapını, pervane mesafesini veya motor konumunu kontrol edin.')
         if any((motor_envelopes[i]^part).volume()>.1 for part in fixed_parts):
             raise ManufacturingError('Motor gövdesi uçak parçasına çakışıyor. Motor ölçüsü ve yerleşimini kontrol edin.')
     if len(prop_disks)==2 and (prop_disks[0]^prop_disks[1]).volume()>.1:

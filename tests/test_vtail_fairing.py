@@ -40,6 +40,5 @@ def test_fairing_keeps_hollow_front_and_solid_aft_cap(wall):
     assert (skin^cavity).volume()<1e-6
     cap=cylinder(.2,.4,[info['end_x_mm']-.6,0,0],[1,0,0])
     assert (skin^cap).volume()==pytest.approx(cap.volume(),rel=.001)
-    # Material remains continuous across the former flat-cut tube endpoint.
     bridge=cylinder(.1,2,[1119.5,8.6,0],[1,0,0])
     assert (skin^bridge).volume()==pytest.approx(bridge.volume(),rel=.001)

@@ -1,4 +1,3 @@
-// Run with node --test tests/test_fuselage.cjs (no additional dependencies).
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -11,7 +10,7 @@ for (const f of ['fuselage.js', 'aircraftmodel.js', 'viewer3d.js', 'stlexport.js
   vm.runInContext(fs.readFileSync(path.join(root, 'static/js', f), 'utf8'), ctx);
 }
 const run = code => vm.runInContext(code, ctx);
-const base = {fuselage_length:1.2, fuselage_max_width:.135, fuselage_max_height:.135, wingspan:1.5};
+const base = {fuselage_length:1.2, fuselage_max_width:.135, fuselage_max_height:.135, wingspan:1.5, wing_x_pos:.32, root_chord:.24, tail_x_pos:.95};
 
 function checkClosed(mesh) {
   const p = mesh.geometry.attributes.position, idx = mesh.geometry.index.array;
@@ -40,10 +39,13 @@ function checkClosed(mesh) {
 for (const id of ['atlas','seyir','akin','combat']) test(`${id}: dimensions, preview/export match and closed meshes`, () => {
   ctx.geom = {...base, fuse_preset:id, fuse_type:'conventional'};
   const loft = run("buildFuselageSections(geom, 'conventional')");
-  const keys = run('presetFuseKeys(geom, geom.fuse_preset)');
+  const keys = run("geom.fuse_preset === 'atlas' ? atlasEditableKeys(geom, true) : presetFuseKeys(geom, geom.fuse_preset)");
   const points = loft.sections.flat();
   assert.equal(points[0].x,0);
-  assert.equal(loft.sections.at(-1)[0].x,base.fuselage_length);
+  const expectedEnd = id === 'akin'
+    ? Math.min(base.tail_x_pos-.15, Math.max(.59*base.fuselage_length,base.wing_x_pos+base.root_chord+.018))
+    : base.fuselage_length;
+  assert(Math.abs(loft.sections.at(-1)[0].x-expectedEnd) < 1e-8);
   assert(Math.abs(Math.max(...points.map(p=>p.z))*2-Math.max(...keys.map(k=>k.w))) < 1e-8);
   assert(points.every(p=>[p.x,p.y,p.z].every(Number.isFinite)));
   const body = run("buildFuselageGroup(geom, 'conventional')").children[0];
@@ -54,12 +56,19 @@ for (const id of ['atlas','seyir','akin','combat']) test(`${id}: dimensions, pre
   assert(checkClosed(hollow) < volume, 'hollow shell has less material');
 });
 
-test('custom conversion preserves the preset surface', () => {
+test('Goliath custom conversion retains editable station dimensions', () => {
   ctx.geom = {...base,fuse_preset:'atlas'};
-  const original = run('libraryFuselageSections(geom)');
+  const keys = run("presetFuseKeys(geom,'atlas')");
   run("geom.fuse_sections=presetFuseKeys(geom,'atlas'); geom.fuse_section_exponent=FUSELAGE_PRESETS.atlas.exponent");
-  const custom = run("buildFuselageSections(geom,'manual')");
-  assert.equal(JSON.stringify(custom),JSON.stringify(original));
+  const custom = run("buildFuselageSections(geom,'manual',undefined,false)");
+  for (const key of keys) {
+    const ring=custom.sections.find(section=>Math.abs(section[0].x-key.t)<1e-8);
+    assert(ring, `missing editable station at ${key.t}`);
+    const zs=ring.map(p=>p.z), ys=ring.map(p=>p.y);
+    assert(Math.abs(Math.max(...zs)-Math.min(...zs)-key.w)<1e-6);
+    assert(Math.abs(Math.max(...ys)-Math.min(...ys)-key.h)<1e-6);
+    assert(Math.abs((Math.max(...ys)+Math.min(...ys))/2-key.cy)<1e-6);
+  }
 });
 
 test('duplicate/out-of-order legacy stations remain finite', () => {

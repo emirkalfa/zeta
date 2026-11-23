@@ -11,10 +11,7 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
     sweep_rad = np.radians(sweep_deg)
 
     cl_alpha_2d_raw = airfoil_props['cl_alpha']
-    # Sweep correction: simple sweep theory reduces effective cl_alpha
-    # (Anderson Eq. 8.41, 8.42).
     cl_alpha_2d = cl_alpha_2d_raw * np.cos(sweep_rad)
-    # Avoid degenerate case
     if cl_alpha_2d < 0.01:
         cl_alpha_2d = cl_alpha_2d_raw
 
@@ -30,11 +27,8 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
 
     for alpha_deg in alphas:
         alpha = np.radians(alpha_deg)
-        # Geometric AoA minus zero-lift angle drives lift (Anderson Eq. 5.51).
         alpha_eff = alpha - alpha_L0
 
-        # Solve lifting line using Fourier series.
-        # Equation: alpha_eff(theta) = sum_{n} A_n sin(n*theta) * [n/sin(theta) + 4b/(c*cl_alpha)]
         thetas = np.linspace(1e-6, np.pi - 1e-6, n_stations)
         chord_dist = root_c * (1 - (1 - taper) * np.abs(np.cos(thetas)))
 
@@ -54,11 +48,9 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
 
         coeffs, _, _, _ = np.linalg.lstsq(A, b_vec, rcond=None)
 
-        # Lift coefficient from Fourier coefficients (Anderson Eq. 5.53).
         CL = np.pi * ar * coeffs[0]
         CL_linear = float(CL)
 
-        # Induced drag from Fourier coefficients (Anderson Eq. 5.61).
         CDi = 0
         for n in range(n_terms):
             k = n + 1
@@ -67,28 +59,22 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
 
         CD = cd_0 + CDi
 
-        # Post-stall model: CL drops and CD rises beyond stall angle.
         alpha_eff_deg = np.degrees(alpha_eff)
         stall_overshoot = max(0, abs(alpha_eff_deg) - airfoil_props['alpha_stall'])
         if stall_overshoot > 0:
             sign = 1 if alpha_eff_deg > 0 else -1
-            # Gradual CL drop (van Dam, Torenbeek post-stall model)
             cl_post = cl_max * (1 - 0.12 * stall_overshoot - 0.02 * stall_overshoot**2)
             if cl_post < 0.05:
                 cl_post = 0.05
             CL = sign * min(abs(CL), cl_post)
-            # Quadratic drag rise in post-stall
             CD += 0.05 * stall_overshoot + 0.08 * stall_overshoot**2
 
         CL = np.clip(CL, -cl_max, cl_max)
 
         CL_2d = cl_alpha_2d * alpha_eff
 
-        # Pitching moment about CG with aero center at quarter-chord.
-        # Cm_cg = cm_ac + CL * (x_cg - x_ac) / c_ref
         Cm = cm_0 + CL * (cg - 0.25 * mac) / mac
 
-        # Lift distribution
         lift_dist = []
         for i in range(n_stations):
             theta = thetas[i]
@@ -98,9 +84,6 @@ def lifting_line_analysis(geom, airfoil_props, n_stations=40, n_terms=20, rho=1.
                 gamma += coeffs[n] * np.sin(k * theta)
             gamma *= 2 * b
             chord = chord_dist[i]
-            # gamma is circulation divided by airspeed (units of length).
-            # Kutta-Joukowski gives cl = 2*(Gamma/V)/chord.
-            # A global heuristic stall cap must also scale the displayed distribution.
             scale = float(CL)/CL_linear if abs(CL_linear)>1e-12 else 1.0
             cl_local = 2 * gamma / chord * scale
             y_pos = -b/2 * np.cos(theta)
@@ -143,7 +126,6 @@ def calculate_polars(geom, airfoil_props, max_alpha=20):
         polars['cm_vs_alpha'].append({'x': r['alpha'], 'y': r['Cm']})
         polars['efficiency'].append({'x': r['alpha'], 'y': r['CL_CD']})
 
-    # Use a separate 5-degree solution: the plotted alpha grid need not contain 5.
     distribution = lifting_line_analysis(geom,airfoil_props,max_alpha=5)[-1]
     polars['lift_distribution'] = distribution['lift_distribution']
 

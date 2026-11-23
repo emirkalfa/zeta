@@ -14,12 +14,12 @@ def test_penta_adaptive_preview_and_stl_have_identical_body_coordinates():
 
 
 @pytest.mark.parametrize('shape',['rectangular','tapered','ste_tapered'])
-def test_penta_auto_sizing_preserves_one_shape_and_selected_position(shape):
+def test_penta_auto_sizing_uses_selected_wing_shape_and_fixed_mount(shape):
     for span in [1.5,2.,3.]:
         g=calculate_geometry(span,4,'4412',wing_shape=shape,airframe='vtol5_fixed',wing_position='high',fuse_type='manual',man_fuse_length=3,man_fuse_width=.8)
-        pod=penta_layout(span,g['root_chord'])
+        pod=penta_layout(span,g['root_chord'],wing_shape=shape)
         assert g['fuselage_length']==pod['length'] and g['fuselage_max_width']==pod['width'] and g['fuselage_max_height']==pod['height']
-        assert g['wing_position']=='high' and g['wing_x_pos']==pod['wing'] and g['fuse_type']=='conventional'
+        assert g['wing_position']=='mid' and g['wing_x_pos']==pod['wing'] and g['fuse_type']=='conventional'
         assert g['tail_booms'] and g['vtail_count']==2
     g=calculate_geometry(2,4,'4412',airframe='combat',wing_position='high');g['fuse_preset']='vtol5'
     old_start=g['tail_booms']['x_start'];old_wing=g['wing_x_pos']

@@ -28,8 +28,6 @@ def test_real_blend_and_flush_seat_in_every_model_position(coords,preset,shape,p
         pt=np.asarray(j['bolt_point_mm']);axis=np.asarray(j['bolt_axis'])
         probe=cylinder(j['pin_diameter_mm']/2-.1,30,pt-axis*15,axis)
         assert ((named['body']+named[j['part']])^probe).volume()<.1
-    # Validation includes actual segmentation, print orientation, screw bosses,
-    # closed float32 STL edges and the configured 220 mm printer volume.
     printed=printable_parts(parts,manifest,rings)
     assert len(manifest['wing_root_braces'])==2
     for p in printed:

@@ -8,8 +8,6 @@ from backend.stability import flight_test
 
 
 def test_all_actual_panel_centers_and_tail_volume_targets():
-    # Independent integration of the frontend panel geometry; does not call the
-    # backend center helper. Covers all three tails, shapes and placements.
     cases=[calculate_geometry(1.5,2.5,'2412',airframe=a,tail_type=t,wing_shape=s,wing_position=p)
            for a,t,s,p in itertools.product(['standard','combat','vtol_fixed'],
               ['conventional','ttail','vtail'],['rectangular','tapered','ste_tapered'],['low','mid','high'])]
@@ -18,10 +16,25 @@ def test_all_actual_panel_centers_and_tail_volume_targets():
     for g,panels in zip(cases,json.loads(out.stdout)):
         def integrate(p):
             root,tip=np.asarray(p['root']),np.asarray(p['tip'])
-            eta=np.linspace(0,1,2001);ch=p['chord']+(p['tipChord']-p['chord'])*eta
+            eta=np.linspace(0,1,20001)
+            nominal=p['chord']+(p['tipChord']-p['chord'])*eta
+            vertical=p['name'].startswith('tail_vertical')
+            kind=g['tail_type']
+            shaped = p['kind']=='tail' and (
+                kind=='vtail' or (vertical and kind=='conventional') or (not vertical and not g.get('tail_booms'))
+            )
+            if shaped:
+                stations=np.r_[np.linspace(0,.94,17), .94+.06*np.sin(np.arange(1,13)*np.pi/24)]
+                u=np.maximum(0,(stations-.94)/.06)
+                outline=(p['chord']+(p['tipChord']-p['chord'])*stations)*(
+                    1-.32*stations**1.25-.12*(1-np.sqrt(np.maximum(0,1-u*u))))
+                ch=np.interp(eta,stations,outline)
+            else:
+                ch=nominal
             span=math.hypot(*(tip-root)[1:])
             area=float(np.trapezoid(ch,eta)*span)
-            ac=float(np.trapezoid(ch*(root[0]+(tip[0]-root[0])*eta+.25*ch),eta)*span)
+            leading=root[0]+(tip[0]-root[0])*eta+nominal-ch
+            ac=float(np.trapezoid(ch*(leading+.25*ch),eta)*span)
             return area,ac
         def combined(items):
             values=[integrate(p) for p in items];area=sum(a for a,_ in values)
@@ -68,7 +81,6 @@ def test_manual_geometry_is_not_resized_by_mass_or_stall_target():
     for k in ['root_chord','tip_chord','wing_area','htail_span','htail_chord','vtail_span','vtail_chord']:
         assert a[k]==b[k]
     assert b['wing_sizing']['estimated_stall_speed']>6
-    # A fully specified manual design need not be feasible in automatic mode.
     c=calculate_geometry(.3,50,'2412',target_stall_speed=2,**args)
     assert c['root_chord']==.4 and c['htail_chord']==.15
 
@@ -80,3 +92,30 @@ def test_api_validates_stall_target_and_uses_selected_reynolds(client):
     assert r.json['wing_sizing']['cl_max']==get_airfoil_properties('2412',50000)['cl_max']
     for value in [0,101,'bad',True]:
         assert client.post('/api/calculate',json={**payload,'target_stall_speed':value}).status_code==400
+
+@pytest.mark.parametrize('shape',['rectangular','tapered','ste_tapered'])
+def test_penta_body_does_not_shrink_as_span_grows(shape):
+    cases=[calculate_geometry(span,4,'4412',wing_shape=shape,airframe='vtol5_fixed',
+                              tail_type='vtail') for span in (.75,1.,1.35,1.5,2.,3.)]
+    for key in ('fuselage_length','fuselage_max_width','fuselage_max_height'):
+        values=[case[key] for case in cases]
+        assert values==sorted(values)
+    assert cases[0]['root_chord']>cases[2]['root_chord']
+
+
+def test_tria_body_continues_growing_above_the_old_limit():
+    cases=[calculate_geometry(span,2.5,'4412',airframe='vtol_fixed') for span in (4.,4.2,4.5,5.)]
+    lengths=[case['fuselage_length'] for case in cases]
+    assert min(np.diff(lengths))>0
+    assert (lengths[3]-lengths[2])/.5 < (lengths[1]-lengths[0])/.2
+
+
+@pytest.mark.parametrize('preset',['atlas','seyir'])
+def test_standard_body_preserves_tail_arm_and_limits_cabin_growth(client,preset):
+    payload=dict(fuse_preset=preset,weight=4,tail_type='vtail',wing_shape='ste_tapered',
+                 target_stall_speed=8,airfoil_code='4412')
+    small=client.post('/api/calculate',json=dict(payload,wingspan=1.5)).json
+    large=client.post('/api/calculate',json=dict(payload,wingspan=2.)).json
+    assert large['fuselage_max_width']/small['fuselage_max_width']==pytest.approx(math.sqrt(2/1.5),rel=1e-5)
+    assert large['fuselage_length']>=large['tail_x_pos']+large['vtail_chord']
+    assert large['htail_area']*large['effective_tail_arm']/(large['wing_area']*large['mac'])>=.699

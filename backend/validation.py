@@ -1,6 +1,12 @@
 """Reject non-finite, missing and nonphysical inputs before model evaluation."""
 import math
 
+TAIL_CONTROL_FIELDS = {
+    f'{surface}_{dimension}_percent': bounds
+    for surface in ('elevator','rudder','ruddervator')
+    for dimension,bounds in (('start',(0,90)),('length',(5,95)),('width',(15,50)))
+}
+
 class InputError(ValueError):
     pass
 
@@ -20,13 +26,17 @@ def number(data,key,low,high,required=False):
 def validate_request(data,endpoint):
     if not isinstance(data,dict):raise InputError("Parametreler okunamadı. Formu kontrol edin.")
     for key,lo,hi in [('penta_motor_diameter',10,100),('penta_pusher_clearance',.04,.40),('target_stall_speed',1,100),('tria_tail_vh',.2,1.2),('tria_tail_vv',.01,.12),('wingspan',.1,100),('weight',.01,10000),('reynolds_number',10000,5000000),
-                       ('max_alpha',1,40),('cg_percent',0,100),('motor_power',0,1000000),
+                       ('max_alpha',1,40),('cg_percent',0,100),('cg_fuselage_percent',0,100),('motor_power',0,1000000),
                        ('battery_wh',0,1000000),('prop_efficiency',.01,1),('avionics_power',0,100000),('n_limit',1,12)]:
+        number(data,key,lo,hi)
+    for key,lo,hi in [('flap_start_percent',0,90),('flap_length_percent',5,95),('flap_width_percent',15,50)]:
+        number(data,key,lo,hi)
+    for key,(lo,hi) in TAIL_CONTROL_FIELDS.items():
         number(data,key,lo,hi)
     for key in list(data):
         if key.startswith('man_'):
             number(data,key,-45 if 'sweep' in key or 'dihedral' in key else .001,60 if 'sweep' in key or 'dihedral' in key else 100)
-    enums={'wing_position':['low','mid','high'],'tail_type':['conventional','ttail','vtail'],
+    enums={'flight_style':['standard','calm'],'wing_controls':['single','dual'],'wing_position':['low','mid','high'],'tail_type':['conventional','ttail','vtail'],
            'wing_shape':['rectangular','tapered','ste_tapered'],'fuse_type':['conventional','manual'],'airframe':['standard','combat','vtol_fixed','vtol5_fixed']}
     for key,choices in enums.items():
         if key in data and data[key] not in choices:raise InputError(f"Geçersiz seçim: {key}.")

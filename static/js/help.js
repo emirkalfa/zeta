@@ -1,4 +1,3 @@
-/* Contextual help: original explanations + traceable primary sources. */
 (() => {
   const sources = {
     quadPlane:['ArduPilot · QuadPlane yerleşimi','https://ardupilot.org/plane/docs/quadplane-building.html'],
@@ -40,7 +39,7 @@
     lblWingShape: ['Kanadın üstten görünüşünü seçer. Konik kanatta uç veter kökten küçüktür; dikdörtgende eşittir; düz firar kenarlıda arka kenar düz kalır. S = b × (kök + uç veter) / 2.', ['drag','method']],
     lblWingPos: ['Kanadı gövdenin alt, orta veya üst bölgesine taşır. Yuvalar ve iç destekler gövdenin gerçek kesitinden yeniden oluşturulur. Kanat motorları aynı hareketi izler; gövde motoru yerinde kalır. Yüksekliğin ayrıntılı aerodinamik girişim etkisi çözülmez.', ['method','stability']],
     lblTailType: ['Standart gövdede klasik, T ve V; çift bomlu gövdede H, üst köprü ve ters V yerleşimidir. V kuyruğun boylamsal etkin alanı S cos²(35°), yönelme eşdeğeri S sin²(35°) kabul edilir. Bu eşdeğerlik yaklaşık ön boyutlandırmadır.', ['stability','method']],
-    lblFuseType: ['Hazır gövde koleksiyonunu veya kendi kesitlerinizi kullanın. Atlas, Seyir ve Akın özgün ZETA şekilleridir; test edilmiş bir üretici uçağının kopyası değildir. Şekle özel CFD/sürükleme polarları bulunmaz.', ['method']],
+    lblFuseType: ['Hazır gövde koleksiyonunu veya kendi kesitlerinizi kullanın. Goliath, Caraxes ve Lark hazır gövde seçenekleridir. Her gövde için ayrı CFD veya deneysel sürükleme poları bulunmaz.', ['method']],
     cgSlider: ['Ağırlık merkezinin ortalama aerodinamik veterin (MAC) ön kenarından geriye olan konumu. %25 başlangıç değeridir. Gerçek pil ve motor yerleşimini tartarak doğrulamalısınız. Statik marj = nötr nokta − CG; hesap kuyruk ve kanat aerodinamik merkezleri arasındaki kolu kullanır.', ['stability']],
     reynolds: ['Re = ρ V c / μ: akış hızı, yoğunluk ve veterle değişen boyutsuz sayıdır. Örneğin 20 m/s hız ve 0,20 m veterde deniz seviyesinde yaklaşık 274.000. ZETA bunu hızla otomatik güncellemez; analiz için tek bir değer kullanır.', ['tunnel','method']],
     maxAlpha: ['Hücum açısı, kanat ile hava akışı arasındaki açıdır. Grafik −5° ile girdiğiniz üst sınır arasında çizilir. Ayrılma/stall sonrası bölüm deneysel veri değildir; çizilen tepe gerçek CLmax ölçümü sayılmaz.', ['lift','tunnel']],
@@ -53,7 +52,7 @@
     targetEndurance: ['Hedeflenen en az seyir süresi, dakika. %10 yakınlık sınırda gösterilir; hedef karşılandı sayılmaz.', ['endurance','method']],
     targetTurnRate: ['Hedeflenen sürekli dönüş hızı, derece/saniye. Güç, stall ve girilen yapısal g sınırı birlikte değerlendirilir.', ['power','method']],
     targetStall: ['Otomatik modda kanat alanının alt sınırını belirler: S = 2mg / (ρ Vs² CLmax). Ağırlık artınca gerektiğinde veter büyür; seçilen açıklık ve manuel ölçüler korunur. Mevcut planform alanı daha büyükse küçültülmez. Deniz seviyesi yoğunluğu 1,225 kg/m³, seçilen Reynolds sayısı ve tahmini CLmax kullanılır; gerçek polar ve uçuş testi gerekir. Vs = √(2mg / (ρ S CLmax)). 15 m/s tek başına “uçamaz” anlamına gelmez; kalkış ve iniş koşullarıyla değerlendirilir.', ['lift','method']],
-    motorLayout: ['Tek motor gövdede, çift motor iki kanatta montaj oluşturur. Savaşan İHA tek motoru arkadan iticidir. Motor ve pervane satın alınan parçadır; ZIP yalnız montaj taşıyıcılarını içerir.', ['method']],
+    motorLayout: ['Çift motor seçeneği sağ ve sol kanada montaj oluşturur. Arka itici, gövdesi bu yerleşime uygun modellerde kullanılabilir. Motor ve pervane satın alınan parçadır; ZIP yalnız montaj taşıyıcılarını içerir.', ['method']],
     motorPattern: ['Çapraz düzen iki karşılıklı delik çifti; dikdörtgen düzen dört köşe deliğidir. Aralıkları motorun kendi teknik çiziminden veya kumpasla ölçerek girin. Model bilinmediği için üretici ölçüsü varsayılamaz.', ['method']],
     motorDiameter: ['Motorun dönen dış gövdesinin uçtan uca çapı. Savaşan İHA’da tek arka motorun gövde sonu ve plakası bu çapa uyarlanır. Vida düzeni bu dairenin içine sığmalıdır.', ['method']],
     motorLength: ['Montaj yüzeyinden motorun ön yüzüne kadar eksen boyunca mesafe; mil ve pervane adaptörü için ayrıca pervane mesafesi girilir.', ['method']],

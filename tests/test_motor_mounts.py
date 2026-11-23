@@ -31,7 +31,6 @@ def test_mount_holes_are_real_voids_and_archive_is_closed(coords,layout):
             assert (owner^cover).volume()<1e-5
             for travel in [1,5,15]:
                 assert (owner^cover.translate([0,-travel,0])).volume()<1e-5
-            # A 3 mm driver shaft can approach each bolt from the open underside.
             for hy,hz in mount['hole_centers_yz_mm']:
                 start=np.array([x+mount['plate_thickness_mm']+1,y+hy,z+hz])
                 end=np.array([mount['back_x_mm']-7,y-mount['plate_radius_mm']-5,z+hz])

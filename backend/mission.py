@@ -8,15 +8,13 @@ import numpy as np
 
 G = 9.81
 OSWALD_E = 0.85
-# Profil sürüklemesine eklenen gövde + kuyruk + girişim payı (küçük İHA'lar için tipik)
 PARASITE_CD0 = 0.015
-# Bataryanın kullanılabilir kısmı (LiPo %20'nin altına indirilmez)
 USABLE_BATTERY = 0.8
 
 DEFAULT_TARGETS = {
-    'endurance_min': 20.0,     # dk, en az
-    'turn_rate_deg': 30.0,     # °/s, en az (sürekli dönüş)
-    'stall_speed': 12.0,       # m/s, en fazla
+    'endurance_min': 20.0,
+    'turn_rate_deg': 30.0,
+    'stall_speed': 12.0,
 }
 
 
@@ -45,13 +43,10 @@ def mission_performance(geom, airfoil_props, motor_power, battery_wh,
         return 0.5 * rho * V**3 * S * cd0 + 2.0 * k * (n * W)**2 / (rho * V * S)
 
     v_stall = float(np.sqrt(2 * W / (rho * S * cl_max)))
-    # En az güç (en uzun havada kalış) ve en az sürükleme (en uzun menzil) hızları
     v_base = np.sqrt(2 * W / (rho * S))
     v_min_power = max(float(v_base * (k / (3 * cd0)) ** 0.25), v_stall * 1.1)
-    # Seyir, stall'a güvenli pay bırakacak şekilde en az 1.3·Vs alınır
     v_best_range = max(float(v_base * (k / cd0) ** 0.25), v_stall * 1.3)
 
-    # Solve P_required(V)=P_available, not the last point of a capped speed grid.
     v_opt=max(float(v_base*(k/(3*cd0))**.25),v_stall)
     minimum_power=float(power_required(v_opt))
     can_fly=bool(P_avail>=minimum_power)
@@ -68,7 +63,6 @@ def mission_performance(geom, airfoil_props, motor_power, battery_wh,
         v_max=bisect_root(v_opt,upper,lambda v:power_required(v)-P_avail)
         if power_required(v_stall)>P_avail:
             v_min=bisect_root(v_stall,v_opt,lambda v:P_avail-power_required(v))
-        # Avionics consume energy per distance too; include their load in range optimum.
         A=.5*rho*S*cd0;B=2*k*W*W/(rho*S)
         lo=(B/A)**.25;hi=max(2*lo,v_max)
         while 2*A*hi**4-avionics_power*prop_efficiency*hi-2*B<0:hi*=2
@@ -80,13 +74,10 @@ def mission_performance(geom, airfoil_props, motor_power, battery_wh,
     p_req=power_required(speeds)
 
     usable_wh = battery_wh * USABLE_BATTERY
-    # Düz seyirde bataryadan çekilen güç; rüzgâr, tırmanma ve manevra dahil değildir
     p_cruise = power_required(v_best_range) / prop_efficiency + avionics_power
     endurance_min = float(usable_wh / p_cruise * 60.0) if can_fly else 0.0
     range_km = float(endurance_min / 60.0 * v_best_range * 3.6)
 
-    # Dönüş performansı: yük faktörü üç sınırın en küçüğüdür
-    #   aerodinamik (stall): n = (V/Vs)²,  yapısal: n_limit,  güç (sürekli dönüş için)
     def turn(V, n):
         if n <= 1.0:
             return 0.0, float('inf')
@@ -111,7 +102,6 @@ def mission_performance(geom, airfoil_props, motor_power, battery_wh,
         if rate_sus > best['rate']:
             best = {'rate': rate_sus, 'radius': radius_sus, 'speed': float(V), 'n': n_sus}
 
-    # Köşe hızı: stall ve yapısal sınırın kesiştiği, anlık dönüşün en hızlı olduğu nokta
     v_corner = v_stall * np.sqrt(n_limit)
     corner_rate, corner_radius = turn(v_corner, n_limit)
 
@@ -128,6 +118,7 @@ def mission_performance(geom, airfoil_props, motor_power, battery_wh,
         'max_speed': round(v_max, 2),
         'loiter_speed': round(v_min_power, 2),
         'cruise_speed': round(v_best_range, 2),
+        'glide_ratio_estimate': round(float(1 / (2 * np.sqrt(k * cd0))), 1),
         'climb_rate': round(climb_rate, 2),
         'endurance_min': round(endurance_min, 1),
         'range_km': round(range_km, 1),

@@ -1,28 +1,27 @@
-/* Ekranda gösterilen uçak modeli (ana 3D sahne ve gövde önizlemesi ortak kullanır).
- * STL çıktısı bu ağlardan üretilmez; yalnızca görselleştirme içindir.
- */
 
+const TAIL_TIP_START = .94;
+
+function tailChordScale(eta) {
+  const u = Math.max(0,(eta - TAIL_TIP_START)/(1-TAIL_TIP_START));
+  return 1 - .32*eta**1.25 - .12*(1-Math.sqrt(Math.max(0,1-u*u)));
+}
+const MODEL_BACKGROUND = 0xe9eef3;
+const MODEL_HOME_VIEW = [-.9, 1.1, -.6];
 const MODEL_COLORS = {
-  airframe: 0xeceef1,
-  fuselage: 0xd3d8de,
-  flap: 0x3b7dd8,
-  aileron: 0xe8590c,
-  elevator: 0x2a9d8f,
-  rudder: 0xd4a017,
+  airframe: 0xadc0ce,
+  fuselage: 0xadc0ce,
+  control: 0x325b73,
   dark: 0x4a5058,
   carbon: 0x2e3238,
-  glass: 0x1c2733,
 };
 
 function modelMaterial(color) {
   return new THREE.MeshStandardMaterial({
     color, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide,
-    // Panel çizgileri yüzeyle aynı derinlikte; yüzeyi biraz geri iterek çizgileri öne alır
     polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
   });
 }
 
-// Airfoil koordinatlarından üst/alt yüzey fonksiyonları (satırlar: üst x 0→1, sonra alt x 1→0)
 function profileFunctions(coords) {
   const nHalf = Math.floor(coords.length / 2);
   const upper = coords.slice(0, nHalf).map(c => [c.x, c.y_upper]).sort((a, b) => a[0] - b[0]);
@@ -41,12 +40,6 @@ function profileFunctions(coords) {
   return { upper: x => interp(upper, x), lower: x => interp(lower, x) };
 }
 
-/**
- * Tek bir taşıyıcı yüzey paneli (kanat yarısı, stabilize, dikey kuyruk…).
- * def: { rootLE, tipLE, rootChord, tipChord, up, coords, controls: [{ etaStart, etaEnd, chordRatio, color }] }
- * Veter +x yönündedir; `up` profil kalınlığının yönüdür. Kontrol yüzeyleri firar kenarında
- * ayrı renkli paneller olarak üretilir; kök ve uç kesitlerinin düz kapakları vardır.
- */
 function buildSurface(group, def) {
   const prof = profileFunctions(def.coords);
   const controls = def.controls || [];
@@ -61,26 +54,53 @@ function buildSurface(group, def) {
   const etas = uniq([
     ...Array.from({ length: N_SPAN + 1 }, (_, k) => k / N_SPAN),
     ...controls.flatMap(c => [c.etaStart, c.etaEnd]),
+    ...(def.roundedTip ? Array.from({length:13}, (_,i) => TAIL_TIP_START + (1-TAIL_TIP_START)*Math.sin(Math.PI*i/24)) : []),
   ]);
 
   const spanDir = def.tipLE.clone().sub(def.rootLE).normalize();
-  const stations = etas.map(eta => ({
-    eta,
-    le: def.rootLE.clone().lerp(def.tipLE, eta),
-    chord: def.rootChord + (def.tipChord - def.rootChord) * eta,
-    thick: 1,
-  }));
-  // Kesit halkası: üst yüzey firar→hücum, ardından alt yüzey hücum→firar
+  const stations = etas.map(eta => {
+    const chord = def.rootChord + (def.tipChord - def.rootChord) * eta;
+    const u = def.roundedTip ? Math.max(0, (eta - TAIL_TIP_START)/(1-TAIL_TIP_START)) : 0;
+    const scale = def.roundedTip ? tailChordScale(eta) : 1;
+    const le = def.rootLE.clone().lerp(def.tipLE, eta);
+    le.x += chord * (1-scale);
+    return {eta, le, chord: chord*scale, nominalChord: chord, thick: 1, tipCap: u > 0};
+  });
+  if (def.wingtip) {
+    const panel = def.tipLE.clone().sub(def.rootLE);
+    const extension = panel.clone().multiplyScalar(.055);
+    const angle = 70*Math.PI/180;
+    for (let i=1; i<=24; i++) {
+      const theta = angle*i/24;
+      const travel = Math.sin(theta)/Math.sin(angle);
+      const bend = (1-Math.cos(theta))/(1-Math.cos(angle));
+      const nominal = def.tipChord*Math.exp((def.tipChord-def.rootChord)/def.tipChord*.055*travel);
+      const chord = nominal*(1-.5*bend);
+      const le = def.tipLE.clone().addScaledVector(extension,travel)
+        .addScaledVector(def.up,extension.length()*.72*bend);
+      le.x += .30*(nominal-chord);
+      stations.push({eta:1+.055*travel,le,chord,thick:1,tipCap:true});
+    }
+  }
   const loop = [];
   for (let k = xs.length - 1; k >= 0; k--) loop.push({ x: xs[k], y: prof.upper(xs[k]) });
   for (let k = 1; k < xs.length; k++) loop.push({ x: xs[k], y: prof.lower(xs[k]) });
   const M = loop.length;
+  const hingeAt = (st, hinge) => {
+    const reference = def.straightTail ? def.tipChord : st.nominalChord;
+    return 1 - (1-hinge)*reference/st.chord;
+  };
+  const sectionX = (st, x) => {
+    if ((!def.straightTail && !def.roundedTip) || !controls.length || st.tipCap) return x;
+    const base = +(1-controls[0].chordRatio).toFixed(5);
+    const hinge = hingeAt(st, base);
+    return x <= base ? x*hinge/base : hinge+(x-base)*(1-hinge)/(1-base);
+  };
 
   const pointAt = (st, x, y) => st.le.clone()
     .addScaledVector(new THREE.Vector3(1, 0, 0), x * st.chord)
     .addScaledVector(def.up, y * st.chord * st.thick);
 
-  // Dörtgenleri ait oldukları parçaya (ana yüzey ya da bir kontrol yüzeyi) dağıt
   const parts = new Map();
   const partFor = (key) => {
     if (!parts.has(key)) parts.set(key, { verts: [], idx: [], lookup: new Map() });
@@ -89,7 +109,9 @@ function buildSurface(group, def) {
   const vertex = (part, i, j) => {
     const id = i * M + j;
     if (!part.lookup.has(id)) {
-      const p = pointAt(stations[i], loop[j].x, loop[j].y);
+      const st = stations[i], x = sectionX(st, loop[j].x);
+      const y = (def.straightTail || def.roundedTip) ? prof[j < xs.length ? 'upper' : 'lower'](x) : loop[j].y;
+      const p = pointAt(st, x, y);
       part.lookup.set(id, part.verts.length / 3);
       part.verts.push(p.x, p.y, p.z);
     }
@@ -108,10 +130,7 @@ function buildSurface(group, def) {
       part.idx.push(a, b, c, b, d, c);
     }
   }
-  // Flat, closed tips match the manufactured panel. Mirrored left panels need
-  // reversed winding; otherwise their normals point inward despite DoubleSide.
   const caps = THREE.ShapeUtils.triangulateShape(loop.map(p => new THREE.Vector2(p.x,p.y)), []);
-  // Caps use separate vertices so smoothing cannot bend the flat end visually.
   const rootCap = partFor(-2), tipCap = partFor(-3);
   for (const tri of caps) {
     rootCap.idx.push(vertex(rootCap,0,tri[2]),vertex(rootCap,0,tri[1]),vertex(rootCap,0,tri[0]));
@@ -133,15 +152,12 @@ function buildSurface(group, def) {
     group.add(mesh);
   }
 
-  // Kontrol yüzeylerinin panel çizgileri (menteşe hattı ve iki yan kenar; üstte ve altta)
   const line = [];
   const at = (eta, x, side) => {
-    const st = {
-      le: def.rootLE.clone().lerp(def.tipLE, eta),
-      chord: def.rootChord + (def.tipChord - def.rootChord) * eta,
-      thick: 1,
-    };
-    return pointAt(st, x, prof[side](x));
+    const st = stations.find(station => Math.abs(station.eta-eta)<.000006);
+    if (!st) return pointAt(stations.at(-1), x, prof[side](x));
+    const section = sectionX(st, x);
+    return pointAt(st, section, prof[side](section));
   };
   for (const c of controls) {
     const hinge = 1 - c.chordRatio;
@@ -164,12 +180,18 @@ function buildSurface(group, def) {
 function buildWingGroup(geom, coords) {
   const group = new THREE.Group();
   const cs = geom.control_surfaces || {};
-  const controls = [
-    { etaStart: cs.flap?.eta_start ?? .08, etaEnd: cs.flap?.eta_end ?? .5, chordRatio: cs.flap?.chord_ratio ?? .3, color: MODEL_COLORS.flap },
-    { etaStart: cs.aileron?.eta_start ?? .55, etaEnd: cs.aileron?.eta_end ?? .9, chordRatio: cs.aileron?.chord_ratio ?? .25, color: MODEL_COLORS.aileron },
+  const controls = cs.flaperon ? [{
+    etaStart: cs.flaperon.eta_start, etaEnd: cs.flaperon.eta_end,
+    chordRatio: cs.flaperon.chord_ratio, color: MODEL_COLORS.control,
+  }] : [
+    { etaStart: cs.flap?.eta_start ?? .08, etaEnd: cs.flap?.eta_end ?? .5, chordRatio: cs.flap?.chord_ratio ?? .3, color: MODEL_COLORS.control },
+    { etaStart: cs.aileron?.eta_start ?? .55, etaEnd: cs.aileron?.eta_end ?? .9, chordRatio: cs.aileron?.chord_ratio ?? .25, color: MODEL_COLORS.control },
   ];
   for (const p of aircraftPanelSpecs(geom,coords,coords,coords).filter(p=>p.kind==='wing')) {
-    buildSurface(group,{rootLE:new THREE.Vector3(...p.root),tipLE:new THREE.Vector3(...p.tip),rootChord:p.chord,tipChord:p.tipChord,up:new THREE.Vector3(...p.up),coords:p.coords,controls});
+    const rootLE = new THREE.Vector3(...p.root);
+    const tipLE = new THREE.Vector3(...p.tip);
+    const up = new THREE.Vector3(...p.up);
+    buildSurface(group,{rootLE,tipLE,rootChord:p.chord,tipChord:p.tipChord,up,coords:p.coords,controls,wingtip:true});
   }
   if(geom.motor_mount?.motorLayout==='twin') addMotorHardware(group,motorPreviewSpecs(geom,geom.motor_mount,[]));
   return group;
@@ -177,6 +199,13 @@ function buildWingGroup(geom, coords) {
 
 function buildTailGroup(geom, hCoords, vCoords) {
   const group = new THREE.Group();
+  if (geom.fuse_preset === 'akin') {
+    const y=akinTubeHeight(geom)*1000;
+    const x=akinPodLength(geom)*1000-8;
+    const end=(geom.tail_x_pos+.4*geom.htail_chord)*1000+23;
+    addCarbonBoomHardware(group,{start_mm:[x,y,0],end_mm:[end,y,0],
+      length_mm:end-x,outer_diameter_mm:16},true);
+  }
   if (geom.tail_booms) {
     const b=geom.tail_booms;
     const y=(geom.wing_position_offset||0)+b.y*Math.sin(THREE.MathUtils.degToRad(geom.dihedral_angle));
@@ -187,10 +216,61 @@ function buildTailGroup(geom, hCoords, vCoords) {
   }
   for (const p of aircraftPanelSpecs(geom,hCoords,hCoords,vCoords).filter(p=>p.kind==='tail')) {
     const vertical=p.name.includes('vertical');
-    const control=vertical?geom.control_surfaces?.rudder:geom.control_surfaces?.elevator;
-    buildSurface(group,{rootLE:new THREE.Vector3(...p.root),tipLE:new THREE.Vector3(...p.tip),rootChord:p.chord,tipChord:p.tipChord,up:new THREE.Vector3(...p.up),coords:p.coords,controls:[{etaStart:0,etaEnd:1,chordRatio:control?.chord_ratio??.3,color:vertical?MODEL_COLORS.rudder:MODEL_COLORS.elevator}]});
+    const key=vertical ? 'rudder' : geom.tail_type==='vtail' ? 'ruddervator' : 'elevator';
+    const control=geom.control_surfaces?.[key];
+    const roundedTip = geom.tail_type === 'conventional'
+      ? !geom.tail_booms || vertical : geom.tail_type === 'vtail' || (!geom.tail_booms && !vertical);
+    buildSurface(group,{rootLE:new THREE.Vector3(...p.root),tipLE:new THREE.Vector3(...p.tip),rootChord:p.chord,tipChord:p.tipChord,up:new THREE.Vector3(...p.up),coords:p.coords,roundedTip,straightTail:true,controls:[{etaStart:control?.eta_start ?? (roundedTip ? .12 : 0),etaEnd:Math.min(roundedTip ? TAIL_TIP_START : 1,control?.eta_end ?? (roundedTip ? (vertical ? .78 : .90) : 1)),chordRatio:control?.chord_ratio??.3,color:MODEL_COLORS.control}]});
   }
   return group;
+}
+
+function addNoseGrille(body, length) {
+  if (!(length > 0)) return;
+  body.geometry.computeBoundingBox();
+  const bounds = body.geometry.boundingBox;
+  const width = bounds.max.z - bounds.min.z;
+  const start = bounds.min.x;
+  const ray = new THREE.Raycaster();
+  const down = new THREE.Vector3(0, -1, 0);
+  const positions = [];
+  const face = (x, z) => {
+    ray.set(new THREE.Vector3(x, bounds.max.y + length, z), down);
+    const hit = ray.intersectObject(body, false)[0];
+    return hit && [x, hit.point.y + .00045, z];
+  };
+  for (let slot = -4; slot <= 4; slot++) {
+    const centerZ = (bounds.min.z + bounds.max.z) / 2 + width * .035 * slot;
+    const shorten = Math.abs(slot) / 4 * .012;
+    const left = centerZ - width * .009;
+    const right = centerZ + width * .009;
+    const leading = start + length * (.025 + shorten);
+    const span = length * (.047 - shorten * 1.7);
+    for (let step = 0; step < 12; step++) {
+      const x0 = leading + span * step / 12;
+      const x1 = leading + span * (step + 1) / 12;
+      const a = face(x0, left), b = face(x0, right), c = face(x1, left), d = face(x1, right);
+      if (a && b && c && d) positions.push(...a, ...b, ...c, ...b, ...d, ...c);
+    }
+  }
+  if (!positions.length) return;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const grille = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    color: MODEL_COLORS.control, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+  }));
+  grille.name = 'nose_grille';
+  body.add(grille);
+}
+
+function addManufacturedNoseGrille(group, length) {
+  const front = group.children.filter(part => /^body(_|$)/.test(part.userData.partName || ''))
+    .reduce((first, part) => {
+      part.geometry.computeBoundingBox();
+      return !first || part.geometry.boundingBox.min.x < first.geometry.boundingBox.min.x ? part : first;
+    }, null);
+  if (front) addNoseGrille(front, length);
 }
 
 function buildFuselageGroup(geom, type, wingCoords) {
@@ -210,7 +290,6 @@ function buildFuselageGroup(geom, type, wingCoords) {
       idx.push(a, c, b, b, c, d);
     }
   }
-  // Uç kapakları
   for (const si of [0, sections.length - 1]) {
     const center = sections[si].reduce((acc, p) => acc.add(new THREE.Vector3(p.x, p.y, p.z)), new THREE.Vector3()).divideScalar(nCirc);
     const ci = verts.length / 3;
@@ -227,103 +306,55 @@ function buildFuselageGroup(geom, type, wingCoords) {
   geo.computeVertexNormals();
   const body = new THREE.Mesh(geo, modelMaterial(MODEL_COLORS.fuselage));
   body.castShadow = true;
+  addNoseGrille(body, sections.at(-1)[0].x - sections[0][0].x);
   group.add(body);
-  if (type !== 'manual') addFuselagePanel(group, sections);
-  if (geom.motor_mount && geom.motor_mount.motorLayout !== 'none') {
-    if(geom.motor_mount.motorLayout==='single') addMotorHardware(group,motorPreviewSpecs(geom,geom.motor_mount,sections));
-    return group;
+  addFuselagePanel(group, body, sections, geom.fuse_preset);
+  if (geom.motor_mount?.motorLayout === 'rear') {
+    addMotorHardware(group, motorPreviewSpecs(geom, geom.motor_mount, sections));
   }
-
-  // Pervane: standart yerleşimde burunda (çekici), yarışma yerleşiminde gövde arkasında (itici)
-  const pusher = geom.airframe === 'combat';
-  const x0 = sections[0][0].x;
-  const x1 = sections[sections.length - 1][0].x;
-  const length = x1 - x0;
-  const spinLen = length * 0.04;
-  const sectionAt = (x) => sections.reduce((best, sec) =>
-    (Math.abs(sec[0].x - x) < Math.abs(best[0].x - x) ? sec : best));
-  const extent = (sec) => {
-    const ys = sec.map(p => p.y);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const centerY = (minY + maxY) / 2;
-    return { minY, maxY, centerY, radius: Math.max(...sec.map(p => Math.hypot(p.y - centerY, p.z))) };
-  };
-
-  const hub = extent(sectionAt(pusher ? x1 - spinLen : x0 + spinLen));
-  const radius = hub.radius * 1.06;
-  const profile = [];
-  for (let k = 0; k <= 12; k++) {
-    const t = k / 12;
-    profile.push(new THREE.Vector2(radius * Math.sqrt(t), t * spinLen * 1.25));
-  }
-  const dark = new THREE.MeshStandardMaterial({ color: MODEL_COLORS.dark, roughness: 0.4, metalness: 0.3 });
-  const spinner = new THREE.Mesh(new THREE.LatheGeometry(profile, 32), dark);
-  // Lathe ekseni +y: çekicide ucu öne (−x), iticide arkaya (+x) bakar
-  spinner.rotation.z = pusher ? Math.PI / 2 : -Math.PI / 2;
-  spinner.position.set(pusher ? x1 + spinLen * 0.25 : x0 - spinLen * 0.25, hub.centerY, 0);
-  spinner.castShadow = true;
-  group.add(spinner);
-
-  let propRadius = Math.max(geom.wingspan * 0.11, radius * 2.5);
-  if (geom.tail_booms) propRadius = Math.min(propRadius, geom.tail_booms.y * 0.85);
-  const blade = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 8), dark);
-  blade.scale.set(radius * 0.12, propRadius, radius * 0.55);
-  blade.rotation.x = Math.PI / 5;
-  blade.position.set(pusher ? x1 - spinLen * 0.25 : x0 + spinLen * 0.25, hub.centerY, 0);
-  blade.castShadow = true;
-  group.add(blade);
-
-  if (pusher) {
-    // Burun altında öne bakan kamera kubbesi (hedef takibi için burun boş bırakılır)
-    const nose = extent(sectionAt(x0 + length * 0.12));
-    const dome = new THREE.Mesh(
-      new THREE.SphereGeometry(nose.radius * 0.5, 24, 16),
-      new THREE.MeshStandardMaterial({ color: MODEL_COLORS.glass, roughness: 0.15, metalness: 0.6 })
-    );
-    dome.position.set(x0 + length * 0.12, nose.minY + nose.radius * 0.15, 0);
-    dome.castShadow = true;
-    group.add(dome);
-  }
-
   return group;
 }
 
-// A flush upper access-panel finish; the manufacturing shell remains continuous.
-function addFuselagePanel(group, sections) {
-  const first = sections[0][0].x, length = sections[sections.length - 1][0].x - first;
-  const sample = (x, theta) => {
-    let i = sections.findIndex(sec => sec[0].x >= x);
-    i = Math.max(1, i);
-    const a = sections[i - 1], b = sections[i];
-    const u = (x - a[0].x) / (b[0].x - a[0].x);
-    const f = theta / (2 * Math.PI) * a.length, j = Math.floor(f), v = f - j;
-    const at = sec => new THREE.Vector3().lerpVectors(sec[j % a.length], sec[(j + 1) % a.length], v);
-    const p = at(a).lerp(at(b), u);
-    p.y += length * .00045;
-    return p;
-  };
-  const rows = 40, cols = 20, vertices = [], indices = [], left = [], right = [];
-  for (let i = 0; i <= rows; i++) {
-    const u = i / rows, x = first + length * (.12 + .32 * u);
-    const halfAngle = .48 * (.3 + .7 * Math.sin(Math.PI * u) ** .55);
-    for (let j = 0; j <= cols; j++) {
-      const p = sample(x, Math.PI / 2 + halfAngle * (2 * j / cols - 1));
-      vertices.push(p.x, p.y, p.z);
-      if (j === 0) left.push(p);
-      if (j === cols) right.push(p);
-      if (i < rows && j < cols) {
-        const a = i * (cols + 1) + j, b = a + 1, c = a + cols + 1;
-        indices.push(a, c, b, b, c, c + 1);
-      }
+function addFuselagePanel(group, body, sections, preset) {
+  const start = sections[0][0].x, length = sections.at(-1)[0].x - start;
+  const hatchStart = ['vtol5','akin'].includes(preset) ? .16 : .13;
+  const first = start + hatchStart * length, last = start + (hatchStart + .30) * length;
+  const between = sections.filter(ring => ring[0].x >= first && ring[0].x <= last);
+  if (!between.length) return;
+  const width = Math.min(...between.map(ring => {
+    const width = ring.map(point => point.z);
+    return Math.max(...width) - Math.min(...width);
+  }));
+  const center = (first + last) / 2, halfBridge = .004;
+  const ray = new THREE.Raycaster();
+  const down = new THREE.Vector3(0, -1, 0);
+  const outline = new THREE.LineBasicMaterial({color: 0x708491, transparent: true, opacity: .8});
+  const rearShift=preset==='vtol' ? .0125*length : 0;
+  for (const [front, rear] of [[first, center - halfBridge], [center + halfBridge + rearShift, last + rearShift]]) {
+    const halfWidth = width * (['seyir','vtol'].includes(preset) && front === first ? .30 : .26);
+    const radius = Math.min(.012, halfWidth * .34, (rear - front) * .2);
+    const shape = new THREE.Shape();
+    shape.moveTo(front + radius, -halfWidth);
+    shape.lineTo(rear - radius, -halfWidth);
+    shape.absarc(rear - radius, -halfWidth + radius, radius, -Math.PI / 2, 0, false);
+    shape.lineTo(rear, halfWidth - radius);
+    shape.absarc(rear - radius, halfWidth - radius, radius, 0, Math.PI / 2, false);
+    shape.lineTo(front + radius, halfWidth);
+    shape.absarc(front + radius, halfWidth - radius, radius, Math.PI / 2, Math.PI, false);
+    shape.lineTo(front, -halfWidth + radius);
+    shape.absarc(front + radius, -halfWidth + radius, radius, Math.PI, 3 * Math.PI / 2, false);
+    shape.closePath();
+    const points = shape.getSpacedPoints(108).flatMap(({x, y: z}) => {
+      ray.set(new THREE.Vector3(x, length, z), down);
+      const hit = ray.intersectObject(body, false)[0];
+      if (!hit) return [];
+      hit.point.y += .0005;
+      return [hit.point];
+    });
+    if (points.length > 2) {
+      group.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(points), outline));
     }
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  group.add(new THREE.Mesh(geo, modelMaterial(0x34424d)));
-  const edge = new THREE.BufferGeometry().setFromPoints([...left, ...right.reverse()]);
-  group.add(new THREE.LineLoop(edge, new THREE.LineBasicMaterial({color: 0xc48554})));
 }
 
 function addMotorHardware(group,motors) {
@@ -369,10 +400,10 @@ function addVtolServoHardware(group,joints){
   group.add(refs);
 }
 
-function addCarbonBoomHardware(group,tube){
+function addCarbonBoomHardware(group,tube,structural=false){
   if(!tube)return;
-  const refs=new THREE.Group();refs.userData.motorHardware=true;
-  refs.visible=$('motorHardwareView')?.checked??true;
+  const refs=new THREE.Group();refs.userData.motorHardware=!structural;
+  refs.visible=structural || ($('motorHardwareView')?.checked??true);
   const start=new THREE.Vector3(...tube.start_mm).multiplyScalar(.001),end=new THREE.Vector3(...tube.end_mm).multiplyScalar(.001);
   const axis=end.clone().sub(start).normalize(),center=start.clone().add(end).multiplyScalar(.5);
   const material=modelMaterial(0x3c4651);
@@ -387,25 +418,16 @@ function disposeModel(group) {
   });
 }
 
-// Sahne ışıkları: yumuşak gökyüzü dolgusu + gölge düşüren ana ışık + karşı dolgu
-function addModelLights(scene, center, radius, withShadows) {
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f98, 0.62));
-  const key = new THREE.DirectionalLight(0xffffff, 0.6);
-  key.position.copy(center).add(new THREE.Vector3(-0.6, 1.6, 0.9).multiplyScalar(radius * 2));
+function modelViewDistance(camera, radius) {
+  const vertical = THREE.MathUtils.degToRad(camera.fov / 2);
+  const horizontal = Math.atan(Math.tan(vertical) * camera.aspect);
+  return .85 * radius / Math.sin(Math.min(vertical, horizontal));
+}
+
+function addModelLights(scene, center, radius) {
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8d9baa, .68));
+  const key = new THREE.DirectionalLight(0xffffff, .70);
+  key.position.copy(center).add(new THREE.Vector3(-.6, .85, .3).multiplyScalar(radius));
   key.target.position.copy(center);
-  if (withShadows) {
-    key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
-    const cam = key.shadow.camera;
-    cam.left = cam.bottom = -radius * 1.2;
-    cam.right = cam.top = radius * 1.2;
-    cam.near = radius * 0.1;
-    cam.far = radius * 6;
-    cam.updateProjectionMatrix();
-    key.shadow.bias = -0.0005;
-  }
   scene.add(key, key.target);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.25);
-  fill.position.copy(center).add(new THREE.Vector3(0.8, 0.3, -1).multiplyScalar(radius * 2));
-  scene.add(fill);
 }

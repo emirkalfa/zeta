@@ -2,39 +2,45 @@ import json
 import subprocess
 from pathlib import Path
 import numpy as np
-from backend.fixed_vtol import canonical_rings,normalize
-from backend.geometry import calculate_geometry
+from backend.fixed_vtol import canonical_rings,normalize,standard_tria_nose,tria_dimensions
+from backend.geometry import calculate_geometry, tail_planform
+from backend.tria_gimbal import follow_gimbal_profile
 
 
 def test_canonical_js_preview_and_python_stl_match():
     root=Path(__file__).resolve().parents[1]
-    script="""const fs=require('fs'),vm=require('vm');let c=vm.createContext({THREE:require('./static/vendor/three.min.js')});vm.runInContext(fs.readFileSync('./static/js/fuselage.js','utf8'),c);console.log(JSON.stringify(vm.runInContext('libraryFuselageSections({fuse_preset:\"vtol\",fuselage_length:3,fuselage_max_width:.8,fuselage_max_height:.8,fuse_width_scale:1.5,fuse_height_scale:.7}).sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000]))',c)));"""
+    script="""const fs=require('fs'),vm=require('vm');let c=vm.createContext({THREE:require('./static/vendor/three.min.js')});vm.runInContext(fs.readFileSync('./static/js/fuselage.js','utf8'),c);console.log(JSON.stringify(vm.runInContext('libraryFuselageSections({fuse_preset:\"vtol\",fuselage_length:1.3,fuselage_max_width:.8,fuselage_max_height:.8,fuse_width_scale:1.5,fuse_height_scale:.7}).sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000]))',c)));"""
     result=subprocess.run(['node','-e',script],cwd=root,text=True,capture_output=True,check=True)
-    assert np.asarray(json.loads(result.stdout))==__import__('pytest').approx(canonical_rings(),abs=1e-6)
+    assert np.asarray(json.loads(result.stdout))==__import__('pytest').approx(canonical_rings(geometry={"wingspan":2}),abs=1e-6)
 
 
 def test_old_settings_cannot_distort_fixed_body():
     g=calculate_geometry(2,4,'2412',wing_position='high');g.update(fuse_preset='vtol',fuse_width_scale=.7,fuse_height_scale=1.5)
     d=normalize({'geometry':g,'panels':[{'kind':'wing','root':[g['wing_x_pos'],0,0],'tip':[g['wing_x_pos'],0,1]}],'fuselage':[]})
     assert d['geometry']['wing_position']=='mid'
-    assert d['geometry']['wing_x_pos']==.36
+    assert d['geometry']['wing_x_pos']==.39
     assert d['geometry']['fuse_width_scale']==1
-    assert np.asarray(d['fuselage'])==__import__('pytest').approx(canonical_rings())
+    expected=standard_tria_nose(follow_gimbal_profile(canonical_rings(geometry={"wingspan":2})))
+    assert np.asarray(d['fuselage'])==__import__('pytest').approx(expected)
 
 
 def test_calculation_uses_fixed_body_before_tail_sizing():
-    for span in [1.5,2]:
+    for span,expected_length in [(1.,1.1),(1.5,1.2),(2.,1.3)]:
+        rings=canonical_rings(geometry={'wingspan':span})
+        width=np.ptp(rings[:,:,2],axis=1).max()/1000
+        height=np.ptp(rings[:,:,1],axis=1).max()/1000
         g=calculate_geometry(span,4,'2412',airframe='vtol_fixed',wing_position='high',fuse_type='manual',man_fuse_length=3)
-        assert g['fuselage_length']==1.2 and g['wing_position']=='mid'
-        assert g['fuselage_max_width']==.17 and g['fuselage_max_height']==.11
-        assert g['wing_x_pos']==.36 and g['tail_x_pos']==.984
+        assert g['fuselage_length']==expected_length and g['wing_position']=='mid'
+        assert np.allclose([g['fuselage_max_width'],g['fuselage_max_height']],[width,height],atol=.0005)
+        expected=tria_dimensions(span)
+        assert g['wing_x_pos']==expected['wing'] and g['tail_x_pos']==expected['tail']
 
 
 def test_tria_vtail_uses_actual_ac_arm_and_explicit_targets():
     import math
     for span in [1.5,2]:
         g=calculate_geometry(span,4,'4412',tail_type='vtail',wing_shape='ste_tapered',airframe='vtol_fixed')
-        area=(g['vtail_chord']+g['vtail_tip_chord'])*g['vtail_span']/2
+        area=tail_planform(g['vtail_chord'],g['vtail_tip_chord'],g['vtail_span'],True)[0]
         assert g['vtail_chord']<g['root_chord']
         assert g['vtail_span']**2/area>2.98
         assert g['tail_sizing_arm']==g['effective_tail_arm']

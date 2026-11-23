@@ -50,7 +50,6 @@ with sync_playwright() as pw:
     page.screenshot(path=str(OUT/'12-zip-yardim.png'),full_page=True)
     issue.get_by_role('button',name='İlgili ayara git').first.click()
     assert page.locator('#printBedX').evaluate('(e)=>e===document.activeElement')
-    # Parameter tab links must also activate their tab and expand the control.
     page.evaluate("showManufacturingIssue('Kamera derinliği burun ile kanat arasına sığmıyor.');switchTab('stl')")
     issue.get_by_role('button',name='İlgili ayara git').first.click()
     assert page.locator('#cameraDepth').evaluate('(e)=>e===document.activeElement')

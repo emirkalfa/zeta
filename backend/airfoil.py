@@ -56,7 +56,6 @@ def _cd_0_at_re(Re, t, m):
 def _cl_max_at_re(Re, cl_max_base, t):
     """CL_max drops at low Re due to early separation."""
     Re = max(Re, 10000)
-    # Gentle reduction below Re=1e6
     factor = 1.0 - 0.15 * max(0, 1 - Re / 1000000)
     return cl_max_base * factor
 
@@ -67,9 +66,6 @@ def get_airfoil_properties(code, Re=200000):
     p = int(code[1]) / 10.0
     t = int(code[2:4]) / 100.0
 
-    # Zero-lift angle from thin airfoil theory (Anderson Eq. 4.61):
-    #   alpha_L0 = -(1/pi) * integral_0^pi (dyc/dx)(cos(theta) - 1) dtheta
-    # Numerical integration over the camber line for any NACA 4-digit code.
     if m > 0 and p > 0:
         n_int = 200
         theta = np.linspace(1e-9, np.pi - 1e-9, n_int)
@@ -84,14 +80,8 @@ def get_airfoil_properties(code, Re=200000):
         alpha_L0 = 0.0
     alpha_L0_deg = float(np.degrees(alpha_L0))
 
-    # 2D lift-curve slope from thin airfoil theory (per radian).
-    # Inviscid value is 2π regardless of Re. Sweep correction applied
-    # in lifting-line analysis.
     cl_alpha = 2 * np.pi
 
-    # Pitching moment about aerodynamic center from thin airfoil theory:
-    #   cm_ac = -(pi/4) * (A1 - A2)
-    # where A_n are Fourier coefficients of dyc/dx.
     if m > 0 and p > 0:
         A1 = (2.0 / np.pi) * np.trapezoid(dyc_dx * np.cos(theta), theta)
         A2 = (2.0 / np.pi) * np.trapezoid(dyc_dx * np.cos(2 * theta), theta)
@@ -99,17 +89,11 @@ def get_airfoil_properties(code, Re=200000):
     else:
         cm_ac = 0.0
 
-    # Empirical CL_max for NACA 4-digit at Re ~ 1e6 (smooth surface).
-    # This heuristic has not been calibrated to measured polars at the requested Re.
-    #   thicker -> slightly lower, more camber -> higher.
     cl_max_base = 1.50 + 4.0 * m - 1.0 * max(t - 0.12, 0.0)
     cl_max = _cl_max_at_re(Re, cl_max_base, t)
 
-    # Profile drag at design Reynolds number.
     cd_0 = _cd_0_at_re(Re, t, m)
 
-    # Stall angle: thicker airfoils stall later, camber shifts curve.
-    # Reduced at low Re (gentle drop below Re=1e6).
     alpha_stall_base = 12.0 + 30.0 * t - 50.0 * m
     alpha_stall = alpha_stall_base * (1.0 - 0.2 * max(0, 1 - Re / 1000000))
 

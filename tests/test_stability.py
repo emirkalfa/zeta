@@ -88,12 +88,10 @@ class TestStabilityStatus:
         g_high = calculate_geometry(1.5, 2.5, "2412", manual_mode=True,
                                     man_root_chord=0.20, man_tip_chord=0.20,
                                     man_htail_span=0.5, man_htail_root=0.2, man_htail_tip=0.1)
-        # AR: b^2/S: same span, S=root*span: AR_low=5, AR_high=7.5
         assert g_low["aspect_ratio"] == pytest.approx(5.0, abs=0.1)
         assert g_high["aspect_ratio"] == pytest.approx(7.5, abs=0.1)
         r_low = flight_test(g_low, airfoil_props_2412)
         r_high = flight_test(g_high, airfoil_props_2412)
-        # Different AR -> different d_eps -> different NP
         assert abs(r_low["neutral_point"] - r_high["neutral_point"]) > 0.01
 
     def test_sm_uses_wing_area_in_arms(self, airfoil_props_2412):

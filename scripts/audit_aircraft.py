@@ -26,7 +26,6 @@ def main():
     c=app.test_client();airfoils=c.get('/api/airfoils').json
     def coords(code):return c.get('/api/airfoil/'+str(next(a['id'] for a in airfoils if a['code']==code))).json['coordinates']
     co=(coords('2412'),coords('0012'));geometry=[];scenarios=[];polar_checks=[]
-    # Seven supported four-digit profiles, all three wing planforms, three Re values.
     for code,shape,re in itertools.product([a['code'] for a in airfoils],['rectangular','tapered','ste_tapered'],[100000,200000,500000]):
         g=calculate_geometry(1.5,1.2,code,wing_shape=shape);p=get_airfoil_properties(code,re)
         results=lifting_line_analysis(g,p,n_stations=80)
@@ -42,7 +41,6 @@ def main():
         data=request_data(co,tail,preset=body,wing_shape=shape)
         g=calculate_geometry(1.5,1.2,'2412',tail_type=tail,wing_shape=shape,wing_position=pos)
         g.update(fuse_preset=body,fuse_width_scale=1.,fuse_height_scale=1.)
-        # Frontend recomputes body rings and panel placement from the same geometry.
         import subprocess
         script="""const fs=require('fs'),vm=require('vm');const c=vm.createContext({THREE:require('./static/vendor/three.min.js'),window:{addEventListener(){}}});for(const f of ['fuselage.js','assembly.js'])vm.runInContext(fs.readFileSync('./static/js/'+f,'utf8'),c);Object.assign(c,JSON.parse(fs.readFileSync(0,'utf8')));console.log(JSON.stringify(vm.runInContext('({geometry:g,panels:aircraftPanelSpecs(g,w,h,h),fuselage:libraryFuselageSections(g).sections.map(r=>r.map(p=>[p.x*1000,p.y*1000,p.z*1000]))})',c)));"""
         result=subprocess.run(['node','-e',script],input=json.dumps({'g':g,'w':co[0],'h':co[1]}),text=True,capture_output=True,cwd=ROOT,check=True)

@@ -146,3 +146,31 @@ class TestDesktopPresence:
         res = client.post('/api/heartbeat')
         assert res.get_json() == {'desktop': False}
         assert app_module._presence['closing'] is None
+
+
+def test_cg_wing_choices_hold_the_same_static_margin(client):
+    inputs = {"wingspan": 2, "weight": 4, "airfoil_code": "4415",
+              "tail_airfoil_code": "0012", "tail_type": "vtail"}
+    initial = client.post("/api/calculate", json=inputs).get_json()
+    options = initial["cg_placement"]["options"]
+    assert len(options) == 3
+    assert options[0]["wing_x"] < options[1]["wing_x"] < options[2]["wing_x"]
+    for option in options:
+        geometry = client.post("/api/calculate", json={
+            **inputs, "cg_fuselage_percent": option["cg_percent"],
+        }).get_json()
+        assert geometry["wing_x_pos"] == pytest.approx(option["wing_x"])
+        assert geometry["tail_x_pos"] == initial["tail_x_pos"]
+        assert geometry["cg_placement"]["cg_x"] == pytest.approx(
+            option["cg_percent"] * geometry["fuselage_length"] / 100
+        )
+        flight = client.post("/api/stability", json={
+            "geometry": geometry, "airfoil_code": "4415", "tail_airfoil_code": "0012",
+        }).get_json()
+        assert flight["static_margin"] == 10
+
+    limited = client.post("/api/calculate", json={
+        **inputs, "cg_fuselage_percent": 100,
+    }).get_json()
+    assert limited["cg_placement"]["limited"]
+    assert limited["wing_x_pos"] == pytest.approx(initial["cg_placement"]["limits"][-1]["wing_x"])

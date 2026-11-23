@@ -75,7 +75,7 @@ def test_manual_combat_tail_dimensions_remain_mountable(coords,tail):
     horizontal=[p for p in data['panels'] if p['name'].startswith('tail_horizontal_')]
     area=sum((p['chord']+p['tipChord'])/2*abs(p['tip'][2]-p['root'][2]) for p in horizontal)
     assert area==pytest.approx(.54*(.18+.09)/2,abs=1e-9)
-    assert area==pytest.approx(g['htail_area'],abs=.0005)  # Report rounds area to 0.001 m².
+    assert area==pytest.approx(g['htail_area'],abs=.0005)
     for joint in report['interfaces']:assert (named[joint['part']]^named[joint['parent']]).volume()<.1
     tail_names=[p['name'] for p in data['panels'] if p['kind']=='tail']
     for i,name in enumerate(tail_names):

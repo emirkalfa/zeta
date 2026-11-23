@@ -23,8 +23,6 @@ def test_hatch_matches_completed_roof(coords,preset,position,shape):
                     hits=solid.ray_cast([x,500,z],[x,-500,z])
                     assert hits
                     return hits[0].position[1]
-                # Extrapolate the neighboring exterior across the intentional
-                # fitting gap. A detached raised root lip fails this check.
                 y0=top(body,edge+side*.8)
                 y1=top(body,edge+side*1.2)
                 expected=y0+(y0-y1)*2.5

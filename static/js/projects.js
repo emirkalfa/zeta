@@ -1,4 +1,3 @@
-/* Portable design snapshots; meshes are regenerated from saved inputs. */
 function projectMessage(message){$('projectLibraryStatus').textContent=message;}
 async function projectAPI(url,body){
   const res=await fetch(url,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});
@@ -20,7 +19,9 @@ function validateProjectFile(data){
   for(const key of ['mode','wing_shape','wing_position','tail_type','fuse_type','mission_profile'])
     if(data.project[key]!==undefined && (typeof data.project[key]!=='string'||!/^[a-z_]+$/.test(data.project[key])))throw new Error('Proje seçenekleri geçersiz.');
   if(!data.manufacturing||typeof data.manufacturing!=='object'||Array.isArray(data.manufacturing))throw new Error('Üretim ayarları eksik.');
-  data={...data,manufacturing:{sparMainPosition:28,...data.manufacturing}};
+  data={...data,manufacturing:{sparMainPosition:28,cameraLensDiameter:12,...data.manufacturing}};
+  if (data.manufacturing.motorLayout === 'single') data.manufacturing.motorLayout = 'rear';
+  if (Number(data.manufacturing.cameraMount) === 2) data.manufacturing.cameraMount = 0;
   for(const id of MANUFACTURING_FIELDS){
     const value=data.manufacturing[id],field=$(id);
     if(value===undefined)throw new Error('Proje dosyasında eksik ayar: '+id);
@@ -38,14 +39,12 @@ async function refreshProjects(selected){
 }
 async function openProject(data){
   data=validateProjectFile(data);
-  // Keep the currently edited design before replacing the working draft.
   await projectAPI('/api/designs',projectSnapshot(('Otomatik yedek: '+($('projectName').value||'Adsız tasarım')).slice(0,100)));
   await store.flush();
   window.projectOpening=true;
   const previousProject=store.get('zeta-project'),previousManufacturing=store.get('zeta-manufacturing');
   try{
     const project={...data.project,project_name:data.name};
-    // A single transaction replaces both sections of the working draft.
     const batch={'zeta-project':JSON.stringify(project),'zeta-manufacturing':JSON.stringify(data.manufacturing)};
     await projectAPI('/api/settings',batch);
     Object.assign(store.cache,batch);

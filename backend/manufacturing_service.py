@@ -13,11 +13,9 @@ class ManufacturingService:
         self.limit=limit;self.ttl=ttl;self.entries=OrderedDict();self.lock=RLock()
 
     def result(self, data, mode='preview', filter='all'):
-        if mode not in ('preview','zip','stl','simulation','merkusim'):
+        if mode not in ('preview','preview_packed','zip','stl','simulation','merkusim'):
             raise ValueError('Geçersiz dışa aktarma biçimi.')
         key=sha256(json.dumps(data,sort_keys=True,separators=(',',':')).encode()).digest()
-        # Single-flight also prevents simultaneous preview/ZIP requests from
-        # duplicating the native Boolean and segmentation work.
         with self.lock:
             now=monotonic()
             for old in list(self.entries):
@@ -46,9 +44,8 @@ class ManufacturingService:
                         result=package(entry['parts'],manifest,entry['rings'],filter,
                                        printed=entry['printed'])
                     else:
-                        result=preview(entry['parts'],manifest,entry['rings'],printed=entry['printed'])
-                # Cache only the common complete ZIP and preview; arbitrary
-                # filter strings must not grow memory without a bound.
+                        kwargs={'packed':True} if mode=='preview_packed' else {}
+                        result=preview(entry['parts'],manifest,entry['rings'],printed=entry['printed'],**kwargs)
                 if output_key[1]=='all':entry['outputs'][output_key]=result
                 return result
             return entry['outputs'][output_key]

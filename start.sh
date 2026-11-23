@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# ZETA'yı tek komutla başlatır: sanal ortamı kurar, bağımlılıkları yükler, tarayıcıyı açar.
 set -e
 cd "$(dirname "$0")"
 
@@ -14,7 +13,6 @@ if [ ! -x .venv/bin/python ]; then
   "$PYTHON" -m venv .venv
 fi
 
-# requirements.txt değişmediyse kurulumu atla
 if ! cmp -s requirements.txt .venv/requirements.installed 2>/dev/null; then
   echo "Bağımlılıklar yükleniyor…"
   .venv/bin/python -m pip install --quiet --disable-pip-version-check -r requirements.txt

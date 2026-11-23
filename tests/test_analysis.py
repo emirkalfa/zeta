@@ -99,8 +99,6 @@ class TestPolars:
         results = lifting_line_analysis(default_geom, airfoil_props_4412)
         r5 = next(r for r in results if r["alpha"] == 5.0)
         cls = [pt["cl_local"] for pt in r5["lift_distribution"]]
-        # Lifting-line gives zero cl at tips (y=±b/2, vortex trails off).
-        # At mid-span, cl should be substantial and positive.
         mid_idx = len(cls) // 2
         assert cls[mid_idx] > 0.3, f"cl at mid-span too low: {cls[mid_idx]}"
 

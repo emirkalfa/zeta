@@ -20,7 +20,6 @@ def prepare_carbon_boom(body,outer,data,assemblies,frames,cuts):
     bore=cylinder(r+gap/2,carrier_end-start+4,[start,0,0],[1,0,0])
     def socket(name,a,b):
         solid=cylinder(r+6,b-a,[a,0,0],[1,0,0])-bore
-        # Split collar with two external bolts: no drilling through carbon fibres.
         solid-=box([b-35,-gap/2,r-1],[b+1,gap/2,r+20])
         solid+=box([b-35,gap/2,r+2],[b,7,r+16])
         solid+=box([b-35,-7,r+2],[b,-gap/2,r+16])
@@ -34,7 +33,6 @@ def prepare_carbon_boom(body,outer,data,assemblies,frames,cuts):
         return solid,points
     neck,body_bolts=socket('body',start-3,end+15)
     neck-=bore
-    # A bulkhead spreads the neck load into the original body shell.
     bulk=(outer^box([end-20,-10000,-10000],[end-14,10000,10000]))-bore
     end_cap=(outer^box([end-2,-10000,-10000],[end,10000,10000]))-bore
     body=(body^box([-10000,-10000,-10000],[end,10000,10000]))+neck+bulk+end_cap

@@ -3,7 +3,31 @@ import numpy as np
 from backend.manufacturing import mesh_solid, profile
 
 
-def blended_root(section, inset, chord, taper, length, end, wall, gap, height_gain=1.0,body_profile=None,frame=None,roof_blend=.75,seat_end=None,return_outer=False):
+def skin_height(rings, stations, ys, zs, side):
+    """Interpolate the outside of the actual shell at wing-root vertices."""
+    body_x=rings[:,0,0]
+    output=ys.copy()
+    for j,(x,z) in enumerate(zip(stations,zs)):
+        index=int(np.clip(np.searchsorted(body_x,x),1,len(body_x)-1))
+        a,b=rings[index-1:index+1,:,1:]
+        t=np.clip((x-body_x[index-1])/(body_x[index]-body_x[index-1]),0,1)
+        yz=a+(b-a)*t
+        lateral=yz[:,1]
+        if not lateral.min()<z<lateral.max():
+            continue
+        next_yz=np.roll(yz,-1,axis=0)
+        mask=(np.minimum(lateral,next_yz[:,1])<=z)&(z<np.maximum(lateral,next_yz[:,1]))
+        left,right=yz[mask],next_yz[mask]
+        heights=left[:,0]+(z-left[:,1])*(right[:,0]-left[:,0])/(right[:,1]-left[:,1])
+        output[j]=max(heights) if side[j]>0 else min(heights)
+    return output
+
+
+def blended_root(section, inset, chord, taper, length, end, wall, gap, height_gain=1.0,body_profile=None,frame=None,roof_blend=.75,seat_end=None,return_outer=False,roof_profile=None):
+    if roof_profile is not None:
+        roof_x=roof_profile[:,0,0]
+        roof_limit=np.abs(roof_profile[:,:,2]).max(axis=1)*.54
+
     def loft(cross_section, stop, inset_mm=0):
         penta=body_profile is not None and roof_blend<.75
         use_body=body_profile is not None and not (penta and inset_mm)
@@ -23,33 +47,47 @@ def blended_root(section, inset, chord, taper, length, end, wall, gap, height_ga
             mids=np.asarray(mids);halves=np.asarray(halves)
             side=np.where(polygon[:,1]>=mids,1.,-1.)
             thickness_weight=np.clip(halves/max(halves.max(),.001),0,1)
-        # Mirrored dihedral roots otherwise meet along a single non-manifold
-        # edge aft of the short body. A small central overlap makes a union
-        # with material thickness rather than four faces touching one line.
-        for z in np.r_[-.3,np.linspace(0,stop,33)]:
-            u=max(0,min(1,z/end))
+            if penta:
+                shoulder_weight = thickness_weight**1.6
+        start = max(0, end - 30) if height_gain != 1 else 0
+        samples=65 if body_profile is not None and not penta and not inset_mm else 33
+        for z in np.r_[-.3,np.linspace(0,stop,samples)]:
+            u=max(0,min(1,(z-start)/(end-start)))
             blend=1-(6*u**5-15*u**4+10*u**3)
             scale=1+(taper-1)*z/length
             xy=polygon.copy()*scale
-            # Keep the fixed body transition on the actual wing planform.
-            # Extending the leading edge independently creates a second lip
-            # in front of the wing, even though the outboard cuff is flush.
-            # Only height blends into the pod; the existing quintic fade
-            # reaches the unchanged airfoil with zero slope at the cuff.
             xy[:,1]*=1+(height_gain-1)*blend
             if use_body:
                 wx=frame[0,0]*xy[:,0]+frame[0,2]*z+frame[0,3]
                 lo=np.interp(wx,body_x,lower);hi=np.interp(wx,body_x,upper)
                 target=(lo+hi)/2+side*thickness_weight*(hi-lo)/2
                 local_y=(target-frame[1,0]*xy[:,0]-frame[1,2]*z-frame[1,3])/frame[1,1]
-                # Stay inside the pod at the central seam rather than sharing
-                # a tangent skin face with it; the pod supplies the outer cap.
                 if penta:
-                    # The exterior only expands from the real wing profile;
-                    # an independent airfoil cavity stays strictly inside it.
-                    local_y=np.where(side>0,np.maximum(local_y,xy[:,1]),np.minimum(local_y,xy[:,1]))
-                body_blend=np.where(side>0,roof_blend,.75)*blend
+                    outward = np.maximum(0, side*(local_y-xy[:,1]))
+                    local_y = xy[:,1] + side*shoulder_weight*outward**2/(outward+5)
+                body_blend=np.where(side>0,roof_blend,.55 if penta else .75)*blend
                 xy[:,1]=xy[:,1]*(1-body_blend)+local_y*body_blend
+                if not penta and not inset_mm and blend>0:
+                    wy=frame[1,0]*xy[:,0]+frame[1,1]*xy[:,1]+frame[1,2]*z+frame[1,3]
+                    wz=frame[2,0]*xy[:,0]+frame[2,1]*xy[:,1]+frame[2,2]*z+frame[2,3]
+                    skin=skin_height(body,wx,wy+side*100,wz,side)
+                    delta=side*(skin-wy)
+                    fade=min(1,(1-u)/.30)
+                    reach=12*thickness_weight*fade*fade*(3-2*fade)
+                    rounded=np.where(np.abs(delta)<reach,
+                        (reach+delta)**2/(4*np.maximum(reach,1e-9)),0)
+                    xy[:,1]+=side*rounded/frame[1,1]
+            if roof_profile is not None and z<end:
+                wx=frame[0,0]*xy[:,0]+frame[0,2]*z+frame[0,3]
+                wy=frame[1,0]*xy[:,0]+frame[1,1]*xy[:,1]+frame[1,2]*z+frame[1,3]
+                limit=np.interp(wx,roof_x,roof_limit)
+                rise=np.clip((z-end*.42)/(end*.58),0,1)
+                relief=1-rise**3*(10-15*rise+6*rise**2)
+                lateral=frame[2,0]*xy[:,0]+frame[2,1]*xy[:,1]+frame[2,2]*z+frame[2,3]
+                skin=skin_height(roof_profile,wx,wy+100,np.clip(lateral,-limit,limit),np.ones_like(wy))
+                excess=np.maximum(wy-(skin-inset_mm-3),0)
+                lowered=excess+2*np.expm1(-excess/2)
+                xy[:,1]-=relief*lowered/frame[1,1]
             rings.append(np.column_stack([xy,np.full(len(xy),z)]))
         rings=np.asarray(rings)
         return mesh_solid(rings,rings[0][:,:2])
@@ -65,8 +103,6 @@ def motor_wing_transition(spec, leading, station, radius, center_y, back, wall=2
     """Hollow C2 nacelle shoulder ending inside the actual local airfoil."""
     chord=(spec['chord']+(spec['tipChord']-spec['chord'])*station)*1000
     points=np.asarray(profile(spec['coords'],1).to_polygons()[0],dtype=float)
-    # Intersect the polygon with the final chord station; this works for
-    # asymmetric and symmetric profiles and either point winding.
     samples=[]
     for a,b in zip(points,np.roll(points,-1,axis=0)):
         if min(a[0],b[0])<=.64<=max(a[0],b[0]) and abs(b[0]-a[0])>1e-10:

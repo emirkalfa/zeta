@@ -2,9 +2,25 @@
 import io,json,zipfile
 import numpy as np
 import pytest
-from backend.manufacturing import generate,package,cylinder
+from backend.manufacturing import Part,box,generate,package,cylinder,measure_printed_controls
 from backend.control_joints import rotate_about
 from tests.test_manufacturing import coords,request_data,assert_stl
+
+
+def test_printed_area_unions_overlapping_splits_in_the_tail_plane():
+    angle=np.radians(35)
+    span=np.array([0.,np.sin(angle),np.cos(angle)])
+    chord=np.array([1.,0.,0.])
+    rotation=np.column_stack([chord,np.cross(span,chord),span])
+    frame=np.column_stack([rotation,np.zeros(3)])
+    solid=box([0,0,0],[20,2,10])
+    source=Part('tail_v_right_ruddervator',solid,frame=frame,family='tail')
+    printed=[Part(source.name+f'_{i+1:02d}of02',solid,
+                  print_to_world=np.column_stack([rotation,span*shift]))
+             for i,shift in enumerate((0,8))]
+    controls=[{'part':source.name}]
+    measure_printed_controls([source],printed,controls)
+    assert controls[0]['printed_planform_area_m2']==pytest.approx(360/1e6)
 
 @pytest.mark.parametrize('tail,combat',[('conventional',False),('ttail',False),('vtail',False),('conventional',True),('ttail',True),('vtail',True)])
 def test_moving_surfaces_have_pin_bores_and_clear_the_entire_assembly(coords,tail,combat):
@@ -22,17 +38,22 @@ def test_moving_surfaces_have_pin_bores_and_clear_the_entire_assembly(coords,tai
                 assert (part.solid^pose).volume()<.1,(c['part'],part.name,angle)
         for knuckle in c['knuckles']:
             a=np.array(knuckle['start_mm']);b=np.array(knuckle['end_mm'])
-            probe=cylinder(c['pin_diameter_mm']*.45,np.linalg.norm(b-a)-.4,a+axis*.2,axis)
-            owner=moving if knuckle['moving'] else fixed
+            length=np.linalg.norm(b-a); direction=(b-a)/length
+            probe=cylinder(c['pin_diameter_mm']*.45,length-.4,a+direction*.2,direction)
+            owner=moving if knuckle['moving'] else named[knuckle.get('parent',c['parent'])]
             assert (owner^probe).volume()<.005,c['part']+' blocked hinge'
     archive=zipfile.ZipFile(io.BytesIO(package(parts,report,rings)))
     exported=json.loads(archive.read('manifest.json'))
+    if tail == 'ttail':
+        elevators=[c for c in report['controls'] if c['kind']=='elevator']
+        assert len(elevators)==1 and len(elevators[0]['parents'])==2
+        assert [name for name in archive.namelist() if name.startswith('tail_elevator_')]==['tail_elevator_one_piece.stl']
     for c in report['controls']:
         assert any(p['file'].startswith(c['part']) for p in exported['parts'])
     for p in exported['parts']:
         assert np.all(np.array(p['size_mm'])<=np.array(exported['bed_mm'])+.001)
         assert_stl(archive.read(p['file']))
-    assert 'bütünleşik kabuk' not in archive.read('MONTAJ.txt').decode()
+    assert 'bÃ¼tÃ¼nleÅŸik kabuk' not in archive.read('MONTAJ.txt').decode()
     assert_stl(archive.read('hinge_fit_fixed.stl'));assert_stl(archive.read('hinge_fit_moving.stl'))
 
 @pytest.mark.parametrize('code',['0012','0015','2412','2415','4412','4415','6412'])

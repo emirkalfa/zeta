@@ -1,5 +1,42 @@
+import math
 import numpy as np
 from .airfoil import get_airfoil_properties
+from .validation import InputError
+
+
+T_TAIL_MOUNT = .27
+T_TAIL_FIN_ADVANCE = .20
+T_TAIL_ELEVATOR_OFFSET = .65
+TAIL_TIP_START = .94
+TAIL_TIP_ETA = np.r_[np.linspace(0, TAIL_TIP_START, 17),
+                     TAIL_TIP_START + (1-TAIL_TIP_START)*np.sin(np.linspace(0,np.pi/2,13)[1:])]
+_tip_progress = np.maximum(0, (TAIL_TIP_ETA-TAIL_TIP_START)/(1-TAIL_TIP_START))
+TAIL_TIP_SCALE = 1 - .32*TAIL_TIP_ETA**1.25 - .12*(1-np.sqrt(np.maximum(0, 1-_tip_progress**2)))
+
+
+def tail_tip_is_free(name, tail_type, twin_boom):
+    if tail_type == 'ttail':
+        return name.startswith('tail_horizontal') and not twin_boom
+    if tail_type == 'vtail':
+        return name.startswith('tail_v_')
+    return name.startswith('tail_vertical') or (name.startswith('tail_horizontal') and not twin_boom)
+
+
+def tail_planform(root, tip, span, rounded):
+    if not rounded:
+        taper = tip/root
+        return span*(root+tip)/2, 2*root/3*(1+taper+taper*taper)/(1+taper), span/3*(1+2*taper)/(1+taper)
+    eta = TAIL_TIP_ETA
+    nominal = root + (tip-root)*eta
+    chord = nominal*TAIL_TIP_SCALE
+    advance = nominal-chord
+    d = np.diff(eta)
+    weights = d*(chord[:-1]+chord[1:])/2
+    total = weights.sum()
+    chord_moment = np.sum(d*(chord[:-1]**2+chord[:-1]*chord[1:]+chord[1:]**2)/3)
+    def mean(values):
+        return np.sum(d*(chord[:-1]*(2*values[:-1]+values[1:])+chord[1:]*(values[:-1]+2*values[1:]))/6)/total
+    return span*total, chord_moment/total+4*mean(advance), span*mean(eta)
 
 
 def aerodynamic_centers(g, combat=False):
@@ -11,18 +48,70 @@ def aerodynamic_centers(g, combat=False):
     dx=(g["root_chord"]-g["tip_chord"])*wy/(g["wingspan"]/2) if g["straight_te"] else wy*np.tan(np.radians(g["sweep_angle"]))
     wing=g["wing_x_pos"]+dx+.25*wm
     if g["tail_type"]=="vtail":
-        tm, ty=mean(g["vtail_chord"],g["vtail_tip_chord"],g["vtail_span"])
-        tail=g["tail_x_pos"]+ty*(np.cos(np.radians(35)) if combat else 1)*np.tan(np.radians(5))+.25*tm
+        span = g["vtail_span"]/2
+        _,tm,ty=tail_planform(g["vtail_chord"],g["vtail_tip_chord"],span,True)
+        run = g["vtail_chord"]-g["vtail_tip_chord"]
+        tail=g["tail_x_pos"]+ty/span*run+.25*tm
         return wing, tail, tail
-    hm,hy=mean(g["htail_chord"],g["htail_tip_chord"],g["htail_span"])
-    vm,vy=mean(g["vtail_chord"],g["vtail_tip_chord"],2*g["vtail_span"])
+    rounded = g["tail_type"] == "conventional"
+    _,hm,hy=tail_planform(g["htail_chord"],g["htail_tip_chord"],g["htail_span"]/2,not combat)
+    _,vm,vy=tail_planform(g["vtail_chord"],g["vtail_tip_chord"],g["vtail_span"],rounded)
+    fin_sweep = g.get("vtail_sweep",5)
+    straight = g["tail_type"] in ("conventional", "ttail")
+    h_run = (g["htail_chord"]-g["htail_tip_chord"])/(g["htail_span"]/2) if straight else np.tan(np.radians(g["htail_sweep"]))
+    v_run = (g["vtail_chord"]-g["vtail_tip_chord"])/g["vtail_span"] if straight else np.tan(np.radians(fin_sweep))
     vle=g["tail_x_pos"]
     if combat:
-        vle+=g["htail_chord"]-g["vtail_chord"] if g["tail_type"]=="ttail" else g["htail_span"]/2*np.tan(np.radians(g["htail_sweep"]))+g["htail_tip_chord"]-g["vtail_chord"]
+        vle+=g["htail_chord"]-g["vtail_chord"] if g["tail_type"]=="ttail" else g["htail_span"]/2*h_run+g["htail_tip_chord"]-g["vtail_chord"]
+    if rounded and not combat:
+        vle += g["htail_chord"] - g["vtail_chord"]
     hle=g["tail_x_pos"]
     if g["tail_type"]=="ttail":
-        hle=vle+g["vtail_span"]*np.tan(np.radians(5))+.25*(g["vtail_tip_chord"]-g["htail_chord"])
-    return wing, hle+hy*np.tan(np.radians(g["htail_sweep"]))+.25*hm, vle+vy*np.tan(np.radians(5))+.25*vm
+        mount = g.get('tail_mount_fraction',T_TAIL_MOUNT)
+        mount_chord = g['vtail_chord']+mount*(g['vtail_tip_chord']-g['vtail_chord'])
+        vle -= T_TAIL_FIN_ADVANCE*g["vtail_chord"]
+        hle=max(vle+mount*g["vtail_span"]*v_run+.25*(mount_chord-g["htail_chord"]),
+                vle+g["vtail_chord"]-T_TAIL_ELEVATOR_OFFSET*g["htail_chord"])
+    return wing, hle+hy*h_run+.25*hm, vle+vy*v_run+.25*vm
+
+def fit_standard_tail(geom, rear_pusher):
+    """Keep the fuselage-mounted roots ahead of its end plate."""
+    if geom.get('tail_booms') or geom.get('vtol_fixed_body') or geom.get('lark_layout'):
+        return
+    root_x = geom['tail_x_pos']
+    vertical = geom['vtail_chord']
+    horizontal = geom['htail_chord']
+    kind = geom['tail_type']
+    reach = vertical if kind in ('vtail', 'ttail') else horizontal
+    if rear_pusher and kind != 'conventional':
+        if kind == 'vtail':
+            reach = vertical
+        else:
+            fin_run = geom.get('tail_mount_fraction',T_TAIL_MOUNT)*(vertical-geom['vtail_tip_chord'])
+            fin_le = -T_TAIL_FIN_ADVANCE*vertical
+            tail_root = max(fin_le+fin_run+.25*(vertical-fin_run-horizontal),
+                            fin_le+vertical-T_TAIL_ELEVATOR_OFFSET*horizontal)
+            reach = max(fin_le+vertical, tail_root + horizontal)
+    length = geom['fuselage_length']
+    clearance = .012 if rear_pusher else .002
+    limit = length - clearance
+    if not geom['manual_mode'] and geom['fuse_type']!='manual' and root_x+reach>limit:
+        geom['fuselage_layout_length']=length
+        geom['fuselage_length']=math.ceil((root_x+reach+clearance)*1000)/1000
+        geom['tailcone_length']+=geom['fuselage_length']-length
+        return
+    new_x = min(root_x, limit - reach)
+    if new_x <= geom['wing_x_pos']:
+        if rear_pusher:
+            raise ValueError('Kuyruk ve arka itici gövdeye sığmıyor. Kuyruk veterini azaltın veya gövdeyi uzatın.')
+        return
+    geom['tail_x_pos'] = new_x
+    wing, htail, vtail = aerodynamic_centers(geom)
+    geom.update(wing_ac_x=wing, htail_ac_x=htail, vtail_ac_x=vtail,
+                effective_tail_arm=htail-wing, htail_arm=htail-wing,
+                effective_vertical_tail_arm=vtail-wing,
+                tail_le_spacing=new_x-geom['wing_x_pos'])
+
 
 def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                        tail_type='conventional',
@@ -38,6 +127,9 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                        airframe='standard',
                        tria_tail_vh=.45, tria_tail_vv=.03,
                        target_stall_speed=12., reynolds_number=200000, penta_pusher_clearance=.078, penta_motor_diameter=28,
+                       wing_controls='dual', flight_style='standard', lark_layout=False,
+                       flap_start_percent=None, flap_length_percent=None, flap_width_percent=None,
+                       tail_control_settings=None, fuse_preset=None,
                        ):
     """airframe: 'standard' klasik çekici pervaneli model uçak yerleşimi,
     'combat' it dalaşı yarışmaları (Savaşan İHA vb.) için çift bomlu, itici pervaneli yerleşim:
@@ -45,12 +137,14 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     combat = airframe in ("combat","vtol5_fixed")
     fixed_body=airframe=='vtol_fixed'
     fixed_penta=airframe=='vtol5_fixed'
+    mount = T_TAIL_MOUNT if tail_type == 'ttail' else 1.
+    if lark_layout:
+        wing_position='high'
     if manual_mode and any(value is None for value in [man_root_chord,man_tip_chord,
             man_htail_span,man_htail_root,man_htail_tip,man_vtail_span,man_vtail_root,man_vtail_tip]):
         defaults=calculate_geometry(wingspan,weight,airfoil_code,wing_position,tail_type,
                                     wing_shape=wing_shape,airframe=airframe,tria_tail_vh=tria_tail_vh,tria_tail_vv=tria_tail_vv,
-                                    target_stall_speed=target_stall_speed,reynolds_number=reynolds_number,penta_pusher_clearance=penta_pusher_clearance,penta_motor_diameter=penta_motor_diameter)
-        # Missing manual dimensions inherit the auto design rather than zero-area tails.
+                                    target_stall_speed=target_stall_speed,reynolds_number=reynolds_number,penta_pusher_clearance=penta_pusher_clearance,penta_motor_diameter=penta_motor_diameter,flight_style=flight_style,wing_controls=wing_controls,lark_layout=lark_layout,fuse_preset=fuse_preset)
         man_root_chord=defaults['root_chord'] if man_root_chord is None else man_root_chord
         man_tip_chord=defaults['tip_chord'] if man_tip_chord is None else man_tip_chord
         man_htail_span=defaults['htail_span'] if man_htail_span is None else man_htail_span
@@ -62,6 +156,8 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     target_stall_speed=float(target_stall_speed)
     if not np.isfinite(target_stall_speed) or not 1<=target_stall_speed<=100:
         raise ValueError('Hedef stall hızı 1 ile 100 m/s arasında olmalı.')
+    if flight_style == "calm":
+        target_stall_speed = min(target_stall_speed, 10.)
     cl_max=get_airfoil_properties(airfoil_code,Re=reynolds_number)['cl_max']
     required_area=2*float(weight)*9.81/(1.225*target_stall_speed**2*cl_max)
     if manual_mode:
@@ -73,7 +169,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         wing_area = (root_chord + tip_chord) / 2 * wingspan
         aspect_ratio = wingspan**2 / wing_area if wing_area > 0 else 7.0
     else:
-        # Yarışma uçağında daha düşük açıklık oranı: daha sağlam kanat, daha hızlı yuvarlanma
         ar = 6.0 if combat else 7.0
         dihedral_angle = 3.0
         if wing_shape == 'rectangular':
@@ -85,8 +180,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         else:
             taper_ratio = 0.5
             sweep_angle = 5.0
-        # Keep the established planform as a minimum; enlarge it when the
-        # lift requirement exceeds that area. CLmax is a preliminary estimate.
         wing_area = max(wingspan**2 / ar, required_area)
         root_chord = 2 * wing_area / (wingspan * (1 + taper_ratio))
         tip_chord = root_chord * taper_ratio
@@ -112,10 +205,12 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     tail_x_pos = 0.82 * fuse_length
 
     if combat:
-        # Kısa gövde; kuyruk kolu bomlarla gövdeden bağımsız uzatılır
         fuse_length = 0.50 * wingspan
         wing_x_pos = 0.40 * fuse_length
         tail_x_pos = wing_x_pos + 0.50 * wingspan
+
+    if lark_layout and fuse_type != 'manual':
+        tail_x_pos = .56 * wingspan
 
     if fuse_type == 'manual' and man_fuse_length is not None:
         fuse_length = float(man_fuse_length)
@@ -126,13 +221,18 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
 
     htail_arm = tail_x_pos - wing_x_pos
     if fixed_body:
-        fuse_length=1.2;wing_x_pos=.36;tail_x_pos=.984;htail_arm=.624
+        from .fixed_vtol import tria_dimensions
+        tria=tria_dimensions(wingspan)
+        fuse_length=tria['length'];wing_x_pos=tria['wing'];tail_x_pos=tria['tail']
+        htail_arm=tail_x_pos-wing_x_pos
         wing_position='mid';fuse_type='conventional'
 
     if fixed_penta:
         from .penta_layout import penta_layout
-        pod=penta_layout(wingspan,root_chord,penta_motor_diameter,penta_pusher_clearance)
+        pod=penta_layout(wingspan,root_chord,penta_motor_diameter,penta_pusher_clearance,
+                         wing_shape=None if manual_mode else wing_shape)
         fuse_length=pod['length'];wing_x_pos=pod['wing'];tail_x_pos=pod['tail']
+        wing_position='mid'
         htail_arm=tail_x_pos-wing_x_pos;fuse_type='conventional'
         fuse_max_width=pod['width'];fuse_max_height=pod['height']
 
@@ -166,8 +266,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         vtail_tip_chord = vtail_root_chord * vtail_taper
 
         if combat:
-            # Bomlar arasında dikdörtgen yatay kuyruk ve bom uçlarında ikiz dikey kuyruk.
-            # vtail_* değerleri tek bir dikey kuyruğa aittir (toplam alanın yarısı).
             htail_taper = 1.0
             htail_sweep = 0.0
             htail_span = 0.36 * wingspan
@@ -179,8 +277,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
             vtail_root_chord = 2 * vtail_area / (vtail_span * (1 + vtail_taper))
             vtail_tip_chord = vtail_root_chord * vtail_taper
 
-    # V-tail replaces both surfaces. At fixed 35 degrees meet both equivalent
-    # tail-volume targets, rather than assigning an arbitrary wing-area fraction.
     if tail_type == 'vtail':
         vgamma = np.radians(35)
         cos2 = np.cos(vgamma) ** 2
@@ -190,7 +286,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         manual_v = manual_mode and all(v is not None and float(v)>0 for v in
                                        [man_vtail_span,man_vtail_root,man_vtail_tip])
         if manual_v:
-            # Manual span means the combined span of both inclined panels.
             vtail_span = float(man_vtail_span)
             vtail_root_chord = float(man_vtail_root)
             vtail_tip_chord = float(man_vtail_tip)
@@ -205,12 +300,11 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
                     raise ValueError('Tria kuyruk hacim katsayıları izin verilen aralıkta değil.')
             vtail_root_chord = np.ceil(2 * vtail_surface_area / (vtail_span * (1 + vtail_taper))*1000)/1000
             vtail_tip_chord = np.ceil(vtail_root_chord * vtail_taper*1000)/1000
-        # Report areas from the same millimeter dimensions used by preview/STL.
         vtail_span=round(vtail_span,3)
         vtail_root_chord=round(vtail_root_chord,3)
         vtail_tip_chord=round(vtail_tip_chord,3)
         vtail_taper=vtail_tip_chord/vtail_root_chord
-        vtail_surface_area=(vtail_root_chord+vtail_tip_chord)*vtail_span/2
+        vtail_surface_area=tail_planform(vtail_root_chord,vtail_tip_chord,vtail_span,True)[0]
         htail_span = vtail_span * np.cos(vgamma)
         htail_area = vtail_surface_area * cos2
         vtail_area = vtail_surface_area * sin2
@@ -218,22 +312,36 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         htail_tip_chord = vtail_tip_chord
         htail_taper = vtail_taper
 
+    conventional = tail_type == 'conventional'
+    vtail_sweep = 5.
+    if tail_type == 'ttail' and not manual_mode:
+        htail_taper, vtail_taper = .72, .70
+        vtail_span *= 1.08
+    if conventional:
+        if manual_mode:
+            vtail_root_chord, vtail_tip_chord = htail_root_chord, htail_tip_chord
+            vtail_taper = htail_taper
+        else:
+            htail_taper = vtail_taper = 1.
+            vtail_span = round(.22*wingspan,3) if not combat else vtail_span
+
     if not manual_mode:
         vh=float(tria_tail_vh) if fixed_body and tail_type=='vtail' else .70
-        vv=float(tria_tail_vv) if fixed_body and tail_type=='vtail' else .045
+        vv=float(tria_tail_vv) if fixed_body and tail_type=='vtail' else .066 if tail_type=='ttail' else .045
         def layout(hr,ht,vr,vt,vs):
             return dict(root_chord=root_chord,tip_chord=tip_chord,wingspan=wingspan,
                         straight_te=wing_shape=='ste_tapered',sweep_angle=wing_sweep,
                         wing_x_pos=round(wing_x_pos,3),tail_x_pos=round(tail_x_pos,3),tail_type=tail_type,
                         htail_chord=hr,htail_tip_chord=ht,htail_span=htail_span,htail_sweep=htail_sweep,
-                        vtail_chord=vr,vtail_tip_chord=vt,vtail_span=vs)
+                        vtail_chord=vr,vtail_tip_chord=vt,vtail_span=vs,vtail_sweep=vtail_sweep,tail_mount_fraction=mount)
         if tail_type=='vtail':
+            v_unit=tail_planform(1,.6,1,True)[0]
             def candidate(area):
                 span=np.ceil(max(.36*wingspan,np.sqrt(3*area))*1000)/1000 if fixed_body else round(.4*wingspan,3)
-                root=np.ceil(2*area/(span*1.6)*1000)/1000
+                root=np.ceil(area/(span*v_unit)*1000)/1000
                 tip=np.ceil(root*.6*1000)/1000
                 wa,ha,va=aerodynamic_centers(layout(root,tip,root,tip,span),combat)
-                actual=(root+tip)*span/2
+                actual=tail_planform(root,tip,span,True)[0]
                 return span,root,tip,actual,ha-wa
             low,high=1e-6,max(wing_area,vtail_surface_area)
             for _ in range(30):
@@ -252,14 +360,17 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
             htail_area=vtail_surface_area*cos2;vtail_area=vtail_surface_area*sin2
             htail_root_chord=vtail_root_chord;htail_tip_chord=vtail_tip_chord;htail_taper=vtail_taper
         else:
-            # Coupled T/twin-fin placement changes both AC arms as chords change.
             hr,vr=htail_root_chord,vtail_root_chord
+            h_unit=tail_planform(1,htail_taper,htail_span,not combat)[0]
+            v_unit=tail_planform(1,vtail_taper,vtail_span,conventional)[0]
             for _ in range(400):
                 wa,ha,va=aerodynamic_centers(layout(hr,hr*htail_taper,vr,vr*vtail_taper,vtail_span),combat)
                 if min(ha-wa,va-wa)<=.01:
                     raise ValueError('Açıklık ve ağırlık için kuyruk kolu yetersiz. Açıklığı artırın veya ağırlığı azaltın.')
-                next_h=2*vh*wing_area*mac/((ha-wa)*htail_span*(1+htail_taper))
-                next_v=2*vv*wing_area*wingspan/((va-wa)*vtail_span*(1+vtail_taper)*(2 if combat else 1))
+                next_h=vh*wing_area*mac/((ha-wa)*h_unit)
+                next_v=vv*wing_area*wingspan/((va-wa)*v_unit*(2 if combat else 1))
+                if conventional:
+                    next_h = next_v = max(next_h,next_v)
                 if max(abs(next_h-hr),abs(next_v-vr))<1e-10:break
                 hr=(hr+next_h)/2;vr=(vr+next_v)/2
             else:raise ValueError('Kuyruk boyutlandırması yakınsamadı. Açıklık ve ağırlığı kontrol edin.')
@@ -268,6 +379,20 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
             htail_taper=htail_tip_chord/htail_root_chord;vtail_taper=vtail_tip_chord/vtail_root_chord
             htail_area=(htail_root_chord+htail_tip_chord)*htail_span/2
             vtail_area=(vtail_root_chord+vtail_tip_chord)*vtail_span/2
+
+    if tail_type != "vtail" and not combat:
+        htail_area=tail_planform(htail_root_chord,htail_tip_chord,htail_span,True)[0]
+    if tail_type == "vtail":
+        vtail_sweep = float(np.degrees(np.arctan2(vtail_root_chord-vtail_tip_chord,vtail_span/2)))
+    if conventional:
+        htail_sweep = np.degrees(np.arctan2(htail_root_chord - htail_tip_chord, htail_span/2))
+        vtail_sweep = float(np.degrees(np.arctan2(vtail_root_chord - vtail_tip_chord, vtail_span)))
+        htail_area=tail_planform(htail_root_chord,htail_tip_chord,htail_span,not combat)[0]
+        vtail_area=tail_planform(vtail_root_chord,vtail_tip_chord,vtail_span,True)[0]
+
+    if tail_type == "ttail":
+        htail_sweep = float(np.degrees(np.arctan2(htail_root_chord-htail_tip_chord,htail_span/2)))
+        vtail_sweep = float(np.degrees(np.arctan2(vtail_root_chord-vtail_tip_chord,vtail_span)))
 
     cg_position = 0.25 * mac
     span_efficiency = 0.85
@@ -278,7 +403,6 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'high': fuse_max_height * 0.65,
     }
 
-    # Fuselage parameters
     if fuse_type == 'manual' and man_fuse_width is not None:
         fuse_diameter = float(man_fuse_width)
     else:
@@ -292,7 +416,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     fuse_max_width = fuse_diameter
     fuse_max_height = fuse_diameter
     if fixed_body:
-        fuse_max_width=.17;fuse_max_height=.11
+        fuse_max_width=tria['width'];fuse_max_height=tria['height']
 
     if fixed_penta:
         fuse_max_width=pod['width'];fuse_max_height=pod['height']
@@ -333,7 +457,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'vtail_tip_chord': round(vtail_tip_chord, 3),
         'vtail_taper': round(vtail_taper, 3),
         'vtail_area': round(vtail_area, 6),
-        'vtail_sweep': 5.0,
+        'vtail_sweep': vtail_sweep,
         'cg_position': round(cg_position, 3),
         'span_efficiency': span_efficiency,
         'taper_ratio_input': taper_ratio,
@@ -344,6 +468,18 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         'fuse_type': fuse_type,
     }
 
+    if fuse_preset in ('atlas','seyir','akin','combat') and fuse_type != 'manual':
+        span = wingspan if wingspan <= 1.5 else math.sqrt(1.5*wingspan)
+        width,height = {
+            'atlas':(.11733987,.13708695), 'seyir':(.09,.0945),
+            'akin':(.126,.1368), 'combat':(.117,.126),
+        }[fuse_preset]
+        result.update(fuselage_max_width=round(width*span,6),fuselage_max_height=round(height*span,6),
+                      cabin_dimensions_preset=fuse_preset)
+    if lark_layout:
+        result['lark_layout'] = True
+    if tail_type == 'ttail':
+        result['tail_mount_fraction'] = mount
     result['vtol_fixed_body']=fixed_body or fixed_penta
     if fixed_penta:
         result['penta_motor_diameter']=penta_motor_diameter
@@ -352,7 +488,7 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     if tail_type == 'vtail':
         result.update(vtail_angle=35.0,
                       vtail_surface_area=round(vtail_surface_area,6),
-                      vtail_panel_area=round(vtail_surface_area/2,6),
+                      vtail_panel_area=round(vtail_surface_area/2,7),
                       htail_effective_area=round(htail_area,6),
                       vtail_effective_area=round(vtail_area,6),
                       vtail_sizing='manual' if manual_v else 'equivalent_tail_volume')
@@ -360,12 +496,10 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         boom_y = vtail_span * np.cos(np.radians(35)) / 2 if tail_type=='vtail' else htail_span / 2
         chord_at_boom = root_chord * (1 - (boom_y / (wingspan / 2)) * (1 - taper_ratio))
         leading_at_boom=wing_x_pos+(root_chord-chord_at_boom if wing_shape=='ste_tapered' else boom_y*np.tan(np.radians(sweep_angle)))
-        # End at the actual last mounting saddle, rather than carrying unused
-        # tube all the way to the trailing edge of a broad V-tail root.
         if tail_type=='vtail':
             last_mount=tail_x_pos+.4*vtail_root_chord+min(.22*vtail_root_chord,.032)/2+.005
         else:
-            fin_lead=tail_x_pos+htail_root_chord-vtail_root_chord if tail_type=='ttail' else tail_x_pos+boom_y*np.tan(np.radians(htail_sweep))+htail_tip_chord-vtail_root_chord
+            fin_lead=tail_x_pos+htail_root_chord-(1+T_TAIL_FIN_ADVANCE)*vtail_root_chord if tail_type=='ttail' else tail_x_pos+boom_y*np.tan(np.radians(htail_sweep))+htail_tip_chord-vtail_root_chord
             fin_mount=fin_lead+.4*vtail_root_chord+min(.22*vtail_root_chord,.032)/2+.005
             bridge_mount=tail_x_pos+.4*htail_root_chord+.010
             last_mount=bridge_mount if tail_type=='conventional' else fin_mount
@@ -386,10 +520,10 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
     result['tail_le_spacing']=round(float(tail_x_pos-wing_x_pos),6)
     result['htail_arm']=result['effective_tail_arm']
     result['tail_sizing_targets']={'horizontal':float(tria_tail_vh) if fixed_body and tail_type=='vtail' else .7,
-                                  'vertical':float(tria_tail_vv) if fixed_body and tail_type=='vtail' else .045,'preliminary':True}
+                                  'vertical':float(tria_tail_vv) if fixed_body and tail_type=='vtail' else .066 if tail_type=='ttail' else .045,'preliminary':True}
     result['tail_sizing_arm']=result['effective_tail_arm']
     result['wing_sizing']={'mode':'manual' if manual_mode else 'automatic',
-                           'target_stall_speed':target_stall_speed,'required_area':float(required_area),
+                           'target_stall_speed':target_stall_speed,'required_area':float(required_area), 'flight_style':flight_style, 'glide_span_m':float(np.sqrt(8 * wing_area)),
                            'cl_max':float(cl_max),'reynolds_number':float(reynolds_number),
                            'density':1.225,'preliminary':True,
                            'estimated_stall_speed':float(np.sqrt(2*weight*9.81/(1.225*wing_area*cl_max)))}
@@ -398,16 +532,93 @@ def calculate_geometry(wingspan, weight, airfoil_code, wing_position='mid',
         wingspan, wing_area, root_chord, taper_ratio, htail_area, vtail_area,
         wing_shape, combat=combat,
     )
+    if tail_type == 'ttail':
+        elevator_start,elevator_end = (.34,.86) if combat else (.18,.66)
+        for key,start,end,tip,span in (
+            ('elevator',elevator_start,elevator_end,htail_tip_chord,htail_span),
+            ('rudder',.43,.93,vtail_tip_chord,vtail_span*(2 if combat else 1)),
+        ):
+            ratio = .46 if key=='rudder' else .50
+            result['control_surfaces'][key] = dict(
+                eta_start=start, eta_end=end, chord_ratio=ratio,
+                area=round(tip*ratio*span*(end-start),4),
+            )
+    result['wing_controls'] = wing_controls
+    if wing_controls == 'single':
+        controls = result['control_surfaces']
+        aim = controls.pop('flap')['area'] + controls.pop('aileron')['area']
+        start, end = .23, .92
+        if result.get('tail_booms'):
+            boom = result['tail_booms']
+            reserve = (boom['diameter']/2 + .020) / (wingspan/2)
+            start = max(start, boom['y']/(wingspan/2) + reserve)
+        start_chord = root_chord + (tip_chord-root_chord) * start
+        end_chord = root_chord + (tip_chord-root_chord) * end
+        available_area = (start_chord+end_chord)/2 * wingspan * (end-start)
+        if available_area <= 0:
+            raise ValueError('Tek kanat yüzeyi için bağlantıların dışında yeterli açıklık yok.')
+        ratio = float(np.clip(aim / available_area, .25, .40))
+        controls['flaperon'] = {
+            'eta_start': float(start), 'eta_end': end, 'chord_ratio': ratio,
+            'area': round(ratio * available_area, 4), 'target_area': round(aim,4),
+            'span_start_m': round(start*wingspan/2,3), 'span_end_m': round(end*wingspan/2,3),
+            'chord_at_root': round(ratio*start_chord,3), 'chord_at_tip': round(ratio*end_chord,3),
+        }
+    if any(v is not None for v in (flap_start_percent,flap_length_percent,flap_width_percent)):
+        controls = result['control_surfaces']
+        key = 'flaperon' if wing_controls=='single' else 'flap'
+        surface = controls[key]
+        start = surface['eta_start'] if flap_start_percent is None else flap_start_percent/100
+        length = surface['eta_end']-surface['eta_start'] if flap_length_percent is None else flap_length_percent/100
+        end = start+length
+        ratio = surface['chord_ratio'] if flap_width_percent is None else flap_width_percent/100
+        if end > .97:
+            raise InputError('Flap başlangıcı ve uzunluğu toplamı en fazla %97 olabilir. Kanat ucunda sabit pay bırakın.')
+        if key=='flap':
+            aileron = controls['aileron']
+            start_aileron = max(aileron['eta_start'],end+max(.01,.010/(wingspan/2)))
+            if (aileron['eta_end']-start_aileron)*wingspan/2 < .028:
+                raise InputError('Bu flap konumu ailerona yeterli yer bırakmıyor. Flabı kısaltın veya Tek · flaperon seçin.')
+            set_control_dimensions(aileron,start_aileron,aileron['eta_end'],aileron['chord_ratio'],wingspan,root_chord,tip_chord)
+        set_control_dimensions(surface,start,end,ratio,wingspan,root_chord,tip_chord)
+        surface.pop('target_area',None)
     if tail_type == 'vtail':
         result['control_surfaces']['ruddervator'] = {'area':round(vtail_surface_area*.30,4),'chord_ratio':.30}
+    if tail_control_settings:
+        surfaces=(
+            [('ruddervator',vtail_span,vtail_tip_chord,.90)] if tail_type=='vtail' else
+            [('elevator',htail_span,htail_tip_chord,.90),
+             ('rudder',vtail_span*(2 if combat and tail_type=='ttail' else 1),vtail_tip_chord,.78)]
+        )
+        for key,span,tip,default_end in surfaces:
+            values=[tail_control_settings.get(f'{key}_{field}_percent') for field in ('start','length','width')]
+            if all(value is None for value in values):
+                continue
+            surface=result['control_surfaces'][key]
+            default_start=surface.get('eta_start',.12)
+            start=default_start if values[0] is None else values[0]/100
+            length=surface.get('eta_end',default_end)-default_start if values[1] is None else values[1]/100
+            ratio=surface['chord_ratio'] if values[2] is None else values[2]/100
+            if start+length>.970000001:
+                raise InputError('Kuyruk dümeninde başlangıç ve uzunluk toplamı en fazla %97 olabilir.')
+            surface.update(eta_start=start,eta_end=start+length,chord_ratio=ratio,
+                           area=round(span*tip*ratio*length,4))
     return result
+
+
+def set_control_dimensions(surface,start,end,ratio,wingspan,root,tip):
+    start_chord = ratio*(root+(tip-root)*start)
+    end_chord = ratio*(root+(tip-root)*end)
+    surface.update(eta_start=start,eta_end=end,chord_ratio=ratio,
+                   span_start_m=round(start*wingspan/2,3),span_end_m=round(end*wingspan/2,3),
+                   chord_at_root=round(start_chord,3),chord_at_tip=round(end_chord,3),
+                   area=round((start_chord+end_chord)/2*wingspan*(end-start),4))
 
 
 def calculate_control_surfaces(wingspan, wing_area, root_chord, taper_ratio,
                                 htail_area, vtail_area, wing_shape, combat=False):
     half_span = wingspan / 2
 
-    # Aileron: outer portion, ~25% chord (yarışma uçağında yuvarlanma hızı için daha büyük)
     ail_eta_start = 0.45 if combat else 0.55
     ail_eta_end = 0.95 if combat else 0.90
     ail_chord_ratio = 0.30 if combat else 0.25
@@ -415,7 +626,6 @@ def calculate_control_surfaces(wingspan, wing_area, root_chord, taper_ratio,
     ail_c_tip = root_chord * (1 - ail_eta_end * (1 - taper_ratio)) * ail_chord_ratio
     ail_area = (ail_c_root + ail_c_tip) / 2 * (ail_eta_end - ail_eta_start) * half_span * 2
 
-    # Flap: inner portion, ~30% chord
     flap_eta_start = 0.08
     flap_eta_end = 0.42 if combat else 0.50
     flap_chord_ratio = 0.30
@@ -535,7 +745,6 @@ def generate_conventional_fuselage_mesh_data(geom, n_circumferential=28):
     n_tail = 30
     sections = []
 
-    # Nose: aerodynamic ogive shape
     for i in range(n_nose + 1):
         eta = i / n_nose
         x_pos = eta * nose_len
@@ -544,13 +753,11 @@ def generate_conventional_fuselage_mesh_data(geom, n_circumferential=28):
         h = max_h * t
         sections.append(el_pts(x_pos, w, h))
 
-    # Cylindrical section: elliptical
     for i in range(n_cyl + 1):
         eta = i / n_cyl
         x_pos = nose_len + eta * cyl_len
         sections.append(el_pts(x_pos, max_w, max_h))
 
-    # Tail cone: smooth taper
     for i in range(n_tail + 1):
         eta = i / n_tail
         x_pos = nose_len + cyl_len + eta * tailcone_len
@@ -567,7 +774,6 @@ def generate_conventional_fuselage_mesh_data(geom, n_circumferential=28):
 def generate_tail_mesh_data(geom, airfoil_coords, n_sections=20, n_foil_points=38):
     result = {}
 
-    # Horizontal tail
     half_span = geom['htail_span'] / 2
     chord = geom['htail_chord']
     arm = geom.get('tail_le_spacing',geom['tail_x_pos']-geom['wing_x_pos'])
@@ -607,12 +813,11 @@ def generate_tail_mesh_data(geom, airfoil_coords, n_sections=20, n_foil_points=3
 
     result['horizontal'] = htail_sections
 
-    # Vertical tail
     vspan = geom['vtail_span']
     vchord = geom['vtail_chord']
-    varm = arm + 0.2
+    conventional = geom['tail_type'] == 'conventional' and not geom.get('tail_booms')
+    varm = arm + (chord - vchord if conventional else .2)
     symm_foil = np.zeros(len(foil_x))
-    # Use symmetric airfoil for vertical tail (half on each side)
     vert_sections = []
     for i in range(n_sections + 1):
         eta = i / n_sections
@@ -624,12 +829,10 @@ def generate_tail_mesh_data(geom, airfoil_coords, n_sections=20, n_foil_points=3
         yu = np.full_like(xu, 0.0)
         zu = np.full_like(xu, z_pos)
 
-        # For vertical tail, we need opposite side too
         xl = foil_x[lower_idx] * c + x_offset
         yl = np.full_like(xl, 0.0)
         zl = np.full_like(xl, z_pos)
 
-        # Right side (positive y)
         xr = foil_x[upper_idx] * c + x_offset
         yr = foil_y_upper[upper_idx] * c * 0.5
         zr = np.full_like(xr, z_pos)

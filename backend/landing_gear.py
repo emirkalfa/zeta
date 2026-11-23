@@ -16,7 +16,7 @@ def install_landing_mounts(body, data, gap, cuts):
         nose=rings[0,0,0]
         cg=(float(g.get('wing_ac_x',g['wing_x_pos']+.25*g['mac']))-.25*g['mac']+g['cg_position'])*1000
         front=nose+length*.18
-        if data['options'].get('cameraMount'):
+        if data['options'].get('cameraMount')==1:
             camera_back=nose+max(12,length*.08)+float(data['options'].get('cameraDepth',25))+2*gap
             front=max(front,camera_back+28)
         main=max(cg+max(35,g['mac']*150),front+60)

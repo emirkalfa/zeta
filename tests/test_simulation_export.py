@@ -38,7 +38,6 @@ def test_simulation_skin_unions_intersections_without_internal_faces():
     tri=np.frombuffer(content,offset=84,dtype=dtype)['vertices']
     volume=np.einsum('ij,ij->i',tri[:,0],np.cross(tri[:,1],tri[:,2])).sum()/6
     assert volume==pytest.approx(1500e-9,rel=1e-6)
-    # All triangles lie on the union boundary; no hidden overlap planes.
     for t in tri:
         assert any(np.allclose(t[:,axis],v) for axis,values in enumerate(([-.015,0],[0,.01],[-.01,0])) for v in values)
 
@@ -50,8 +49,6 @@ def stl_triangles(content):
 
 def test_simulation_frame_scale_and_normals_preserve_chirality():
     from backend.manufacturing import simulation_stl
-    # Unequal dimensions and an offset distinguish axes and detect unwanted
-    # centering; positive signed volume and normals detect reflection.
     shape=md.Manifold.cube([1200,100,300]).translate([-200,40,-80])
     data=simulation_stl({'simulation_outer':shape})
     mesh=stl_triangles(data);tri=mesh['vertices'];vertices=tri.reshape(-1,3)
@@ -72,8 +69,6 @@ def test_real_aircraft_simulation_matches_design_dimensions(coords,preset,combat
     source=simulation_envelope(rings)
     data=simulation_stl(rings);mesh=stl_triangles(data);tri=mesh['vertices']
     vertices=tri.reshape(-1,3);bounds=np.array(source.bounding_box())
-    # Metre-scale extents and positive volume rule out reflections, print
-    # rotations and thousandfold scaling errors; wheel contact is at Y=0.
     np.testing.assert_allclose(vertices.min(axis=0),[-bounds[3],0,-bounds[5]]*np.array([.001]*3),atol=.00003)
     np.testing.assert_allclose(vertices.max(axis=0),[-bounds[0],bounds[4]-bounds[1],-bounds[2]]*np.array([.001]*3),atol=.00003)
     volume=np.einsum('ij,ij->i',tri[:,0],np.cross(tri[:,1],tri[:,2])).sum()/6
@@ -102,7 +97,6 @@ def test_simulation_wheels_are_level_stable_and_only_in_simulation(coords,preset
     for w in wheels:
         assert w['center_mm'][1]-w['radius_mm']==pytest.approx(ground)
         assert (gear^airframe).volume()>1
-        # The attachment has real volume in the body and connects every wheel.
         probe=cylinder(2,4,np.array(w['mount_mm'])-[0,2,0],[0,1,0])
         assert (probe^airframe).volume()>1
     combined=simulation_envelope(rings)
@@ -112,7 +106,6 @@ def test_simulation_wheels_are_level_stable_and_only_in_simulation(coords,preset
     assert not manifest['landing_mounts']['printed_legs']
     stl=stl_triangles(simulation_stl(rings))['vertices']
     assert stl[:,:,1].min()==pytest.approx(0,abs=1e-6)
-    # Three contact patches lie on the same exported Z ground plane.
     for wheel in wheels:
         x,_,z=wheel['contact_mm']
         contact=stl.reshape(-1,3)
@@ -129,7 +122,6 @@ def test_motor_propeller_visuals_follow_mount_axis(axis):
     solid=propulsion([motor])[0];check(solid,'motor with propeller')
     probe=cylinder(10,20,face+axis*2,axis)
     assert (probe-solid).volume()<.01
-    # A point near the blade tip contains material, unlike an empty shaft.
     across=np.cross([0,1,0] if abs(axis[1])<.9 else [0,0,1],axis);across/=np.linalg.norm(across)
     tip=cylinder(.5,1,center+across*110-axis*.5,axis)
     assert (tip^solid).volume()>.5

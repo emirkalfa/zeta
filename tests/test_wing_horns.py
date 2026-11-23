@@ -23,7 +23,6 @@ def test_wing_horns_adjustment_holes_motion_and_stl(coords,preset,shape,position
             pose=rotate_about(moving,control['hinge_point_mm'],control['hinge_axis'],angle)
             for part in parts:
                 if part.name!=control['part']:assert (pose^part.solid).volume()<.1,(control['part'],part.name,angle)
-    # Representative serialised ZIPs cover both the ordinary and VTOL paths.
     if preset in ('atlas','vtol5'):
         archive=zipfile.ZipFile(io.BytesIO(package(parts,report,rings)))
         manifest=json.loads(archive.read('manifest.json'))

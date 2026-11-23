@@ -21,7 +21,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Windows konsolu Türkçe karakterleri kodlayamayınca print çökmesin
 for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         _stream.reconfigure(errors="replace")
@@ -58,7 +57,6 @@ def pyinstaller(onefile, icon=None):
         sys.executable, "-m", "PyInstaller", ROOT / "app.py",
         "--name", "ZETA", "--noconfirm", "--clean",
         "--onefile" if onefile else "--onedir",
-        # Konsol penceresi açılmaz; uygulama tarayıcı sekmesi kapanınca kendini kapatır
         "--windowed",
         "--distpath", DIST, "--workpath", BUILD / "pyinstaller", "--specpath", BUILD,
         "--add-data", f"{ROOT / 'templates'}{sep}templates",
@@ -105,7 +103,6 @@ def build_macos():
     with plist_path.open('wb') as f:plistlib.dump(info,f)
     arch = "arm64" if platform.machine() == "arm64" else "x64"
     out = RELEASE / f"ZETA-{VERSION}-macos-{arch}.zip"
-    # ditto, .app içindeki sembolik bağları ve izinleri korur
     run(["ditto", "-c", "-k", "--keepParent", DIST / "ZETA.app", out])
     return out
 
@@ -130,7 +127,6 @@ def build_linux():
         tool.chmod(tool.stat().st_mode | stat.S_IXUSR)
 
     out = RELEASE / f"ZETA-{VERSION}-linux-{arch}.AppImage"
-    # CI ortamlarında FUSE bulunmadığı için araç kendini açarak çalıştırılır
     env = {**os.environ, "ARCH": arch, "APPIMAGE_EXTRACT_AND_RUN": "1"}
     run([tool, "--no-appstream", appdir, out], env=env)
     return out

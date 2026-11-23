@@ -1,4 +1,3 @@
-/* Explain failed exports without bypassing the production checks. */
 function manufacturingAdvice(message) {
   const rules=[
     [/karbon boru.*kök pimi|karbon boru.*çok yakın/i,'Karbon boru hattı kök kilit pimine veya diğer boruya fazla yakın.',[

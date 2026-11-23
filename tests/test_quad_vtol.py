@@ -17,7 +17,23 @@ def test_five_motors_and_real_mounting_holes(quad_model):
     data,(parts,manifest,rings)=quad_model
     assert len(manifest['motors'])==5 and not manifest['vtol_joints']
     assert len(manifest['booms'])==2
+    assert all(b['purchased'] and b['length_mm']>0 and b['bolt_point_mm'] is None for b in manifest['booms'])
     named={p.name:p.solid for p in parts}
+    for boom in manifest['booms']:
+        socket=boom['tail_socket']
+        assert socket['engagement_mm']>=34 and socket['closed_end']
+        x,y,z=boom['center_mm']
+        r=boom['outer_diameter_mm']/2
+        tube=cylinder(r,boom['length_mm'],[x,y,z],[1,0,0])
+        carrier=named[socket['part']]
+        assert (carrier^tube).volume()<.1
+        stop=cylinder(r/2,1,[boom['end_x_mm']+.6,y,z],[1,0,0])
+        assert (carrier^stop).volume()>.9*stop.volume()
+        for advance in [3,12,24]:
+            point=[socket['start_x_mm']+advance,y,z]
+            ring=cylinder(r+.8,1,point,[1,0,0])-cylinder(r+.4,1,point,[1,0,0])
+            assert (carrier^ring).volume()>.95*ring.volume()
+
     lift=[m for m in manifest['motors'] if m.get('out_axis')]
     assert len(lift)==4 and all(m['out_axis']==[0,1,0] for m in lift)
     pusher=next(m for m in manifest['motors'] if m.get('axis'))
@@ -27,7 +43,17 @@ def test_five_motors_and_real_mounting_holes(quad_model):
     for m in lift:
         solid=named[m['parent']]
         side='right' if '_right_' in m['name'] else 'left'
-        assert (solid^named['boom_'+side]).volume()<.1
+        boom=next(b for b in manifest['booms'] if b['part']=='boom_'+side)
+        tube=cylinder(boom['outer_diameter_mm']/2,boom['length_mm'],boom['center_mm'],[1,0,0])
+        assert (solid^tube).volume()<.1
+        if m['name'].endswith('_rear'):
+            lower=named[m['parent']+'_lower']
+            assert (lower^tube).volume()<.1
+            assert (solid^lower).volume()<.1
+            assert len(m['tube_clamp_bolt_points_mm'])==4
+            for point in m['tube_clamp_bolt_points_mm']:
+                probe=cylinder(1.4,60,np.asarray(point)-[0,40,0],[0,1,0])
+                assert ((solid+lower)^probe).volume()<.1
         for point in m['hole_points_mm']:
             assert (solid^cylinder(1.4,16,np.asarray(point)-[0,15,0],[0,1,0])).volume()<.1
         if m['clamp_bolt_points_mm']:
@@ -42,6 +68,7 @@ def test_quad_zip_is_watertight_and_fits_printer(quad_model):
     archive=zipfile.ZipFile(io.BytesIO(package(parts,manifest,rings)))
     for side in ['right','left']:
         assert any(n.startswith('vtol5_'+side+'_rail') for n in archive.namelist())
+    assert not any(n.startswith('boom_') and n.endswith('.stl') for n in archive.namelist())
     for name in archive.namelist():
         if name.endswith('.stl'):assert_stl(archive.read(name))
 
