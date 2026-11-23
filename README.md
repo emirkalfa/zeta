@@ -36,17 +36,27 @@ Masaüstü uygulaması Türkçe ve İngilizce arayüz ile açık ve koyu tema su
 
 Dikdörtgen, konik ve düz firar kenarlı kanat seçenekleri bulunur. Kanat kökü, motor bağlantıları ve üretim parçaları seçilen modele göre yeniden oluşturulur. Sabit gövde kısıtları ilgili model ailesinde korunur.
 
-## Goliath gimbal burnu
+## VTOL modelleri
+
+| Tria VTOL · 3 motor | Penta VTOL · 5 motor |
+| --- | --- |
+| ![Tria VTOL, iki döner ön motor, dikey arka motor ve tek karbon kuyruk borusu](docs/images/zeta-3.5.118-tria.png) | ![Penta VTOL, dört kaldırma motoru, arka itici motor ve çift kuyruk bomu](docs/images/zeta-3.5.118-penta.png) |
+
+## Burun modelleri
+
+| Standart burun | Sabit kamera burnu | Gimbal burnu |
+| --- | --- | --- |
+| ![Goliath standart oval burun ve havalandırma ızgarası](docs/images/zeta-3.5.118-vent.png) | ![Goliath burnunda merkezde lens açıklığı ve yan montaj delikleri](docs/images/zeta-3.5.118-lens.png) | ![Goliath’ın kısa, oval gimbal burnu ve ızgaralı VTX kapağı](docs/images/zeta-3.5.118-gimbal.png) |
+
+### Goliath gimbal montajı
 
 **Gövde ayarları → Burun kamerası → Kamera yuvası** altında **Gimbal burnu ve VTX kapağı** seçeneğini aç. Burun, Goliath gövdesinin kesitlerinden üretilir ve iki M2 vidayla gövdeye bağlanır.
 
-| Üst kapak ve ızgara | Alt kamera açıklığı |
-| --- | --- |
-| ![Goliath’ın kısa, oval burun ucu ile sökülebilir kapaktaki yedi açık havalandırma yarığı](docs/images/goliath-3.5.118-grille.png) | ![Önde kavisli bir dudakla başlayan ve gövde bağlantısından önce kapanan alt açıklık](docs/images/goliath-3.5.118-opening.png) |
-
 Kamera, alt açıklığın üzerindeki iç montaj plakasına takılır. VTX tepsisi üst kapağın altında yer alır ve kapakla birlikte çıkar. Burun kabuğu, ızgaralı kapak, kamera montaj plakası ve VTX tepsisi ayrı STL parçalarıdır.
 
-![Kablo geçişli gimbal montaj plakası ve bağ yuvalı VTX tepsisi](docs/images/goliath-3.5.118-mounts.png)
+| Alt kamera açıklığı | Montaj parçaları |
+| --- | --- |
+| ![Kavisli ön dudağın arkasından açılan ve gövde bağlantısından önce kapanan kamera açıklığı](docs/images/goliath-3.5.118-opening.png) | ![Kablo geçişli gimbal montaj plakası ve bağ yuvalı VTX tepsisi](docs/images/goliath-3.5.118-mounts.png) |
 
 ## Tasarımdan montaja
 
@@ -59,8 +69,6 @@ Tria'nın ön motor mekanizmalarında servo bölmesi ve ayrı servis kapağı bu
 ### İki ayrı yerden servis yap
 
 Gövdenin üstünde, aralarında sabit köprü bulunan iki bağımsız servis kapağı vardır. Kapaklar seçilen montaja göre geçme tırnaklarla ya da vidalarla sabitlenir. **Servis kapakları** bölümünden ön ve arka servis kapakları ile burun kapağı ayrı gizlenerek iç bölmeler incelenebilir. Kapaklar STL paketinde ayrı parçalar olarak bulunur.
-
-![Tria VTOL servis kapağı yerleşimi, ZETA 3.5.29](docs/tria-service-hatches-3.5.29.png)
 
 ### Kumanda yüzeylerini ayrı üret
 
@@ -145,6 +153,6 @@ Paketler `dist/release/` klasörüne yazılır. Paketleyici çalıştığı işl
 
 ## Commit özeti
 
-Bu çalışma GitHub’a **2 commit** ile aktarılmıştır. İlk commit uygulama değişikliklerini, ikinci commit README ve detay görsellerini içerir. Bu güncelleme dahil dalın toplam geçmişi **157 commit** içerir. [Dalın commit geçmişi](https://github.com/emirkalfa/zeta/commits/codex/fuselage-model-library/)
+Bu çalışma **3 commit** içerir. Commit’ler uygulama, README ve model görselleri güncellemelerini kapsar. Bu güncelleme dahil dalın toplam geçmişi **158 commit** içerir. [Dalın commit geçmişi](https://github.com/emirkalfa/zeta/commits/codex/fuselage-model-library/)
 
 [Sürüm geçmişi](CHANGELOG.md) · [MIT lisansı](LICENSE)
